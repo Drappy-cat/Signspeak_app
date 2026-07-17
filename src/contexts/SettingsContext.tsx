@@ -7,6 +7,7 @@ export interface Settings {
   fontSize: FontSizeKey;
   language: string;
   vibrate: boolean;
+  appLang: 'id' | 'en';
 }
 
 interface SettingsContextType {
@@ -20,9 +21,10 @@ const defaultSettings: Settings = {
   fontSize: 'normal',
   language: 'id',
   vibrate: true,
+  appLang: 'id',
 };
 
-const SETTINGS_STORAGE_KEY = '@signspeak/settings';
+const SETTINGS_STORAGE_KEY = '@lentera/settings';
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 

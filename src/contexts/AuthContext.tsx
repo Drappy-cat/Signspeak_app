@@ -16,7 +16,7 @@ interface AuthContextType {
   role: Role;
   isReady: boolean;
   hasOnboarded: boolean;
-  login: (email: string, password?: string, classCode?: string) => Promise<void>;
+  login: (email: string, password?: string, classCode?: string, targetRole?: Role) => Promise<void>;
   logout: () => Promise<void>;
   setRole: (role: Role) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -24,8 +24,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const USER_STORAGE_KEY = '@signspeak/user';
-const ONBOARDING_STORAGE_KEY = '@signspeak/onboarded';
+const USER_STORAGE_KEY = '@lentera/user';
+const ONBOARDING_STORAGE_KEY = '@lentera/onboarded';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -58,14 +58,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (email: string, password?: string, classCode?: string) => {
+  const login = async (email: string, password?: string, classCode?: string, targetRole?: Role) => {
+    const activeRole = targetRole || role;
+    if (targetRole) {
+      setRoleState(targetRole);
+    }
     // Mock login functionality
     const mockUser: User = {
       email,
-      name: role === 'student' ? 'Budi Santoso' : 'Bu Sari Dewi',
-      role: role,
+      name: activeRole === 'student' ? 'Budi Santoso' : 'Bu Sari Dewi',
+      role: activeRole,
       school: 'SMAN 1 Surabaya',
-      className: role === 'student' ? 'XII IPA 3' : undefined,
+      className: activeRole === 'student' ? 'XII IPA 3' : undefined,
     };
 
     try {

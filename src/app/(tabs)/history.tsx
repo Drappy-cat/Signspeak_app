@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { Search, BookOpen, Clock } from 'lucide-react-native';
 import { useSettings } from '../../contexts/SettingsContext';
+import { DICT } from '../../constants/i18n';
 
 // Using mock data to match prototype
 const HISTORY_DATA = [
@@ -14,6 +15,9 @@ const HISTORY_DATA = [
 export default function HistoryScreen() {
   const { settings } = useSettings();
   const hc = settings.highContrast;
+  const appLang = settings.appLang || 'id';
+  const d = DICT[appLang];
+
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
@@ -31,16 +35,25 @@ export default function HistoryScreen() {
   const dividerColor = hc ? '#334155' : '#f1f5f9';
   const linkColor = hc ? '#60a5fa' : '#1e40af';
 
+  const headerTitle = appLang === 'en' ? 'Transcript History' : 'Riwayat Transkrip';
+  const searchPlaceholder = appLang === 'en' ? 'Search subjects or keywords...' : 'Cari mata pelajaran atau kata kunci...';
+  const sectionHeader = appLang === 'en' ? 'This Week' : 'Minggu Ini';
+  const completedLabel = appLang === 'en' ? 'Completed' : 'Selesai';
+  const wordsLabel = appLang === 'en' ? 'words' : 'kata';
+  const openLabel = appLang === 'en' ? 'Open →' : 'Buka →';
+
+  const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
       {/* Header */}
       <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 }}>
-        <Text style={{ fontSize: 20, fontWeight: '900', marginBottom: 12, color: textColor }}>Riwayat Transkrip</Text>
+        <Text style={{ fontSize: 20, fontWeight: '900', marginBottom: 12, color: textColor }}>{headerTitle}</Text>
         {/* Search bar */}
         <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }, searchStyle]}>
           <Search size={15} color={mutedColor} />
           <TextInput
-            placeholder="Cari mata pelajaran atau kata kunci..."
+            placeholder={searchPlaceholder}
             placeholderTextColor={mutedColor}
             style={{ flex: 1, fontSize: 14, fontWeight: '500', color: textColor, padding: 0 }}
           />
@@ -53,7 +66,7 @@ export default function HistoryScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', color: mutedColor, marginBottom: 2 }}>
-          Minggu Ini
+          {sectionHeader}
         </Text>
 
         {HISTORY_DATA.map(item => (
@@ -84,17 +97,17 @@ export default function HistoryScreen() {
             <View style={{
               marginHorizontal: 16, paddingTop: 10, paddingBottom: 12,
               borderTopWidth: 1, borderTopColor: dividerColor,
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              flexDirection: 'row', alignItems: 'center', justify: 'space-between',
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>{item.words.toLocaleString('id-ID')} kata</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>{item.words.toLocaleString('id-ID')} {wordsLabel}</Text>
                 <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: hc ? '#475569' : '#cbd5e1' }} />
                 <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: hc ? '#1e293b' : '#ecfdf5' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#94a3b8' : '#059669' }}>Selesai</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#94a3b8' : '#059669' }}>{completedLabel}</Text>
                 </View>
               </View>
               <TouchableOpacity activeOpacity={0.7}>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: linkColor }}>Buka →</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: linkColor }}>{openLabel}</Text>
               </TouchableOpacity>
             </View>
           </View>

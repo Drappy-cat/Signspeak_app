@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { Home, BookOpen, Settings, Mic, Radio } from 'lucide-react-native';
 import { Platform, Pressable } from 'react-native';
+import { DICT } from '../../constants/i18n';
 
 export default function TabLayout() {
   const { role } = useAuth();
@@ -10,6 +11,9 @@ export default function TabLayout() {
   const isTeacher = role === 'teacher';
   
   const hc = settings.highContrast;
+  const appLang = settings.appLang || 'id';
+  const d = DICT[appLang];
+
   const navBg = hc ? '#1e293b' : '#ffffff'; // bg-slate-800 : bg-white
   const border = hc ? '#334155' : '#e2e8f0'; // border-slate-700 : border-slate-200
   const activeColor = hc ? '#60a5fa' : '#1e3a8a'; // text-blue-400 : text-blue-900
@@ -46,21 +50,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Beranda',
+          title: d.home,
           tabBarIcon: ({ color }) => <Home size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="live"
         options={{
-          title: isTeacher ? 'Sesi' : 'Live',
+          title: isTeacher ? d.session : d.live,
           tabBarIcon: ({ color }) => isTeacher ? <Mic size={22} color={color} /> : <Radio size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'Riwayat',
+          title: d.history,
           tabBarIcon: ({ color }) => <BookOpen size={22} color={color} />,
           href: isTeacher ? null : '/(tabs)/history',
         }}
@@ -68,7 +72,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: isTeacher ? 'Pengaturan' : 'Atur',
+          title: isTeacher ? d.settingsTitle : d.settings,
           tabBarIcon: ({ color }) => <Settings size={22} color={color} />,
         }}
       />

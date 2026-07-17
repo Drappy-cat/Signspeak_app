@@ -36,7 +36,7 @@ export const initDb = async () => {
   }
 
   if (!db) {
-    db = await SQLite.openDatabaseAsync('signspeak.db');
+    db = await SQLite.openDatabaseAsync('lentera.db');
     await db.execAsync(`
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS sessions (

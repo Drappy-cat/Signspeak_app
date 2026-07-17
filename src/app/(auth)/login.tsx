@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Headphones } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { DICT } from '../../constants/i18n';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -14,6 +15,9 @@ export default function LoginScreen() {
   const { settings } = useSettings();
   
   const hc = settings.highContrast;
+  const appLang = settings.appLang || 'id';
+  const d = DICT[appLang];
+
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
@@ -41,15 +45,17 @@ export default function LoginScreen() {
     }, 800);
   };
 
+  const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1, backgroundColor: bgColor }}
     >
-      <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
         <View style={{ flex: 1, paddingHorizontal: 24 }}>
           {/* Logo area */}
-          <View style={{ alignItems: 'center', paddingTop: 64, paddingBottom: 24, gap: 12 }}>
+          <View style={{ alignItems: 'center', paddingTop: 40, paddingBottom: 20, gap: 12 }}>
             <View style={{
               width: 64, height: 64, borderRadius: 16,
               backgroundColor: '#1e3a8a',
@@ -60,9 +66,12 @@ export default function LoginScreen() {
               <Headphones size={32} color="#ffffff" />
             </View>
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 20, fontWeight: '900', color: '#1e3a8a' }}>SignSpeak</Text>
-              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
-                Masuk sebagai <Text style={{ fontWeight: '700' }}>{role === 'student' ? 'Siswa' : 'Guru'}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: '#1e3a8a', letterSpacing: 1 }}>LENTERA</Text>
+              <Text style={{ fontSize: 9, fontWeight: '800', color: mutedColor, textTransform: 'uppercase', tracking: 1.5, textAlign: 'center', marginTop: 2 }}>
+                Learning Text &{'\n'}Real-time Accessibility
+              </Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 12 }}>
+                {d.loginTitle} <Text style={{ fontWeight: '700' }}>{role === 'student' ? d.student : d.teacher}</Text>
               </Text>
             </View>
           </View>
@@ -71,7 +80,7 @@ export default function LoginScreen() {
           <View style={[{ padding: 20, gap: 16 }, cardStyle]}>
             {/* Email */}
             <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>Email</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.loginEmail}</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -87,7 +96,7 @@ export default function LoginScreen() {
             </View>
             {/* Password */}
             <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>Kata Sandi</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.loginPass}</Text>
               <TextInput
                 value={pass}
                 onChangeText={setPass}
@@ -114,16 +123,16 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>Masuk</Text>
+                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>{d.loginBtn}</Text>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Register link */}
           <View style={{ marginTop: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ fontSize: 14, color: mutedColor }}>Belum punya akun? </Text>
+            <Text style={{ fontSize: 14, color: mutedColor }}>{d.loginNoAccount} </Text>
             <TouchableOpacity activeOpacity={0.7} onPress={handleLogin}>
-              <Text style={{ color: '#1e40af', fontWeight: '800', fontSize: 14 }}>Daftar Gratis</Text>
+              <Text style={{ color: '#1e40af', fontWeight: '800', fontSize: 14 }}>{d.loginRegister}</Text>
             </TouchableOpacity>
           </View>
 
@@ -136,9 +145,9 @@ export default function LoginScreen() {
             }}>
               <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '900' }}>#</Text>
             </View>
-            <View>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#e2e8f0' : '#1e3a8a' }}>Bergabung via Kode Kelas</Text>
-              <Text style={{ fontSize: 11, color: mutedColor, marginTop: 2 }}>Masukkan kode dari guru tanpa perlu daftar</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#e2e8f0' : '#1e3a8a' }}>{d.loginJoinCode}</Text>
+              <Text style={{ fontSize: 11, color: mutedColor, marginTop: 2 }} numberOfLines={1}>{d.loginJoinCodeSub}</Text>
             </View>
           </View>
 

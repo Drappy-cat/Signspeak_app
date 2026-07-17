@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -8,6 +8,7 @@ import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe } f
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
+import { DICT } from '../../constants/i18n';
 
 // Demo data
 const HISTORY_DATA = [
@@ -37,24 +38,30 @@ export default function HomeScreen() {
   const router = useRouter();
   
   const hc = settings.highContrast;
+  const appLang = settings.appLang || 'id';
+  const d = DICT[appLang];
+
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textMain = hc ? "text-white" : "text-slate-900";
-  // Use inline styles for shadow to avoid NativeWind issues on web
+  
   const cardStyle = hc
     ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
     : { backgroundColor: '#ffffff', borderColor: '#f1f5f9', borderWidth: 1, borderRadius: 12, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 };
+  
   const muted = hc ? "text-slate-400" : "text-slate-500";
   const iconBg = hc ? "bg-blue-800" : "bg-blue-50";
   const iconColor = hc ? "#93c5fd" : "#1d4ed8";
   const linkColor = hc ? "text-blue-400" : "text-blue-800";
   const bellBg = hc ? "#1e293b" : "#ffffff";
 
+  const [selectedLang, setSelectedLang] = React.useState(settings.language || 'id');
+
   const StudentHome = () => (
     <View className="pb-10">
       {/* Header */}
       <View className="px-5 pt-3 pb-2 flex-row items-center justify-between">
         <View>
-          <Text className={`text-xs font-bold ${muted}`}>Selamat Pagi 👋</Text>
+          <Text className={`text-xs font-bold ${muted}`}>{d.welcome}</Text>
           <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>Budi Santoso</Text>
         </View>
         <TouchableOpacity
@@ -62,7 +69,7 @@ export default function HomeScreen() {
           style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: bellBg,
-            alignItems: 'center', justifyContent: 'center',
+            alignItems: 'center', justify: 'center',
             shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
           }}
@@ -88,16 +95,16 @@ export default function HomeScreen() {
             <View style={{ position: 'relative' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <PulseDot />
-                <Text style={{ color: '#fca5a5', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' }}>Sesi Aktif</Text>
+                <Text style={{ color: '#fca5a5', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' }}>{d.activeSession}</Text>
               </View>
               <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 18, lineHeight: 24 }}>Biologi — XII IPA 3</Text>
-              <Text style={{ color: '#93c5fd', fontSize: 14, marginTop: 4 }}>Bu Sari Dewi • Sedang berlangsung</Text>
+              <Text style={{ color: '#93c5fd', fontSize: 14, marginTop: 4 }}>Bu Sari Dewi • {appLang === 'en' ? 'In progress' : 'Sedang berlangsung'}</Text>
               <View style={{
                 marginTop: 16, alignSelf: 'flex-start',
                 flexDirection: 'row', alignItems: 'center', gap: 6,
                 backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12,
               }}>
-                <Text style={{ color: '#1e3a8a', fontSize: 14, fontWeight: '800' }}>Gabung Sekarang</Text>
+                <Text style={{ color: '#1e3a8a', fontSize: 14, fontWeight: '800' }}>{d.joinNow}</Text>
                 <ArrowRight size={14} color="#1e3a8a" />
               </View>
             </View>
@@ -108,23 +115,23 @@ export default function HomeScreen() {
       {/* Stats row */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16, flexDirection: 'row', gap: 12 }}>
         <View style={[{ flex: 1, padding: 14 }, cardStyle]}>
-          <Text className={`text-xs font-bold ${muted}`}>Total Sesi</Text>
+          <Text className={`text-xs font-bold ${muted}`}>{appLang === 'en' ? 'Total Sessions' : 'Total Sesi'}</Text>
           <Text style={{ fontSize: 24, fontWeight: '900', marginTop: 4, color: hc ? '#f8fafc' : '#0f172a' }}>24</Text>
-          <Text className={`text-xs ${muted} mt-0.5`}>bulan ini</Text>
+          <Text className={`text-xs ${muted} mt-0.5`}>{appLang === 'en' ? 'this month' : 'bulan ini'}</Text>
         </View>
         <View style={[{ flex: 1, padding: 14 }, cardStyle]}>
-          <Text className={`text-xs font-bold ${muted}`}>Kata Ditranskripsi</Text>
+          <Text className={`text-xs font-bold ${muted}`}>{appLang === 'en' ? 'Words Transcribed' : 'Kata Ditranskripsi'}</Text>
           <Text style={{ fontSize: 24, fontWeight: '900', marginTop: 4, color: hc ? '#f8fafc' : '#0f172a' }}>18.4K</Text>
-          <Text className={`text-xs ${muted} mt-0.5`}>total keseluruhan</Text>
+          <Text className={`text-xs ${muted} mt-0.5`}>{appLang === 'en' ? 'overall total' : 'total keseluruhan'}</Text>
         </View>
       </View>
 
       {/* Recent history */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ fontWeight: '800', fontSize: 15, color: hc ? '#f8fafc' : '#0f172a' }}>Riwayat Terbaru</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justify: 'space-between', marginBottom: 12 }}>
+          <Text style={{ fontWeight: '800', fontSize: 15, color: hc ? '#f8fafc' : '#0f172a' }}>{d.recentHistory}</Text>
           <TouchableOpacity onPress={() => router.push('/(tabs)/history')} activeOpacity={0.7}>
-            <Text className={`text-sm font-bold ${linkColor}`}>Lihat Semua</Text>
+            <Text className={`text-sm font-bold ${linkColor}`}>{d.seeAll}</Text>
           </TouchableOpacity>
         </View>
         <View style={{ gap: 10 }}>
@@ -149,20 +156,12 @@ export default function HomeScreen() {
     </View>
   );
 
-  const CLASSES = [
-    { name: "XII IPA 3", subject: "Biologi", students: 28, active: true },
-    { name: "XI IPA 1", subject: "Biologi", students: 30, active: false },
-    { name: "X IPS 2", subject: "Biologi Dasar", students: 32, active: false },
-  ];
-
-  const [selectedLang, setSelectedLang] = React.useState(settings.language || 'id');
-
   const TeacherHome = () => (
     <View className="pb-10">
       {/* Header */}
       <View className="px-5 pt-3 pb-2 flex-row items-center justify-between">
         <View>
-          <Text className={`text-xs font-bold ${muted}`}>Pengajar</Text>
+          <Text className={`text-xs font-bold ${muted}`}>{d.teacher}</Text>
           <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>Bu Sari Dewi</Text>
         </View>
         <TouchableOpacity
@@ -170,7 +169,7 @@ export default function HomeScreen() {
           style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: bellBg,
-            alignItems: 'center', justifyContent: 'center',
+            alignItems: 'center', justify: 'center',
             shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
           }}
@@ -184,7 +183,7 @@ export default function HomeScreen() {
         <View style={[{ padding: 14 }, cardStyle]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <Globe size={13} color={hc ? '#60a5fa' : '#1e40af'} />
-            <Text style={{ fontSize: 12, fontWeight: '800', color: hc ? '#f8fafc' : '#0f172a' }}>Bahasa Transkripsi</Text>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: hc ? '#f8fafc' : '#0f172a' }}>{d.transcriptionLang}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
@@ -205,7 +204,7 @@ export default function HomeScreen() {
           </View>
           {selectedLang === 'mad' && (
             <Text style={{ fontSize: 10, color: hc ? '#f59e0b' : '#d97706', marginTop: 6, textAlign: 'center' }}>
-              ⚠️ Madura menggunakan engine Bahasa Indonesia
+              {appLang === 'en' ? '⚠️ Madurese uses Indonesian engine' : '⚠️ Madura menggunakan engine Bahasa Indonesia'}
             </Text>
           )}
         </View>
@@ -234,9 +233,9 @@ export default function HomeScreen() {
               <Mic size={28} color="#ffffff" />
             </View>
             <View style={{ flex: 1, position: 'relative' }}>
-              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 18 }}>Mulai Sesi Baru</Text>
+              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 18 }}>{d.startSession}</Text>
               <Text style={{ color: '#93c5fd', fontSize: 13, marginTop: 2 }}>
-                Transkripsi dalam Bahasa {LANGUAGE_LABELS[selectedLang]}
+                {appLang === 'en' ? 'Transcribe in ' : 'Transkripsi dalam Bahasa '} {LANGUAGE_LABELS[selectedLang]}
               </Text>
             </View>
           </LinearGradient>
@@ -245,7 +244,7 @@ export default function HomeScreen() {
 
       {/* Classes */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        <Text style={{ fontWeight: '800', fontSize: 15, marginBottom: 12, color: hc ? '#f8fafc' : '#0f172a' }}>Kelas Saya</Text>
+        <Text style={{ fontWeight: '800', fontSize: 15, marginBottom: 12, color: hc ? '#f8fafc' : '#0f172a' }}>{d.myClasses}</Text>
         <View style={{ gap: 10 }}>
           {[
             { name: "XII IPA 3", subject: "Biologi", students: 28, active: true },
@@ -262,7 +261,7 @@ export default function HomeScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{cls.name} — {cls.subject}</Text>
-                <Text className={`text-xs ${muted} mt-0.5`}>{cls.students} siswa terdaftar</Text>
+                <Text className={`text-xs ${muted} mt-0.5`}>{cls.students} {appLang === 'en' ? 'students registered' : 'siswa terdaftar'}</Text>
               </View>
               {cls.active && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: 4 }}>
@@ -278,7 +277,7 @@ export default function HomeScreen() {
 
       {/* Recent */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        <Text style={{ fontWeight: '800', fontSize: 15, marginBottom: 12, color: hc ? '#f8fafc' : '#0f172a' }}>Sesi Terbaru</Text>
+        <Text style={{ fontWeight: '800', fontSize: 15, marginBottom: 12, color: hc ? '#f8fafc' : '#0f172a' }}>{d.recentSessions}</Text>
         <View style={{ gap: 8 }}>
           {HISTORY_DATA.slice(0, 3).map(item => (
             <View key={item.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }, cardStyle]}>
@@ -293,7 +292,7 @@ export default function HomeScreen() {
                 <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{item.subject}</Text>
                 <Text className={`text-xs ${muted} mt-0.5`}>{item.date}</Text>
               </View>
-              <Text className={`text-xs font-bold ${linkColor}`}>{item.words.toLocaleString()} kata</Text>
+              <Text className={`text-xs font-bold ${linkColor}`}>{item.words.toLocaleString()} {appLang === 'en' ? 'words' : 'kata'}</Text>
             </View>
           ))}
         </View>
@@ -301,8 +300,10 @@ export default function HomeScreen() {
     </View>
   );
 
+  const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
       {/* Decorative ambient bg */}
       {Platform.OS === 'web' ? (
         <View style={{

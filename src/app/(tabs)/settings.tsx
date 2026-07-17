@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { useSettings } from '../../contexts/SettingsContext';
 import { FontSizeLabels, FontSizeKey, FontSizes } from '../../constants/theme';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
+import { DICT } from '../../constants/i18n';
 import { Type, Moon, Globe, Zap, User } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
@@ -48,6 +49,9 @@ export default function SettingsScreen() {
   const router = useRouter();
 
   const hc = settings.highContrast;
+  const appLang = settings.appLang || 'id';
+  const d = DICT[appLang];
+
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
@@ -71,12 +75,14 @@ export default function SettingsScreen() {
     router.replace('/(auth)/role-select');
   };
 
+  const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
       {/* Header */}
       <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
-        <Text style={{ fontSize: 20, fontWeight: '900', color: textColor }}>Aksesibilitas</Text>
-        <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>Sesuaikan tampilan sesuai kebutuhan Anda</Text>
+        <Text style={{ fontSize: 20, fontWeight: '900', color: textColor }}>{d.accessibility}</Text>
+        <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>{d.accSub}</Text>
       </View>
 
       <ScrollView
@@ -84,11 +90,51 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 12 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* App Language Selection */}
+        <View style={[{ padding: 16 }, cardStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Globe size={15} color={iconColor} />
+            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{d.appLanguage}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => updateSettings({ appLang: 'id' })}
+              style={[
+                { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+                appLang === 'id' ? activeBtnStyle : inactiveBtnStyle,
+              ]}
+            >
+              <Text style={{
+                fontSize: 12, fontWeight: '800',
+                color: appLang === 'id' ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+              }}>
+                Bahasa Indonesia
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => updateSettings({ appLang: 'en' })}
+              style={[
+                { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+                appLang === 'en' ? activeBtnStyle : inactiveBtnStyle,
+              ]}
+            >
+              <Text style={{
+                fontSize: 12, fontWeight: '800',
+                color: appLang === 'en' ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+              }}>
+                English
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Font size card */}
         <View style={[{ padding: 16 }, cardStyle]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Type size={15} color={iconColor} />
-            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Ukuran Teks Transkripsi</Text>
+            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{d.textSize}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {(Object.keys(FontSizeLabels) as FontSizeKey[]).map(s => (
@@ -111,7 +157,7 @@ export default function SettingsScreen() {
             ))}
           </View>
           <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: dividerColor }}>
-            <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 4 }}>Pratinjau:</Text>
+            <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 4 }}>{d.preview}</Text>
             <Text style={{ fontSize: FontSizes[settings.fontSize].transcript, fontWeight: '800', color: textColor }}>
               Teks Abc 123
             </Text>
@@ -120,21 +166,21 @@ export default function SettingsScreen() {
 
         {/* High contrast toggle */}
         <View style={[{ padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, cardStyle]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
             <Moon size={15} color={iconColor} />
-            <View>
-              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Mode Kontras Tinggi</Text>
-              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>Latar gelap untuk kenyamanan visual</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{d.highContrast}</Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>{d.highContrastSub}</Text>
             </View>
           </View>
           <CustomToggle val={hc} onChange={() => updateSettings({ highContrast: !hc })} hc={hc} />
         </View>
 
-        {/* Language */}
+        {/* Transcription Language */}
         <View style={[{ padding: 16 }, cardStyle]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Globe size={15} color={iconColor} />
-            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Bahasa Transkripsi</Text>
+            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{d.transcriptionLang}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {Object.keys(LANGUAGE_LABELS).map(l => (
@@ -160,11 +206,11 @@ export default function SettingsScreen() {
 
         {/* Vibrate toggle */}
         <View style={[{ padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, cardStyle]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
             <Zap size={15} color={iconColor} />
-            <View>
-              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Indikator Getar</Text>
-              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>Getar saat guru mulai berbicara</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{d.vibrate}</Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>{d.vibrateSub}</Text>
             </View>
           </View>
           <CustomToggle val={settings.vibrate} onChange={() => updateSettings({ vibrate: !settings.vibrate })} hc={hc} />
@@ -180,10 +226,10 @@ export default function SettingsScreen() {
             }}>
               <User size={22} color={iconColor} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={{ fontWeight: '800', fontSize: 15, color: textColor }}>{user?.name || 'Budi Santoso'}</Text>
               <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
-                {role === 'student' ? 'Siswa · XII IPA 3' : 'Guru'} · SMAN 1 Surabaya
+                {role === 'student' ? (appLang === 'en' ? 'Student · XII IPA 3' : 'Siswa · XII IPA 3') : (appLang === 'en' ? 'Teacher' : 'Guru')} · SMAN 1 Surabaya
               </Text>
             </View>
           </View>
@@ -196,7 +242,7 @@ export default function SettingsScreen() {
             }}
           >
             <Text style={{ fontSize: 14, fontWeight: '800', color: hc ? '#f87171' : '#dc2626' }}>
-              Keluar dari Akun
+              {d.logout}
             </Text>
           </TouchableOpacity>
         </View>

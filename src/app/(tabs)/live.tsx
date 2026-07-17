@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Mic, Square, Play, Users, Globe, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,6 +8,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { KEYWORDS, LANGUAGE_LABELS } from '../../constants/keywords';
 import { parseHighlights, formatDuration } from '../../utils/formatters';
 import { FontSizes } from '../../constants/theme';
+import { DICT } from '../../constants/i18n';
 
 // ── PulseDot ──────────────────────────────────────────────────────────────────
 function PulseDot({ color = 'bg-red-500' }: { color?: string }) {
@@ -63,28 +64,35 @@ function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
 
 // ── Highlighted Transcript Text ───────────────────────────────────────────────
 function HighlightText({
-  text, keywords, hc, fontSize,
+  text, keywords, hc, fontSize, isOld = false, customColor = null,
 }: {
-  text: string; keywords: string[]; hc: boolean; fontSize: any;
+  text: string; keywords: string[]; hc: boolean; fontSize: any; isOld?: boolean; customColor?: string | null;
 }) {
   const parts = parseHighlights(text, keywords);
+  const defaultTextColor = customColor || (hc ? '#f8fafc' : '#0f172a');
+  const textColorStr = isOld ? (hc ? '#475569' : '#94a3b8') : defaultTextColor;
+
   return (
-    <Text style={{ fontSize: fontSize.transcript, lineHeight: fontSize.lineHeight }}>
+    <Text style={{ fontSize: isOld ? fontSize.transcript * 0.85 : fontSize.transcript, lineHeight: isOld ? fontSize.lineHeight * 0.85 : fontSize.lineHeight }}>
       {parts.map((part, i) =>
         part.isKeyword ? (
           <Text
             key={i}
             style={{
               fontWeight: '800', fontStyle: 'italic',
-              backgroundColor: hc ? '#f59e0b' : '#fef3c7',
-              color: hc ? '#1c1917' : '#92400e',
+              backgroundColor: isOld 
+                ? (hc ? 'rgba(245,158,11,0.15)' : 'rgba(254,243,199,0.5)')
+                : (hc ? '#f59e0b' : '#fef3c7'),
+              color: isOld 
+                ? (hc ? '#94a3b8' : '#b45309')
+                : (hc ? '#1c1917' : '#92400e'),
               borderRadius: 3, paddingHorizontal: 2,
             }}
           >
             {part.text}
           </Text>
         ) : (
-          <Text key={i} style={{ color: hc ? '#f8fafc' : '#0f172a' }}>{part.text}</Text>
+          <Text key={i} style={{ color: textColorStr }}>{part.text}</Text>
         )
       )}
     </Text>
@@ -102,6 +110,9 @@ export default function LiveScreen() {
   const [paused, setPaused] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+
+  const appLang = settings.appLang || 'id';
+  const d = DICT[appLang];
 
   useEffect(() => {
     if (!session.isActive) {
@@ -163,6 +174,9 @@ export default function LiveScreen() {
     const isSpeaking = session.interimTranscript.length > 0;
     const hasContent = session.transcript.length > 0 || session.interimTranscript.length > 0;
 
+    // Split completed transcript into sentences to style older sentences differently
+    const sentences = session.transcript.split(/(?<=[.!?])\s+/).filter(Boolean);
+
     return (
       <View style={{ flex: 1, backgroundColor: bgColor }}>
         {/* Header */}
@@ -190,9 +204,9 @@ export default function LiveScreen() {
           <SpeakingBars active={isSpeaking && !paused} hc={hc} />
           <View>
             <Text style={{ fontSize: 12, fontWeight: '700', color: isSpeaking && !paused ? (hc ? '#34d399' : '#059669') : mutedColor }}>
-              {isSpeaking && !paused ? 'Sedang berbicara...' : paused ? '⏸ Dijeda' : 'Menunggu guru berbicara...'}
+              {isSpeaking && !paused ? (appLang === 'en' ? 'Speaking...' : 'Sedang berbicara...') : paused ? (appLang === 'en' ? '⏸ Paused' : '⏸ Dijeda') : (appLang === 'en' ? 'Waiting for teacher...' : 'Menunggu guru berbicara...')}
             </Text>
-            <Text style={{ fontSize: 10, color: mutedColor }}>Bu Sari Dewi • Guru</Text>
+            <Text style={{ fontSize: 10, color: mutedColor }}>Bu Sari Dewi • {appLang === 'en' ? 'Teacher' : 'Guru'}</Text>
           </View>
         </View>
 
@@ -209,42 +223,53 @@ export default function LiveScreen() {
                 <Mic size={24} color={hc ? '#60a5fa' : '#1d4ed8'} />
               </View>
               <Text style={{ fontSize: 15, fontWeight: '700', color: textColor, textAlign: 'center' }}>
-                Menunggu transkripsi...
+                {appLang === 'en' ? 'Waiting for transcription...' : 'Menunggu transkripsi...'}
               </Text>
               <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', marginTop: 6, lineHeight: 20 }}>
-                Teks guru akan muncul di sini{'\n'}secara otomatis saat mereka berbicara
+                {appLang === 'en' 
+                  ? "Teacher's speech will appear here\nautomatically in real-time" 
+                  : "Teks guru akan muncul di sini\nsecara otomatis saat mereka berbicara"}
               </Text>
             </View>
           ) : null}
 
-          {/* Final transcript */}
-          {session.transcript ? (
-            <HighlightText
-              text={session.transcript}
-              keywords={currentKeywords}
-              hc={hc}
-              fontSize={FontSizes[settings.fontSize]}
-            />
-          ) : null}
+          {/* Render sentences, dimming older ones like Lentera prototype */}
+          {sentences.map((sentence, idx) => {
+            const isLast = idx === sentences.length - 1;
+            return (
+              <View key={idx} style={{ marginBottom: 6 }}>
+                <HighlightText
+                  text={sentence}
+                  keywords={currentKeywords}
+                  hc={hc}
+                  fontSize={FontSizes[settings.fontSize]}
+                  isOld={!isLast}
+                />
+              </View>
+            );
+          })}
 
           {/* Interim (live typing indicator) */}
           {session.interimTranscript ? (
-            <Text style={{
-              fontSize: FontSizes[settings.fontSize].transcript,
-              lineHeight: FontSizes[settings.fontSize].lineHeight,
-              color: mutedColor,
-              fontStyle: 'italic',
-            }}>
-              {session.interimTranscript}
-              <Text style={{ opacity: 0.5 }}>▌</Text>
-            </Text>
+            <View style={{ marginTop: 4 }}>
+              <Text style={{
+                fontSize: FontSizes[settings.fontSize].transcript,
+                lineHeight: FontSizes[settings.fontSize].lineHeight,
+                color: hc ? '#cbd5e1' : '#475569',
+                fontStyle: 'italic',
+                fontWeight: '700',
+              }}>
+                {session.interimTranscript}
+                <Text style={{ color: hc ? '#38bdf8' : '#1d4ed8', fontWeight: '900' }}>▌</Text>
+              </Text>
+            </View>
           ) : null}
         </ScrollView>
 
         {/* Controls bar */}
         <View style={[{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, ctrlStyle]}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>
-            Ukuran: <Text style={{ color: textColor }}>{settings.fontSize === 'normal' ? 'Normal' : settings.fontSize === 'large' ? 'Besar' : 'X. Besar'}</Text>
+            {appLang === 'en' ? 'Size: ' : 'Ukuran: '}<Text style={{ color: textColor }}>{settings.fontSize === 'normal' ? (appLang === 'en' ? 'Normal' : 'Normal') : settings.fontSize === 'large' ? (appLang === 'en' ? 'Large' : 'Besar') : (appLang === 'en' ? 'X. Large' : 'X. Besar')}</Text>
           </Text>
           <TouchableOpacity
             onPress={() => setPaused(!paused)}
@@ -258,7 +283,7 @@ export default function LiveScreen() {
               : <Square size={13} color={hc ? "#e2e8f0" : "#334155"} fill={hc ? "#e2e8f0" : "#334155"} />
             }
             <Text style={{ fontSize: 13, fontWeight: '800', color: paused ? 'white' : hc ? '#e2e8f0' : '#334155' }}>
-              {paused ? 'Lanjut' : 'Jeda'}
+              {paused ? (appLang === 'en' ? 'Resume' : 'Lanjut') : (appLang === 'en' ? 'Pause' : 'Jeda')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -275,7 +300,7 @@ export default function LiveScreen() {
     >
       {/* Header */}
       <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-        <Text style={{ fontSize: 20, fontWeight: '900', color: textColor }}>Kelola Sesi</Text>
+        <Text style={{ fontSize: 20, fontWeight: '900', color: textColor }}>{d.manageSession}</Text>
         <Text style={{ fontSize: 14, color: mutedColor, marginTop: 2 }}>{session.subject} — {session.classCode}</Text>
       </View>
 
@@ -305,7 +330,7 @@ export default function LiveScreen() {
               : <Mic size={32} color="white" />
             }
             <Text style={{ color: 'white', fontSize: 11, fontWeight: '900', marginTop: 4 }}>
-              {isRecording ? 'STOP' : 'MULAI'}
+              {isRecording ? 'STOP' : (appLang === 'en' ? 'START' : 'MULAI')}
             </Text>
           </TouchableOpacity>
         </RNAnimated.View>
@@ -316,11 +341,15 @@ export default function LiveScreen() {
               <PulseDot color="bg-red-500" />
               <Text style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: 22, color: textColor }}>{formatDuration(elapsed)}</Text>
             </View>
-            <Text style={{ fontSize: 12, color: mutedColor }}>Sesi sedang berjalan · Merekam audio</Text>
+            <Text style={{ fontSize: 12, color: mutedColor }}>
+              {appLang === 'en' ? 'Session in progress · Recording' : 'Sesi sedang berjalan · Merekam audio'}
+            </Text>
           </View>
         ) : (
           <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', maxWidth: 200, lineHeight: 20 }}>
-            Tekan MULAI untuk merekam{'\n'}dan mentranskripsi suara Anda
+            {appLang === 'en' 
+              ? 'Press START to record\nand transcribe your voice' 
+              : 'Tekan MULAI untuk merekam\ndan mentranskripsi suara Anda'}
           </Text>
         )}
       </View>
@@ -330,7 +359,7 @@ export default function LiveScreen() {
         <View style={[{ padding: 14 }, cardStyle]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <Globe size={14} color={hc ? '#60a5fa' : '#1e40af'} />
-            <Text style={{ fontSize: 13, fontWeight: '800', color: textColor }}>Bahasa Transkripsi</Text>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: textColor }}>{d.transcriptionLang}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {Object.entries(LANGUAGE_LABELS).map(([code, label]) => {
@@ -360,7 +389,9 @@ export default function LiveScreen() {
             })}
           </View>
           <Text style={{ fontSize: 11, color: mutedColor, marginTop: 8, textAlign: 'center' }}>
-            {session.language === 'mad' ? '⚠️ Madura menggunakan engine Indonesia' : `Menggunakan engine ${LANGUAGE_LABELS[session.language]}`}
+            {session.language === 'mad' 
+              ? (appLang === 'en' ? '⚠️ Madurese uses Indonesian engine' : '⚠️ Madura menggunakan engine Indonesia') 
+              : `${appLang === 'en' ? 'Using engine' : 'Menggunakan engine'} ${LANGUAGE_LABELS[session.language]}`}
           </Text>
         </View>
       </View>
@@ -368,13 +399,17 @@ export default function LiveScreen() {
       <View style={{ paddingHorizontal: 20, gap: 12 }}>
         {/* Participants stat */}
         <View style={[{ padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, cardStyle]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
             <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: hc ? '#1e3a8a' : '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
               <Users size={17} color={hc ? "#93c5fd" : "#1d4ed8"} />
             </View>
-            <View>
-              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Peserta Bergabung</Text>
-              <Text style={{ fontSize: 12, color: mutedColor }}>dari 28 siswa terdaftar</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>
+                {appLang === 'en' ? 'Participants Joined' : 'Peserta Bergabung'}
+              </Text>
+              <Text style={{ fontSize: 12, color: mutedColor }}>
+                {appLang === 'en' ? 'out of 28 registered students' : 'dari 28 siswa terdaftar'}
+              </Text>
             </View>
           </View>
           <Text style={{ fontSize: 30, fontWeight: '900', color: hc ? '#60a5fa' : '#1e3a8a' }}>8</Text>
@@ -382,7 +417,9 @@ export default function LiveScreen() {
 
         {/* Join code */}
         <View style={[{ padding: 16 }, cardStyle]}>
-          <Text style={{ fontWeight: '800', fontSize: 14, marginBottom: 12, color: textColor }}>Kode Bergabung</Text>
+          <Text style={{ fontWeight: '800', fontSize: 14, marginBottom: 12, color: textColor }}>
+            {appLang === 'en' ? 'Join Code' : 'Kode Bergabung'}
+          </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
             <View style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: hc ? '#334155' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
               {/* Fake QR */}
@@ -394,14 +431,18 @@ export default function LiveScreen() {
             </View>
             <View>
               <Text style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: 22, letterSpacing: 4, color: textColor }}>BIO-4821</Text>
-              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 4 }}>Bagikan ke siswa untuk bergabung</Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 4 }}>
+                {appLang === 'en' ? 'Share with students to join' : 'Bagikan ke siswa untuk bergabung'}
+              </Text>
             </View>
           </View>
         </View>
 
         {/* Siswa Online chips */}
         <View style={[{ padding: 16 }, cardStyle]}>
-          <Text style={{ fontWeight: '800', fontSize: 14, marginBottom: 10, color: textColor }}>Siswa Online</Text>
+          <Text style={{ fontWeight: '800', fontSize: 14, marginBottom: 10, color: textColor }}>
+            {appLang === 'en' ? 'Online Students' : 'Siswa Online'}
+          </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {['Andi', 'Siti', 'Budi', 'Rina', 'Doni', 'Maya', 'Heri', 'Lina'].map((name, i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: hc ? '#334155' : '#eff6ff' }}>
@@ -418,15 +459,19 @@ export default function LiveScreen() {
             onPress={() => { endSession(); router.replace('/(tabs)/home'); }}
             style={{ marginTop: 4, paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: hc ? '#7f1d1d' : '#fecaca', backgroundColor: hc ? 'rgba(127,29,29,0.2)' : '#fef2f2' }}
           >
-            <Text style={{ fontWeight: '800', fontSize: 14, color: hc ? '#f87171' : '#dc2626' }}>Akhiri Sesi</Text>
+            <Text style={{ fontWeight: '800', fontSize: 14, color: hc ? '#f87171' : '#dc2626' }}>
+              {appLang === 'en' ? 'End Session' : 'Akhiri Sesi'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
     </ScrollView>
   );
 
+  const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
       {role === 'teacher' ? <TeacherLive /> : <StudentLive />}
     </SafeAreaView>
   );

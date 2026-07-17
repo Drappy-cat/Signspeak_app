@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
 import { Platform } from 'react-native';
 import { DEMO_SENTENCES } from '../constants/keywords';
+import { translateToMadurese } from '../utils/translator';
 
 
 // ─── Language Mapping ─────────────────────────────────────────────────────────
@@ -183,12 +184,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                 : finalText;
           }
 
-          setSession(prev => ({
-            ...prev,
-            transcript: accumulatedTranscriptRef.current,
-            interimTranscript: interimText,
-            errorMessage: null,
-          }));
+          setSession(prev => {
+            const isMad = prev.language === 'mad';
+            const finalTranscript = isMad 
+              ? translateToMadurese(accumulatedTranscriptRef.current) 
+              : accumulatedTranscriptRef.current;
+            const finalInterim = isMad 
+              ? translateToMadurese(interimText) 
+              : interimText;
+
+            return {
+              ...prev,
+              transcript: finalTranscript,
+              interimTranscript: finalInterim,
+              errorMessage: null,
+            };
+          });
 
           resetAutoPauseTimer();
         },
@@ -310,11 +321,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         baseText = baseText ? baseText + ' ' + nextSentence : nextSentence;
         accumulatedTranscriptRef.current = baseText;
 
-        setSession(prev => ({
-          ...prev,
-          transcript: baseText,
-          interimTranscript: '',
-        }));
+        setSession(prev => {
+          const isMad = prev.language === 'mad';
+          const finalTranscript = isMad 
+            ? translateToMadurese(baseText) 
+            : baseText;
+
+          return {
+            ...prev,
+            transcript: finalTranscript,
+            interimTranscript: '',
+          };
+        });
 
         sentenceIndex++;
         resetAutoPauseTimer();
@@ -378,7 +396,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     if (session.isActive && accumulatedTranscriptRef.current.length > 0 && role === 'teacher') {
       const duration = Math.floor((Date.now() - (session.startTime || Date.now())) / 1000);
-      const text = accumulatedTranscriptRef.current;
+      const text = session.language === 'mad'
+        ? translateToMadurese(accumulatedTranscriptRef.current)
+        : accumulatedTranscriptRef.current;
       const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
 
       try {
@@ -445,12 +465,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             : finalStr.trim();
       }
 
-      setSession(prev => ({
-        ...prev,
-        transcript: accumulatedTranscriptRef.current,
-        interimTranscript: interimStr.trim(),
-        errorMessage: null,
-      }));
+      setSession(prev => {
+        const isMad = prev.language === 'mad';
+        const finalTranscript = isMad 
+          ? translateToMadurese(accumulatedTranscriptRef.current) 
+          : accumulatedTranscriptRef.current;
+        const finalInterim = isMad 
+          ? translateToMadurese(interimStr.trim()) 
+          : interimStr.trim();
+
+        return {
+          ...prev,
+          transcript: finalTranscript,
+          interimTranscript: finalInterim,
+          errorMessage: null,
+        };
+      });
 
       resetAutoPauseTimer();
     });

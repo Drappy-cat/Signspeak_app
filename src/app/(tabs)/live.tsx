@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -110,8 +111,41 @@ export default function LiveScreen() {
 
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [studentQuestion, setStudentQuestion] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
   const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+
+  const handleSpeakQuestion = async () => {
+    if (!studentQuestion.trim()) return;
+
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (_) {}
+
+    if (Platform.OS === 'web') {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(studentQuestion);
+        utterance.lang = appLang === 'en' ? 'en-US' : 'id-ID';
+        window.speechSynthesis.speak(utterance);
+      } else {
+        Alert.alert('Error', 'Browser tidak mendukung Text-to-Speech.');
+      }
+    } else {
+      try {
+        const Speech = require('expo-speech');
+        await Speech.speak(studentQuestion, {
+          language: appLang === 'en' ? 'en-US' : 'id-ID',
+          pitch: 1.0,
+          rate: 0.9,
+        });
+      } catch (e) {
+        console.error('[TTS] Native speech error:', e);
+        Alert.alert('Error', 'Gagal memanggil mesin Text-to-Speech HP.');
+      }
+    }
+
+    setStudentQuestion('');
+  };
 
   const appLang = settings.appLang || 'id';
   const d = DICT[appLang];
@@ -335,6 +369,54 @@ export default function LiveScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Fitur Tanya Balik (Text-to-Speech) */}
+        <View style={{ 
+          paddingHorizontal: 16, 
+          paddingVertical: 12, 
+          borderTopWidth: 1, 
+          borderTopColor: hc ? '#334155' : '#e2e8f0', 
+          backgroundColor: hc ? '#1e293b' : '#f8fafc',
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          gap: 10 
+        }}>
+          <TextInput
+            placeholder={appLang === 'en' ? 'Type a question to speak out loud...' : 'Ketik untuk menyuarakan pertanyaan...'}
+            placeholderTextColor={mutedColor}
+            value={studentQuestion}
+            onChangeText={setStudentQuestion}
+            style={{
+              flex: 1,
+              backgroundColor: hc ? '#0f172a' : '#ffffff',
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              fontSize: 14,
+              color: textColor,
+              borderWidth: 1,
+              borderColor: hc ? '#334155' : '#cbd5e1',
+            }}
+          />
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleSpeakQuestion}
+            style={{
+              backgroundColor: '#1e3a8a',
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Volume2 size={16} color="#ffffff" />
+            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+              {appLang === 'en' ? 'Speak' : 'Tanya'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -365,7 +447,13 @@ export default function LiveScreen() {
         <RNAnimated.View style={{ transform: [{ scale: pulseAnim }] }}>
           <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => { toggleRecording(); if (!isRecording) setElapsed(0); }}
+            onPress={async () => {
+              try {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              } catch (_) {}
+              toggleRecording();
+              if (!isRecording) setElapsed(0);
+            }}
             style={{
               width: 112, height: 112, borderRadius: 56, alignItems: 'center', justifyContent: 'center',
               backgroundColor: isRecording ? '#ef4444' : '#1e3a8a',

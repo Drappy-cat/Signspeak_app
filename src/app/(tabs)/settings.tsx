@@ -6,7 +6,7 @@ import { LANGUAGE_LABELS } from '../../constants/keywords';
 import { Type, Moon, Globe, Zap, User } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import { Animated, Easing, Platform } from 'react-native';
+import { Animated, Easing } from 'react-native';
 
 function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => void; hc: boolean }) {
   const anim = React.useRef(new Animated.Value(val ? 22 : 2)).current;
@@ -24,9 +24,20 @@ function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => voi
     <TouchableOpacity
       activeOpacity={1}
       onPress={onChange}
-      className={`w-12 h-7 rounded-full justify-center ${val ? "bg-blue-700" : hc ? "bg-slate-600" : "bg-slate-300"}`}
+      style={{
+        width: 48, height: 28, borderRadius: 14, justifyContent: 'center',
+        backgroundColor: val ? '#1d4ed8' : hc ? '#475569' : '#cbd5e1',
+      }}
     >
-      <Animated.View style={{ transform: [{ translateX: anim }] }} className="w-6 h-6 rounded-full bg-white shadow-sm" />
+      <Animated.View
+        style={{
+          transform: [{ translateX: anim }],
+          width: 24, height: 24, borderRadius: 12,
+          backgroundColor: '#ffffff',
+          shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.15, shadowRadius: 3, elevation: 2,
+        }}
+      />
     </TouchableOpacity>
   );
 }
@@ -38,15 +49,22 @@ export default function SettingsScreen() {
 
   const hc = settings.highContrast;
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
-  const textMain = hc ? "text-white" : "text-slate-900";
-  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100 shadow-sm shadow-slate-200/50";
-  const muted = hc ? "text-slate-400" : "text-slate-500";
-  const activeBtn = hc ? "bg-blue-700" : "bg-blue-900";
-  const activeBtnText = "text-white";
-  const inactiveBtn = hc ? "bg-slate-700" : "bg-slate-100";
-  const inactiveBtnText = hc ? "text-slate-300" : "text-slate-600";
-  const iconColor = hc ? "#60a5fa" : "#1e40af"; // text-blue-400 : text-blue-800
-  const divider = hc ? "border-slate-700" : "border-slate-100";
+  const textColor = hc ? '#f8fafc' : '#0f172a';
+  const mutedColor = hc ? '#94a3b8' : '#64748b';
+  const iconColor = hc ? "#60a5fa" : "#1e40af";
+  const dividerColor = hc ? '#334155' : '#f1f5f9';
+
+  const cardStyle = hc
+    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
+    : { backgroundColor: '#ffffff', borderColor: '#f1f5f9', borderWidth: 1, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 };
+
+  const activeBtnStyle = hc
+    ? { backgroundColor: '#1d4ed8' }
+    : { backgroundColor: '#1e3a8a' };
+
+  const inactiveBtnStyle = hc
+    ? { backgroundColor: '#334155' }
+    : { backgroundColor: '#f1f5f9' };
 
   const handleLogout = async () => {
     await logout();
@@ -55,67 +73,84 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
-      <View className="px-5 pt-3 pb-2">
-        <Text className={`text-xl font-black ${textMain}`}>Aksesibilitas</Text>
-        <Text className={`text-xs ${muted} mt-0.5`}>Sesuaikan tampilan sesuai kebutuhan Anda</Text>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
+        <Text style={{ fontSize: 20, fontWeight: '900', color: textColor }}>Aksesibilitas</Text>
+        <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>Sesuaikan tampilan sesuai kebutuhan Anda</Text>
       </View>
 
-      <ScrollView className="flex-1 px-5 pt-2 pb-10" contentContainerStyle={{ gap: 12, flexGrow: 1 }}>
-        {/* Font size */}
-        <View className={`rounded-xl border p-4 ${card}`}>
-          <View className="flex-row items-center gap-2 mb-3">
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 12 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Font size card */}
+        <View style={[{ padding: 16 }, cardStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Type size={15} color={iconColor} />
-            <Text className={`font-extrabold text-sm ${textMain}`}>Ukuran Teks Transkripsi</Text>
+            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Ukuran Teks Transkripsi</Text>
           </View>
-          <View className="flex-row gap-2">
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             {(Object.keys(FontSizeLabels) as FontSizeKey[]).map(s => (
               <TouchableOpacity
                 key={s}
                 activeOpacity={0.7}
                 onPress={() => updateSettings({ fontSize: s })}
-                className={`flex-1 py-2.5 rounded-xl items-center ${settings.fontSize === s ? activeBtn : inactiveBtn}`}
+                style={[
+                  { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+                  settings.fontSize === s ? activeBtnStyle : inactiveBtnStyle,
+                ]}
               >
-                <Text className={`text-xs font-extrabold ${settings.fontSize === s ? activeBtnText : inactiveBtnText}`}>
+                <Text style={{
+                  fontSize: 12, fontWeight: '800',
+                  color: settings.fontSize === s ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+                }}>
                   {FontSizeLabels[s]}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-          <View className={`mt-3 pt-3 border-t ${divider}`}>
-            <Text className={`text-xs ${muted} mb-1`}>Pratinjau:</Text>
-            <Text style={{ fontSize: FontSizes[settings.fontSize].transcript }} className={`font-extrabold ${textMain}`}>
+          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: dividerColor }}>
+            <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 4 }}>Pratinjau:</Text>
+            <Text style={{ fontSize: FontSizes[settings.fontSize].transcript, fontWeight: '800', color: textColor }}>
               Teks Abc 123
             </Text>
           </View>
         </View>
 
-        {/* High contrast */}
-        <View className={`rounded-xl border p-4 flex-row items-center justify-between ${card}`}>
-          <View className="flex-row items-center gap-3">
+        {/* High contrast toggle */}
+        <View style={[{ padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, cardStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Moon size={15} color={iconColor} />
             <View>
-              <Text className={`font-extrabold text-sm ${textMain}`}>Mode Kontras Tinggi</Text>
-              <Text className={`text-xs ${muted} mt-0.5`}>Latar gelap untuk kenyamanan visual</Text>
+              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Mode Kontras Tinggi</Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>Latar gelap untuk kenyamanan visual</Text>
             </View>
           </View>
           <CustomToggle val={hc} onChange={() => updateSettings({ highContrast: !hc })} hc={hc} />
         </View>
 
         {/* Language */}
-        <View className={`rounded-xl border p-4 ${card}`}>
-          <View className="flex-row items-center gap-2 mb-3">
+        <View style={[{ padding: 16 }, cardStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Globe size={15} color={iconColor} />
-            <Text className={`font-extrabold text-sm ${textMain}`}>Bahasa Transkripsi</Text>
+            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Bahasa Transkripsi</Text>
           </View>
-          <View className="flex-row gap-2">
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             {Object.keys(LANGUAGE_LABELS).map(l => (
               <TouchableOpacity
                 key={l}
                 activeOpacity={0.7}
                 onPress={() => updateSettings({ language: l })}
-                className={`flex-1 py-2.5 rounded-xl items-center ${settings.language === l ? activeBtn : inactiveBtn}`}
+                style={[
+                  { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+                  settings.language === l ? activeBtnStyle : inactiveBtnStyle,
+                ]}
               >
-                <Text className={`text-xs font-extrabold ${settings.language === l ? activeBtnText : inactiveBtnText}`}>
+                <Text style={{
+                  fontSize: 12, fontWeight: '800',
+                  color: settings.language === l ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+                }}>
                   {LANGUAGE_LABELS[l]}
                 </Text>
               </TouchableOpacity>
@@ -123,38 +158,44 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Vibrate */}
-        <View className={`rounded-xl border p-4 flex-row items-center justify-between ${card}`}>
-          <View className="flex-row items-center gap-3">
+        {/* Vibrate toggle */}
+        <View style={[{ padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, cardStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Zap size={15} color={iconColor} />
             <View>
-              <Text className={`font-extrabold text-sm ${textMain}`}>Indikator Getar</Text>
-              <Text className={`text-xs ${muted} mt-0.5`}>Getar saat guru mulai berbicara</Text>
+              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Indikator Getar</Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>Getar saat guru mulai berbicara</Text>
             </View>
           </View>
           <CustomToggle val={settings.vibrate} onChange={() => updateSettings({ vibrate: !settings.vibrate })} hc={hc} />
         </View>
 
         {/* Profile */}
-        <View className={`rounded-xl border p-4 ${card}`}>
-          <View className="flex-row items-center gap-3 mb-3">
-            <View className={`w-12 h-12 rounded-full items-center justify-center ${hc ? "bg-blue-900" : "bg-blue-100"}`}>
+        <View style={[{ padding: 16 }, cardStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <View style={{
+              width: 48, height: 48, borderRadius: 24,
+              backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
+              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
               <User size={22} color={iconColor} />
             </View>
             <View>
-              <Text className={`font-extrabold ${textMain}`}>{user?.name || "Budi Santoso"}</Text>
-              <Text className={`text-xs ${muted}`}>
+              <Text style={{ fontWeight: '800', fontSize: 15, color: textColor }}>{user?.name || 'Budi Santoso'}</Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
                 {role === 'student' ? 'Siswa · XII IPA 3' : 'Guru'} · SMAN 1 Surabaya
               </Text>
             </View>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleLogout}
-            className={`w-full py-2.5 rounded-xl items-center`}
-            style={{ backgroundColor: hc ? 'rgba(127, 29, 29, 0.4)' : '#fef2f2' }}
+            style={{
+              width: '100%', paddingVertical: 10, borderRadius: 12, alignItems: 'center',
+              backgroundColor: hc ? 'rgba(127,29,29,0.4)' : '#fef2f2',
+            }}
           >
-            <Text className={`text-sm font-extrabold ${hc ? "text-red-400" : "text-red-600"}`}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: hc ? '#f87171' : '#dc2626' }}>
               Keluar dari Akun
             </Text>
           </TouchableOpacity>

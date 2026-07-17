@@ -78,7 +78,7 @@ export default function OnboardingScreen() {
       </View>
 
       <View className="px-8 pb-10 flex-col gap-5">
-        <View className="flex-row justify-center space-x-2">
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
           {SLIDES.map((_, i) => (
             <Animated.View
               key={i}

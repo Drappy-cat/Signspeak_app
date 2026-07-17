@@ -1,11 +1,18 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { saveSession } from '../services/db';
 import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
-import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { Platform } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { DEMO_SENTENCES } from '../constants/keywords';
+
+
+// ─── Language Mapping ─────────────────────────────────────────────────────────
+// Maps our internal language codes to BCP-47 tags recognized by Web Speech API & Android STT
+const LANG_TO_BCP47: Record<string, string> = {
+  id: 'id-ID',   // Bahasa Indonesia — full support in Chrome, Edge, Android
+  jv: 'jv-ID',   // Bahasa Jawa — supported on Android, fallback to id-ID on web
+  mad: 'id-ID',  // Bahasa Madura — no dedicated STT yet, fallback to id-ID
+};
 
 export interface ActiveSession {
   isActive: boolean;
@@ -42,158 +49,316 @@ const defaultSession: ActiveSession = {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
+// ─── Web Speech API Helper ────────────────────────────────────────────────────
+// Separate class to manage the Web SpeechRecognition instance cleanly
+class WebSpeechEngine {
+  private recognition: any = null;
+  private lang: string = 'id-ID';
+  private onResult: (transcript: string, interim: string) => void;
+  private onError: (msg: string) => void;
+  private active: boolean = false;
+  private restartTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    onResult: (transcript: string, interim: string) => void,
+    onError: (msg: string) => void,
+  ) {
+    this.onResult = onResult;
+    this.onError = onError;
+  }
+
+  isSupported(): boolean {
+    return typeof window !== 'undefined' &&
+      (typeof (window as any).SpeechRecognition !== 'undefined' ||
+       typeof (window as any).webkitSpeechRecognition !== 'undefined');
+  }
+
+  start(lang: string): boolean {
+    if (!this.isSupported()) return false;
+    this.lang = lang;
+    this.active = true;
+    this._createAndStart();
+    return true;
+  }
+
+  stop() {
+    this.active = false;
+    if (this.restartTimeoutId) {
+      clearTimeout(this.restartTimeoutId);
+      this.restartTimeoutId = null;
+    }
+    if (this.recognition) {
+      try { this.recognition.stop(); } catch (_) {}
+      this.recognition = null;
+    }
+  }
+
+  private _createAndStart() {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.lang = this.lang;
+    this.recognition.interimResults = true;
+    this.recognition.continuous = false; // Will be restarted on end for continuous effect
+    this.recognition.maxAlternatives = 1;
+
+    this.recognition.onresult = (event: any) => {
+      let finalText = '';
+      let interimText = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalText += result[0].transcript + ' ';
+        } else {
+          interimText += result[0].transcript;
+        }
+      }
+
+      this.onResult(finalText.trim(), interimText.trim());
+    };
+
+    this.recognition.onerror = (event: any) => {
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        // Expected — restart silently
+        return;
+      }
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        this.onError('Izin mikrofon ditolak. Aktifkan mikrofon di browser Anda.');
+        this.active = false;
+        return;
+      }
+      if (event.error === 'network') {
+        this.onError('Koneksi internet diperlukan untuk Speech Recognition di browser.');
+        return;
+      }
+      // Other errors — try restarting
+      console.warn('[STT] Error:', event.error);
+    };
+
+    this.recognition.onend = () => {
+      // Auto-restart to simulate continuous mode (Web API doesn't support it natively)
+      if (this.active) {
+        this.restartTimeoutId = setTimeout(() => {
+          if (this.active) {
+            this._createAndStart();
+          }
+        }, 300);
+      }
+    };
+
+    try {
+      this.recognition.start();
+    } catch (e) {
+      console.warn('[STT] Could not start:', e);
+    }
+  }
+}
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<ActiveSession>(defaultSession);
   const [isRecording, setIsRecording] = useState(false);
   const { user, role } = useAuth();
 
-  const autoPauseTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Refs for side-effect objects
+  const webSpeechRef = useRef<WebSpeechEngine | null>(null);
+  const webMockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const accumulatedTranscriptRef = useRef<string>('');
 
-  // Pondasi untuk Real-time Sync (Misal: Firebase / Supabase)
-  const syncToBackend = (transcript: string, interim: string, isFinal: boolean) => {
-    // TODO: Implement backend real-time sync here
-    // Contoh: database.ref(`sessions/${session.classCode}`).update({ transcript, interim, isFinal });
-    // console.log('[SYNC] Mengirim ke backend:', { transcript, interim, isFinal });
-  };
+  // Initialize Web Speech Engine once
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      webSpeechRef.current = new WebSpeechEngine(
+        // onResult callback
+        (finalText: string, interimText: string) => {
+          if (finalText) {
+            accumulatedTranscriptRef.current =
+              accumulatedTranscriptRef.current
+                ? accumulatedTranscriptRef.current + ' ' + finalText
+                : finalText;
+          }
 
-  // Hook for speech recognition events
-  useSpeechRecognitionEvent('result', (event) => {
-    resetAutoPauseTimer();
-    
-    let finalStr = '';
-    let interimStr = '';
-    
-    for (const result of event.results) {
-      if (result.isFinal) {
-        finalStr += result.transcript + ' ';
-      } else {
-        interimStr += result.transcript + ' ';
+          setSession(prev => ({
+            ...prev,
+            transcript: accumulatedTranscriptRef.current,
+            interimTranscript: interimText,
+            errorMessage: null,
+          }));
+
+          resetAutoPauseTimer();
+        },
+        // onError callback
+        (msg: string) => {
+          setSession(prev => ({ ...prev, errorMessage: msg }));
+        },
+      );
+    }
+
+    return () => {
+      webSpeechRef.current?.stop();
+      if (webMockTimerRef.current) clearInterval(webMockTimerRef.current);
+      if (autoPauseTimerRef.current) clearTimeout(autoPauseTimerRef.current);
+    };
+  }, []);
+
+  // ── Native STT via expo-speech-recognition ──────────────────────────────────
+  // We import these conditionally to avoid crashes on web
+  const nativeSTT = useRef<{
+    module: any;
+    useEvent: any;
+  } | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      // Dynamic import to avoid crashing on web
+      try {
+        const mod = require('expo-speech-recognition');
+        nativeSTT.current = {
+          module: mod.ExpoSpeechRecognitionModule,
+          useEvent: mod.useSpeechRecognitionEvent,
+        };
+      } catch (e) {
+        console.warn('[STT] expo-speech-recognition not available');
       }
     }
-    
-    setSession(prev => {
-      // Jika finalStr kosong, tetap pakai transcript sebelumnya (agar teks lama tidak hilang)
-      // Jika event memberikan teks komplit, kita update transcript
-      const newTranscript = finalStr.trim() ? finalStr.trim() : prev.transcript;
-      const newInterim = interimStr.trim();
-      
-      syncToBackend(newTranscript, newInterim, Boolean(finalStr.trim()));
-      
-      return {
-        ...prev,
-        transcript: newTranscript,
-        interimTranscript: newInterim,
-        errorMessage: null, // Bersihkan error jika berhasil menangkap suara
-      };
-    });
-  });
-
-  useSpeechRecognitionEvent('error', (event) => {
-    console.error('Speech recognition error:', event.error, event.message);
-    if (event.error === 'no-speech' || event.error === 'network') {
-      // Ignore silence or network if we are offline-first
-      return;
-    }
-    setSession(prev => ({
-      ...prev,
-      errorMessage: `Peringatan STT: ${event.message || event.error}`
-    }));
-  });
+  }, []);
 
   const resetAutoPauseTimer = () => {
-    if (autoPauseTimerRef.current) {
-      clearTimeout(autoPauseTimerRef.current);
-    }
-    // 5 minutes auto-pause if no speech
+    if (autoPauseTimerRef.current) clearTimeout(autoPauseTimerRef.current);
     autoPauseTimerRef.current = setTimeout(async () => {
-      console.log('Auto-pausing session due to 5 minutes of silence.');
-      if (Platform.OS !== 'web') {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-      pauseRecording();
+      console.log('[STT] Auto-pause: 5 minutes of silence');
+      await pauseRecording();
     }, 5 * 60 * 1000);
   };
 
-  const webMockTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-
+  // ── Start Recording ──────────────────────────────────────────────────────────
   const startRecording = async (lang: string) => {
+    const bcp47 = LANG_TO_BCP47[lang] || 'id-ID';
+    accumulatedTranscriptRef.current = session.transcript;
+
+    if (Platform.OS === 'web') {
+      // Try real Web Speech API first
+      const engine = webSpeechRef.current;
+      if (engine && engine.isSupported()) {
+        console.log(`[STT] Starting Web Speech API in ${bcp47}...`);
+        const started = engine.start(bcp47);
+        if (started) {
+          setIsRecording(true);
+          resetAutoPauseTimer();
+          setSession(prev => ({ ...prev, errorMessage: null }));
+          return;
+        }
+      }
+
+      // Fallback: Demo simulation mode (browser doesn't support or permission denied)
+      console.log('[STT] Falling back to demo simulation mode...');
+      _startDemoMode(lang);
+      return;
+    }
+
+    // ── Native (Android / iOS) ────────────────────────────────────────────────
     try {
-      if (Platform.OS === 'web') {
-        // --- WEB MOCK: Karena web tidak mendeteksi native module dengan mudah, kita gunakan mock data
-        console.log('Starting Web Mock STT...');
-        const sentences = DEMO_SENTENCES[lang] || DEMO_SENTENCES['id'];
-        let sentenceIndex = 0;
-        let currentText = session.transcript;
-
-        webMockTimerRef.current = setInterval(() => {
-          if (sentenceIndex < sentences.length) {
-            const nextSentence = sentences[sentenceIndex];
-            currentText = currentText + (currentText ? ' ' : '') + nextSentence;
-            
-            setSession(prev => ({
-              ...prev,
-              transcript: currentText
-            }));
-            
-            sentenceIndex++;
-            resetAutoPauseTimer();
-          }
-        }, 4000); // 4 detik tiap kalimat
-        
-        setIsRecording(true);
-        resetAutoPauseTimer();
+      const mod = nativeSTT.current?.module;
+      if (!mod) {
+        console.warn('[STT] Native module not available, using demo mode');
+        _startDemoMode(lang);
         return;
       }
 
-      // --- NATIVE STT (Android/iOS)
-      const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      const { granted } = await mod.requestPermissionsAsync();
       if (!granted) {
-        setSession(prev => ({ ...prev, errorMessage: 'Izin mikrofon ditolak' }));
-        console.error('Microphone permission denied');
+        setSession(prev => ({ ...prev, errorMessage: 'Izin mikrofon ditolak. Buka Pengaturan dan aktifkan izin Mikrofon.' }));
         return;
       }
-      
-      if (Platform.OS !== 'web') {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
-      
-      // Start the recognition engine (Option 1 - Native OS STT)
-      // The architecture here allows us to inject Vosk (Option 2) in the future if needed
-      await ExpoSpeechRecognitionModule.start({
-        lang: lang === 'id' ? 'id-ID' : lang === 'jv' ? 'jv-ID' : 'id-ID', // Fallback madura to id-ID for now
+
+      await mod.start({
+        lang: bcp47,
         interimResults: true,
         continuous: true,
-        requiresOnDeviceRecognition: true, // Force offline if supported
+        requiresOnDeviceRecognition: false,
       });
-      
+
       setIsRecording(true);
       resetAutoPauseTimer();
-    } catch (e) {
-      console.error('Failed to start speech recognition:', e);
+    } catch (e: any) {
+      console.error('[STT] Native start error:', e);
+      setSession(prev => ({ ...prev, errorMessage: `Gagal memulai: ${e.message}` }));
+      // Fallback to demo
+      _startDemoMode(lang);
     }
   };
 
+  // ── Demo Mode (when real STT not available) ───────────────────────────────
+  const _startDemoMode = (lang: string) => {
+    const sentences = DEMO_SENTENCES[lang] || DEMO_SENTENCES['id'];
+    let sentenceIndex = 0;
+    let baseText = accumulatedTranscriptRef.current;
+
+    setSession(prev => ({
+      ...prev,
+      errorMessage: '⚠️ Demo Mode: Mikrofon tidak tersedia — menampilkan simulasi teks',
+    }));
+
+    webMockTimerRef.current = setInterval(() => {
+      if (sentenceIndex < sentences.length) {
+        const nextSentence = sentences[sentenceIndex];
+        baseText = baseText ? baseText + ' ' + nextSentence : nextSentence;
+        accumulatedTranscriptRef.current = baseText;
+
+        setSession(prev => ({
+          ...prev,
+          transcript: baseText,
+          interimTranscript: '',
+        }));
+
+        sentenceIndex++;
+        resetAutoPauseTimer();
+      } else {
+        // Loop sentences
+        sentenceIndex = 0;
+      }
+    }, 3500);
+
+    setIsRecording(true);
+    resetAutoPauseTimer();
+  };
+
+  // ── Pause Recording ──────────────────────────────────────────────────────────
   const pauseRecording = async () => {
-    try {
-      if (Platform.OS === 'web' && webMockTimerRef.current) {
-        clearInterval(webMockTimerRef.current);
-        webMockTimerRef.current = null;
-      } else if (Platform.OS !== 'web') {
-        await ExpoSpeechRecognitionModule.stop();
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      }
-      
-      setIsRecording(false);
-      
-      if (autoPauseTimerRef.current) {
-        clearTimeout(autoPauseTimerRef.current);
-      }
-    } catch (e) {
-      console.error('Failed to stop speech recognition:', e);
+    // Stop Web Speech
+    if (Platform.OS === 'web') {
+      webSpeechRef.current?.stop();
+    }
+
+    // Stop demo mode timer
+    if (webMockTimerRef.current) {
+      clearInterval(webMockTimerRef.current);
+      webMockTimerRef.current = null;
+    }
+
+    // Stop native STT
+    if (Platform.OS !== 'web') {
+      try {
+        await nativeSTT.current?.module?.stop();
+      } catch (_) {}
+    }
+
+    setIsRecording(false);
+    setSession(prev => ({ ...prev, interimTranscript: '' }));
+
+    if (autoPauseTimerRef.current) {
+      clearTimeout(autoPauseTimerRef.current);
     }
   };
 
+  // ── Session Lifecycle ────────────────────────────────────────────────────────
   const startSession = async (classCode: string, subject: string, language: string) => {
+    accumulatedTranscriptRef.current = '';
     setSession({
       isActive: true,
       classCode,
@@ -204,39 +369,38 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       errorMessage: null,
       startTime: Date.now(),
     });
-    
+
     await startRecording(language);
   };
 
   const endSession = async () => {
     await pauseRecording();
-    
-    if (session.isActive && session.transcript.length > 0 && role === 'teacher') {
-      // Save to database
-      const duration = Math.floor((Date.now() - (session.startTime || Date.now())) / 1000);
-      const wordCount = session.transcript.split(/\s+/).filter(w => w.length > 0).length;
-      
-      await saveSession({
-        subject: session.subject || 'Sesi Tanpa Judul',
-        className: session.classCode || 'Kelas Umum',
-        teacherName: user?.name || 'Guru',
-        date: `Hari ini, ${getTime()}`,
-        duration,
-        wordCount,
-        language: session.language,
-        excerpt: session.transcript.substring(0, 100) + (session.transcript.length > 100 ? '...' : ''),
-        transcriptFull: session.transcript,
-      });
-    }
-    
-    setSession(defaultSession);
-  };
 
-  const appendTranscript = (text: string) => {
-    setSession(prev => ({
-      ...prev,
-      transcript: prev.transcript + (prev.transcript ? ' ' : '') + text,
-    }));
+    if (session.isActive && accumulatedTranscriptRef.current.length > 0 && role === 'teacher') {
+      const duration = Math.floor((Date.now() - (session.startTime || Date.now())) / 1000);
+      const text = accumulatedTranscriptRef.current;
+      const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
+
+      try {
+        await saveSession({
+          subject: session.subject || 'Sesi Tanpa Judul',
+          className: session.classCode || 'Kelas Umum',
+          teacherName: user?.name || 'Guru',
+          date: `Hari ini, ${getTime()}`,
+          duration,
+          wordCount,
+          language: session.language,
+          excerpt: text.substring(0, 120) + (text.length > 120 ? '...' : ''),
+          transcriptFull: text,
+        });
+      } catch (e) {
+        console.error('[DB] Failed to save session:', e);
+      }
+    }
+
+    accumulatedTranscriptRef.current = '';
+    setSession(defaultSession);
+    setIsRecording(false);
   };
 
   const updateLanguage = (language: string) => {
@@ -255,16 +419,63 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ── Native event hooks (only used when running natively) ─────────────────────
+  // We can't call hooks conditionally, so we always register but they only fire natively
+  const NativeEventBridge = () => {
+    if (Platform.OS === 'web' || !nativeSTT.current?.useEvent) return null;
+
+    const { useSpeechRecognitionEvent } = nativeSTT.current;
+
+    useSpeechRecognitionEvent('result', (event: any) => {
+      let finalStr = '';
+      let interimStr = '';
+
+      for (const result of event.results) {
+        if (result.isFinal) {
+          finalStr += result.transcript + ' ';
+        } else {
+          interimStr += result.transcript + ' ';
+        }
+      }
+
+      if (finalStr.trim()) {
+        accumulatedTranscriptRef.current =
+          accumulatedTranscriptRef.current
+            ? accumulatedTranscriptRef.current + ' ' + finalStr.trim()
+            : finalStr.trim();
+      }
+
+      setSession(prev => ({
+        ...prev,
+        transcript: accumulatedTranscriptRef.current,
+        interimTranscript: interimStr.trim(),
+        errorMessage: null,
+      }));
+
+      resetAutoPauseTimer();
+    });
+
+    useSpeechRecognitionEvent('error', (event: any) => {
+      if (event.error === 'no-speech') return;
+      setSession(prev => ({
+        ...prev,
+        errorMessage: `Peringatan STT: ${event.message || event.error}`,
+      }));
+    });
+
+    return null;
+  };
+
   return (
-    <SessionContext.Provider value={{ 
-      session, 
-      startSession, 
-      endSession, 
-      updateLanguage, 
-      pauseRecording, 
+    <SessionContext.Provider value={{
+      session,
+      startSession,
+      endSession,
+      updateLanguage,
+      pauseRecording,
       resumeRecording,
       isRecording,
-      toggleRecording
+      toggleRecording,
     }}>
       {children}
     </SessionContext.Provider>

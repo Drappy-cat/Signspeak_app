@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Headphones } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,15 +14,21 @@ export default function LoginScreen() {
   const { settings } = useSettings();
   
   const hc = settings.highContrast;
-
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
-  const textMain = hc ? "text-white" : "text-slate-900";
-  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200 shadow-sm shadow-slate-200/50";
-  const inpBg = hc ? "bg-slate-700 border-slate-600" : "bg-slate-50 border-slate-200";
-  const inpText = hc ? "text-white" : "text-slate-900";
-  const muted = hc ? "text-slate-400" : "text-slate-500";
-  const joinCard = hc ? "bg-slate-800 border-slate-700" : "bg-blue-50 border-blue-100 shadow-sm shadow-slate-200/50";
-  const joinTitle = hc ? "text-slate-200" : "text-blue-900";
+  const textColor = hc ? '#f8fafc' : '#0f172a';
+  const mutedColor = hc ? '#94a3b8' : '#64748b';
+
+  const cardStyle = hc
+    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 16 }
+    : { backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 };
+
+  const inputStyle = hc
+    ? { backgroundColor: '#334155', borderColor: '#475569', borderWidth: 1, color: '#f8fafc' }
+    : { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1, color: '#0f172a' };
+
+  const joinCardStyle = hc
+    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
+    : { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', borderWidth: 1, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 };
 
   const handleLogin = async () => {
     if (!email) return;
@@ -41,76 +47,103 @@ export default function LoginScreen() {
       style={{ flex: 1, backgroundColor: bgColor }}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
-      <View className="flex-1 px-6">
-        <View className="items-center pt-16 pb-6 gap-3">
-          <View className="w-16 h-16 rounded-2xl bg-blue-900 items-center justify-center shadow-lg shadow-blue-900/20">
-            <Headphones size={32} color="#ffffff" />
+        <View style={{ flex: 1, paddingHorizontal: 24 }}>
+          {/* Logo area */}
+          <View style={{ alignItems: 'center', paddingTop: 64, paddingBottom: 24, gap: 12 }}>
+            <View style={{
+              width: 64, height: 64, borderRadius: 16,
+              backgroundColor: '#1e3a8a',
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
+            }}>
+              <Headphones size={32} color="#ffffff" />
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 20, fontWeight: '900', color: '#1e3a8a' }}>SignSpeak</Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
+                Masuk sebagai <Text style={{ fontWeight: '700' }}>{role === 'student' ? 'Siswa' : 'Guru'}</Text>
+              </Text>
+            </View>
           </View>
-          <View className="items-center">
-            <Text className="text-xl font-black text-blue-900">SignSpeak</Text>
-            <Text className={`text-xs ${muted} mt-0.5`}>
-              Masuk sebagai <Text className="font-bold">{role === 'student' ? 'Siswa' : 'Guru'}</Text>
-            </Text>
-          </View>
-        </View>
 
-        <View className={`rounded-2xl border p-5 flex-col gap-4 shadow-sm shadow-black/5 ${card}`}>
-          <View className="flex-col gap-1.5">
-            <Text className={`text-sm font-bold ${textMain}`}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="nama@sekolah.sch.id"
-              placeholderTextColor={hc ? "#64748b" : "#94a3b8"}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${inpBg} ${inpText}`}
-            />
+          {/* Form card */}
+          <View style={[{ padding: 20, gap: 16 }, cardStyle]}>
+            {/* Email */}
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>Email</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="nama@sekolah.sch.id"
+                placeholderTextColor={mutedColor}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={[{
+                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+                  fontSize: 14, fontWeight: '500',
+                }, inputStyle]}
+              />
+            </View>
+            {/* Password */}
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>Kata Sandi</Text>
+              <TextInput
+                value={pass}
+                onChangeText={setPass}
+                placeholder="••••••••"
+                placeholderTextColor={mutedColor}
+                secureTextEntry
+                style={[{
+                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+                  fontSize: 14, fontWeight: '500',
+                }, inputStyle]}
+              />
+            </View>
+            {/* Login button */}
+            <TouchableOpacity
+              onPress={handleLogin}
+              disabled={!email || loading}
+              activeOpacity={0.9}
+              style={{
+                width: '100%', paddingVertical: 14, borderRadius: 12,
+                alignItems: 'center', justifyContent: 'center', marginTop: 4,
+                backgroundColor: !email || loading ? 'rgba(30,58,138,0.5)' : '#1e3a8a',
+              }}
+            >
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>Masuk</Text>
+              )}
+            </TouchableOpacity>
           </View>
-          <View className="flex-col gap-1.5">
-            <Text className={`text-sm font-bold ${textMain}`}>Kata Sandi</Text>
-            <TextInput
-              value={pass}
-              onChangeText={setPass}
-              placeholder="••••••••"
-              placeholderTextColor={hc ? "#64748b" : "#94a3b8"}
-              secureTextEntry
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${inpBg} ${inpText}`}
-            />
-          </View>
-          <TouchableOpacity
-            onPress={handleLogin}
-            disabled={!email || loading}
-            activeOpacity={0.9}
-            className={`w-full py-3.5 rounded-xl mt-1 items-center justify-center ${!email || loading ? 'bg-blue-900/50' : 'bg-blue-900'}`}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className="text-white font-extrabold text-base">Masuk</Text>
-            )}
-          </TouchableOpacity>
-        </View>
 
-        <View className="mt-4 flex-row justify-center items-center">
-          <Text className={`text-sm ${muted}`}>Belum punya akun? </Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={handleLogin}>
-            <Text className="text-blue-800 font-extrabold text-sm">Daftar Gratis</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View className={`mt-4 rounded-xl border p-3 flex-row items-center gap-3 ${joinCard}`}>
-          <View className="w-8 h-8 rounded-lg bg-blue-900 items-center justify-center">
-            <Text className="text-white text-xs font-black">#</Text>
+          {/* Register link */}
+          <View style={{ marginTop: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ fontSize: 14, color: mutedColor }}>Belum punya akun? </Text>
+            <TouchableOpacity activeOpacity={0.7} onPress={handleLogin}>
+              <Text style={{ color: '#1e40af', fontWeight: '800', fontSize: 14 }}>Daftar Gratis</Text>
+            </TouchableOpacity>
           </View>
-          <View>
-            <Text className={`text-xs font-bold ${joinTitle}`}>Bergabung via Kode Kelas</Text>
-            <Text className={`text-[11px] ${muted} mt-0.5`}>Masukkan kode dari guru tanpa perlu daftar</Text>
-          </View>
-        </View>
 
-        <View className="flex-1" />
-      </View>
+          {/* Join by code card */}
+          <View style={[{ marginTop: 16, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }, joinCardStyle]}>
+            <View style={{
+              width: 32, height: 32, borderRadius: 8,
+              backgroundColor: '#1e3a8a',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '900' }}>#</Text>
+            </View>
+            <View>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#e2e8f0' : '#1e3a8a' }}>Bergabung via Kode Kelas</Text>
+              <Text style={{ fontSize: 11, color: mutedColor, marginTop: 2 }}>Masukkan kode dari guru tanpa perlu daftar</Text>
+            </View>
+          </View>
+
+          <View style={{ flex: 1 }} />
+        </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

@@ -4,9 +4,10 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight } from 'lucide-react-native';
+import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
+import { LANGUAGE_LABELS } from '../../constants/keywords';
 
 // Demo data
 const HISTORY_DATA = [
@@ -148,6 +149,14 @@ export default function HomeScreen() {
     </View>
   );
 
+  const CLASSES = [
+    { name: "XII IPA 3", subject: "Biologi", students: 28, active: true },
+    { name: "XI IPA 1", subject: "Biologi", students: 30, active: false },
+    { name: "X IPS 2", subject: "Biologi Dasar", students: 32, active: false },
+  ];
+
+  const [selectedLang, setSelectedLang] = React.useState(settings.language || 'id');
+
   const TeacherHome = () => (
     <View className="pb-10">
       {/* Header */}
@@ -170,12 +179,44 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* CTA */}
+      {/* Language Selector */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
+        <View style={[{ padding: 14 }, cardStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Globe size={13} color={hc ? '#60a5fa' : '#1e40af'} />
+            <Text style={{ fontSize: 12, fontWeight: '800', color: hc ? '#f8fafc' : '#0f172a' }}>Bahasa Transkripsi</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
+              <TouchableOpacity
+                key={code}
+                activeOpacity={0.7}
+                onPress={() => setSelectedLang(code)}
+                style={{
+                  flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
+                  backgroundColor: selectedLang === code ? '#1e3a8a' : hc ? '#334155' : '#f1f5f9',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: selectedLang === code ? '#fff' : hc ? '#cbd5e1' : '#475569' }}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {selectedLang === 'mad' && (
+            <Text style={{ fontSize: 10, color: hc ? '#f59e0b' : '#d97706', marginTop: 6, textAlign: 'center' }}>
+              ⚠️ Madura menggunakan engine Bahasa Indonesia
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* CTA - Start Session */}
       <View className="px-5 pt-2">
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => {
-            startSession('Biologi', 'XII IPA 3', settings.language);
+            startSession('Biologi', 'XII IPA 3', selectedLang);
             router.push('/(tabs)/live');
           }}
         >
@@ -194,7 +235,9 @@ export default function HomeScreen() {
             </View>
             <View style={{ flex: 1, position: 'relative' }}>
               <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 18 }}>Mulai Sesi Baru</Text>
-              <Text style={{ color: '#93c5fd', fontSize: 14, marginTop: 2 }}>Transkripsi real-time untuk siswa</Text>
+              <Text style={{ color: '#93c5fd', fontSize: 13, marginTop: 2 }}>
+                Transkripsi dalam Bahasa {LANGUAGE_LABELS[selectedLang]}
+              </Text>
             </View>
           </LinearGradient>
         </TouchableOpacity>

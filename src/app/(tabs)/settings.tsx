@@ -1,99 +1,158 @@
 import React from 'react';
-import { View, Text, ScrollView, Switch, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useSettings } from '../../contexts/SettingsContext';
-import { FontSizeLabels, FontSizeKey } from '../../constants/theme';
+import { FontSizeLabels, FontSizeKey, FontSizes } from '../../constants/theme';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
-import { Type, Moon, Globe, LogOut, Check } from 'lucide-react-native';
+import { Type, Moon, Globe, Zap, User } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+
+function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => void; hc: boolean }) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: withSpring(val ? 22 : 2, { stiffness: 400, damping: 28 }) }],
+  }));
+
+  return (
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={onChange}
+      className={`w-12 h-7 rounded-full justify-center ${val ? "bg-blue-700" : hc ? "bg-slate-600" : "bg-slate-300"}`}
+    >
+      <Animated.View style={animatedStyle} className="w-6 h-6 rounded-full bg-white shadow-sm" />
+    </TouchableOpacity>
+  );
+}
 
 export default function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
-  const { logout, role } = useAuth();
+  const { user, logout, role } = useAuth();
   const router = useRouter();
+
+  const hc = settings.highContrast;
+
+  const bg = hc ? "bg-slate-900" : "bg-[#F0F7FF]";
+  const textMain = hc ? "text-white" : "text-slate-900";
+  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100";
+  const muted = hc ? "text-slate-400" : "text-slate-500";
+  const activeBtn = hc ? "bg-blue-700" : "bg-blue-900";
+  const activeBtnText = "text-white";
+  const inactiveBtn = hc ? "bg-slate-700" : "bg-slate-100";
+  const inactiveBtnText = hc ? "text-slate-300" : "text-slate-600";
+  const iconColor = hc ? "#60a5fa" : "#1e40af"; // text-blue-400 : text-blue-800
+  const divider = hc ? "border-slate-700" : "border-slate-100";
 
   const handleLogout = async () => {
     await logout();
     router.replace('/(auth)/role-select');
   };
 
-  const OptionSection = ({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) => (
-    <View className="mb-6">
-      <View className="flex-row items-center mb-4 px-2">
-        {icon}
-        <Text className="text-slate-900 font-extrabold text-base ml-2">{title}</Text>
-      </View>
-      <View className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
-        {children}
-      </View>
-    </View>
-  );
-
   return (
-    <View className="flex-1 bg-slate-50">
-      <View className="px-6 pt-12 pb-4 bg-white border-b border-slate-100 mb-4">
-        <Text className="text-slate-900 text-2xl font-black">Pengaturan</Text>
+    <SafeAreaView className={`flex-1 ${bg}`}>
+      <View className="px-5 pt-3 pb-2">
+        <Text className={`text-xl font-black ${textMain}`}>Aksesibilitas</Text>
+        <Text className={`text-xs ${muted} mt-0.5`}>Sesuaikan tampilan sesuai kebutuhan Anda</Text>
       </View>
 
-      <ScrollView className="flex-1 px-4">
-        <OptionSection title="Tampilan" icon={<Type size={20} color="#3b82f6" />}>
-          <View className="p-4 border-b border-slate-100 flex-row justify-between items-center">
+      <ScrollView className="flex-1 px-5 pt-2 pb-10" contentContainerStyle={{ gap: 12 }}>
+        {/* Font size */}
+        <View className={`rounded-xl border p-4 ${card}`}>
+          <View className="flex-row items-center gap-2 mb-3">
+            <Type size={15} color={iconColor} />
+            <Text className={`font-extrabold text-sm ${textMain}`}>Ukuran Teks Transkripsi</Text>
+          </View>
+          <View className="flex-row gap-2">
+            {(Object.keys(FontSizeLabels) as FontSizeKey[]).map(s => (
+              <TouchableOpacity
+                key={s}
+                activeOpacity={0.7}
+                onPress={() => updateSettings({ fontSize: s })}
+                className={`flex-1 py-2.5 rounded-xl items-center ${settings.fontSize === s ? activeBtn : inactiveBtn}`}
+              >
+                <Text className={`text-xs font-extrabold ${settings.fontSize === s ? activeBtnText : inactiveBtnText}`}>
+                  {FontSizeLabels[s]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View className={`mt-3 pt-3 border-t ${divider}`}>
+            <Text className={`text-xs ${muted} mb-1`}>Pratinjau:</Text>
+            <Text style={{ fontSize: FontSizes[settings.fontSize].transcript }} className={`font-extrabold ${textMain}`}>
+              Teks Abc 123
+            </Text>
+          </View>
+        </View>
+
+        {/* High contrast */}
+        <View className={`rounded-xl border p-4 flex-row items-center justify-between ${card}`}>
+          <View className="flex-row items-center gap-3">
+            <Moon size={15} color={iconColor} />
             <View>
-              <Text className="text-slate-900 font-bold text-base mb-1">Ukuran Teks</Text>
-              <Text className="text-slate-500 text-sm">Sesuaikan ukuran teks transkripsi</Text>
-            </View>
-            <View className="flex-row items-center bg-slate-100 rounded-lg p-1">
-              {(Object.keys(FontSizeLabels) as FontSizeKey[]).map(key => (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => updateSettings({ fontSize: key })}
-                  className={`px-3 py-1.5 rounded-md ${settings.fontSize === key ? 'bg-white shadow-sm' : ''}`}
-                >
-                  <Text className={`font-bold ${settings.fontSize === key ? 'text-blue-600' : 'text-slate-500'}`}>
-                    {FontSizeLabels[key]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              <Text className={`font-extrabold text-sm ${textMain}`}>Mode Kontras Tinggi</Text>
+              <Text className={`text-xs ${muted} mt-0.5`}>Latar gelap untuk kenyamanan visual</Text>
             </View>
           </View>
-          
-          <View className="p-4 flex-row justify-between items-center">
-            <View>
-              <Text className="text-slate-900 font-bold text-base mb-1">Mode Kontras Tinggi</Text>
-              <Text className="text-slate-500 text-sm">Warna lebih jelas untuk dibaca</Text>
-            </View>
-            <Switch
-              value={settings.highContrast}
-              onValueChange={(val) => updateSettings({ highContrast: val })}
-              trackColor={{ false: '#e2e8f0', true: '#3b82f6' }}
-              thumbColor="#ffffff"
-            />
+          <CustomToggle val={hc} onChange={() => updateSettings({ highContrast: !hc })} hc={hc} />
+        </View>
+
+        {/* Language */}
+        <View className={`rounded-xl border p-4 ${card}`}>
+          <View className="flex-row items-center gap-2 mb-3">
+            <Globe size={15} color={iconColor} />
+            <Text className={`font-extrabold text-sm ${textMain}`}>Bahasa Transkripsi</Text>
           </View>
-        </OptionSection>
+          <View className="flex-row gap-2">
+            {Object.keys(LANGUAGE_LABELS).map(l => (
+              <TouchableOpacity
+                key={l}
+                activeOpacity={0.7}
+                onPress={() => updateSettings({ language: l })}
+                className={`flex-1 py-2.5 rounded-xl items-center ${settings.language === l ? activeBtn : inactiveBtn}`}
+              >
+                <Text className={`text-xs font-extrabold ${settings.language === l ? activeBtnText : inactiveBtnText}`}>
+                  {LANGUAGE_LABELS[l]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
-        <OptionSection title="Bahasa Daerah" icon={<Globe size={20} color="#10b981" />}>
-          {Object.keys(LANGUAGE_LABELS).map((key, index) => (
-            <TouchableOpacity
-              key={key}
-              onPress={() => updateSettings({ language: key })}
-              className={`p-4 flex-row justify-between items-center ${
-                index !== Object.keys(LANGUAGE_LABELS).length - 1 ? 'border-b border-slate-100' : ''
-              }`}
-            >
-              <Text className="text-slate-900 font-bold text-base">{LANGUAGE_LABELS[key]}</Text>
-              {settings.language === key && <Check size={20} color="#3b82f6" />}
-            </TouchableOpacity>
-          ))}
-        </OptionSection>
+        {/* Vibrate */}
+        <View className={`rounded-xl border p-4 flex-row items-center justify-between ${card}`}>
+          <View className="flex-row items-center gap-3">
+            <Zap size={15} color={iconColor} />
+            <View>
+              <Text className={`font-extrabold text-sm ${textMain}`}>Indikator Getar</Text>
+              <Text className={`text-xs ${muted} mt-0.5`}>Getar saat guru mulai berbicara</Text>
+            </View>
+          </View>
+          <CustomToggle val={settings.vibrate} onChange={() => updateSettings({ vibrate: !settings.vibrate })} hc={hc} />
+        </View>
 
-        <TouchableOpacity 
-          onPress={handleLogout}
-          className="mt-4 mb-10 bg-red-50 py-4 rounded-xl flex-row items-center justify-center border border-red-100"
-        >
-          <LogOut size={20} color="#ef4444" />
-          <Text className="text-red-500 font-extrabold text-base ml-2">Keluar Akun ({role === 'teacher' ? 'Guru' : 'Siswa'})</Text>
-        </TouchableOpacity>
+        {/* Profile */}
+        <View className={`rounded-xl border p-4 ${card}`}>
+          <View className="flex-row items-center gap-3 mb-3">
+            <View className={`w-12 h-12 rounded-full items-center justify-center ${hc ? "bg-blue-900" : "bg-blue-100"}`}>
+              <User size={22} color={iconColor} />
+            </View>
+            <View>
+              <Text className={`font-extrabold ${textMain}`}>{user?.name || "Budi Santoso"}</Text>
+              <Text className={`text-xs ${muted}`}>
+                {role === 'student' ? 'Siswa · XII IPA 3' : 'Guru'} · SMAN 1 Surabaya
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            activeOpacity={0.7}
+            onPress={handleLogout}
+            className={`w-full py-2.5 rounded-xl items-center ${hc ? "bg-red-900/40" : "bg-red-50"}`}
+          >
+            <Text className={`text-sm font-extrabold ${hc ? "text-red-400" : "text-red-600"}`}>
+              Keluar dari Akun
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

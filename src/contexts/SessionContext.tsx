@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { DEMO_SENTENCES } from '../constants/keywords';
 
 export interface ActiveSession {
@@ -12,6 +13,8 @@ export interface ActiveSession {
   subject: string | null;
   language: string;
   transcript: string;
+  interimTranscript: string;
+  errorMessage: string | null;
   startTime: number | null;
 }
 
@@ -32,6 +35,8 @@ const defaultSession: ActiveSession = {
   subject: null,
   language: 'id',
   transcript: '',
+  interimTranscript: '',
+  errorMessage: null,
   startTime: null,
 };
 
@@ -44,27 +49,55 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const autoPauseTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
+  // Pondasi untuk Real-time Sync (Misal: Firebase / Supabase)
+  const syncToBackend = (transcript: string, interim: string, isFinal: boolean) => {
+    // TODO: Implement backend real-time sync here
+    // Contoh: database.ref(`sessions/${session.classCode}`).update({ transcript, interim, isFinal });
+    // console.log('[SYNC] Mengirim ke backend:', { transcript, interim, isFinal });
+  };
+
   // Hook for speech recognition events
   useSpeechRecognitionEvent('result', (event) => {
     resetAutoPauseTimer();
     
-    let text = '';
+    let finalStr = '';
+    let interimStr = '';
+    
     for (const result of event.results) {
-      // In continuous mode, event.results contains the accumulated results
-      text += result.transcript + ' ';
+      if (result.isFinal) {
+        finalStr += result.transcript + ' ';
+      } else {
+        interimStr += result.transcript + ' ';
+      }
     }
     
-    setSession(prev => ({
-      ...prev,
-      transcript: text.trim()
-    }));
+    setSession(prev => {
+      // Jika finalStr kosong, tetap pakai transcript sebelumnya (agar teks lama tidak hilang)
+      // Jika event memberikan teks komplit, kita update transcript
+      const newTranscript = finalStr.trim() ? finalStr.trim() : prev.transcript;
+      const newInterim = interimStr.trim();
+      
+      syncToBackend(newTranscript, newInterim, Boolean(finalStr.trim()));
+      
+      return {
+        ...prev,
+        transcript: newTranscript,
+        interimTranscript: newInterim,
+        errorMessage: null, // Bersihkan error jika berhasil menangkap suara
+      };
+    });
   });
 
   useSpeechRecognitionEvent('error', (event) => {
     console.error('Speech recognition error:', event.error, event.message);
     if (event.error === 'no-speech' || event.error === 'network') {
       // Ignore silence or network if we are offline-first
+      return;
     }
+    setSession(prev => ({
+      ...prev,
+      errorMessage: `Peringatan STT: ${event.message || event.error}`
+    }));
   });
 
   const resetAutoPauseTimer = () => {
@@ -72,8 +105,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(autoPauseTimerRef.current);
     }
     // 5 minutes auto-pause if no speech
-    autoPauseTimerRef.current = setTimeout(() => {
+    autoPauseTimerRef.current = setTimeout(async () => {
       console.log('Auto-pausing session due to 5 minutes of silence.');
+      if (Platform.OS !== 'web') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
       pauseRecording();
     }, 5 * 60 * 1000);
   };
@@ -112,8 +148,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       // --- NATIVE STT (Android/iOS)
       const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!granted) {
+        setSession(prev => ({ ...prev, errorMessage: 'Izin mikrofon ditolak' }));
         console.error('Microphone permission denied');
         return;
+      }
+      
+      if (Platform.OS !== 'web') {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
       
       // Start the recognition engine (Option 1 - Native OS STT)
@@ -139,6 +180,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         webMockTimerRef.current = null;
       } else if (Platform.OS !== 'web') {
         await ExpoSpeechRecognitionModule.stop();
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
       
       setIsRecording(false);
@@ -158,6 +200,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       subject,
       language,
       transcript: '',
+      interimTranscript: '',
+      errorMessage: null,
       startTime: Date.now(),
     });
     

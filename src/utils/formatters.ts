@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 /**
  * Format seconds into MM:SS string
  */
@@ -90,3 +92,68 @@ export function parseHighlights(
   }
   return result;
 }
+
+export function getCardShadow(hc: boolean, level: 'sm' | 'md' | 'lg' = 'md') {
+  if (hc) {
+    return {
+      borderWidth: 1,
+      borderColor: '#334155',
+    };
+  }
+
+  if (Platform.OS === 'web') {
+    if (level === 'sm') {
+      return {
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+      };
+    }
+    if (level === 'lg') {
+      return {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+      };
+    }
+    return {
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.07)',
+      borderWidth: 1,
+      borderColor: '#f1f5f9',
+    };
+  }
+
+  // Native iOS/Android shadows
+  if (level === 'sm') {
+    return {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 1,
+      borderWidth: 1,
+      borderColor: '#e2e8f0',
+    };
+  }
+  if (level === 'lg') {
+    return {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: '#e2e8f0',
+    };
+  }
+  return {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  };
+}
+

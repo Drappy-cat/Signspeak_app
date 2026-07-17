@@ -5,6 +5,7 @@ import { Headphones } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { DICT } from '../../constants/i18n';
+import { getCardShadow } from '../../utils/formatters';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -22,17 +23,21 @@ export default function LoginScreen() {
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
 
-  const cardStyle = hc
-    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 16 }
-    : { backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 };
+  const cardStyle = {
+    backgroundColor: hc ? '#1e293b' : '#ffffff',
+    borderRadius: 16,
+    ...getCardShadow(hc, 'lg'),
+  };
 
   const inputStyle = hc
     ? { backgroundColor: '#334155', borderColor: '#475569', borderWidth: 1, color: '#f8fafc' }
     : { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1, color: '#0f172a' };
 
-  const joinCardStyle = hc
-    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
-    : { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', borderWidth: 1, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 };
+  const joinCardStyle = {
+    backgroundColor: hc ? '#1e293b' : '#eff6ff',
+    borderRadius: 12,
+    ...getCardShadow(hc, 'sm'),
+  };
 
   const handleLogin = async () => {
     if (!email) return;

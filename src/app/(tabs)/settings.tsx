@@ -4,6 +4,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { FontSizeLabels, FontSizeKey, FontSizes } from '../../constants/theme';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
 import { DICT } from '../../constants/i18n';
+import { getCardShadow } from '../../utils/formatters';
 import { Type, Moon, Globe, Zap, User } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
@@ -31,13 +32,16 @@ function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => voi
       }}
     >
       <Animated.View
-        style={{
-          transform: [{ translateX: anim }],
-          width: 24, height: 24, borderRadius: 12,
-          backgroundColor: '#ffffff',
-          shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.15, shadowRadius: 3, elevation: 2,
-        }}
+        style={[
+          {
+            transform: [{ translateX: anim }],
+            width: 24, height: 24, borderRadius: 12,
+            backgroundColor: '#ffffff',
+          },
+          Platform.OS === 'web'
+            ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)' } as any
+            : { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 }
+        ]}
       />
     </TouchableOpacity>
   );
@@ -58,9 +62,11 @@ export default function SettingsScreen() {
   const iconColor = hc ? "#60a5fa" : "#1e40af";
   const dividerColor = hc ? '#334155' : '#f1f5f9';
 
-  const cardStyle = hc
-    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
-    : { backgroundColor: '#ffffff', borderColor: '#f1f5f9', borderWidth: 1, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 };
+  const cardStyle = {
+    backgroundColor: hc ? '#1e293b' : '#ffffff',
+    borderRadius: 12,
+    ...getCardShadow(hc, 'md'),
+  };
 
   const activeBtnStyle = hc
     ? { backgroundColor: '#1d4ed8' }

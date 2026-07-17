@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Mic, Square, Play, Users, Globe, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,6 +9,7 @@ import { KEYWORDS, LANGUAGE_LABELS } from '../../constants/keywords';
 import { parseHighlights, formatDuration } from '../../utils/formatters';
 import { FontSizes } from '../../constants/theme';
 import { DICT } from '../../constants/i18n';
+import { getCardShadow } from '../../utils/formatters';
 
 // ── PulseDot ──────────────────────────────────────────────────────────────────
 function PulseDot({ color = 'bg-red-500' }: { color?: string }) {
@@ -71,9 +72,10 @@ function HighlightText({
   const parts = parseHighlights(text, keywords);
   const defaultTextColor = customColor || (hc ? '#f8fafc' : '#0f172a');
   const textColorStr = isOld ? (hc ? '#475569' : '#94a3b8') : defaultTextColor;
+  const fs = fontSize || { transcript: 20, lineHeight: 30 };
 
   return (
-    <Text style={{ fontSize: isOld ? fontSize.transcript * 0.85 : fontSize.transcript, lineHeight: isOld ? fontSize.lineHeight * 0.85 : fontSize.lineHeight }}>
+    <Text style={{ fontSize: isOld ? fs.transcript * 0.85 : fs.transcript, lineHeight: isOld ? fs.lineHeight * 0.85 : fs.lineHeight }}>
       {parts.map((part, i) =>
         part.isKeyword ? (
           <Text
@@ -113,13 +115,24 @@ export default function LiveScreen() {
 
   const appLang = settings.appLang || 'id';
   const d = DICT[appLang];
+  const alertedRef = useRef(false);
 
   useEffect(() => {
-    if (!session.isActive) {
-      router.replace('/(tabs)/home');
+    if (role === 'student' && !session.isActive) {
+      if (!alertedRef.current) {
+        Alert.alert(
+          appLang === 'en' ? 'Waiting for Teacher' : 'Menunggu Sesi Guru',
+          appLang === 'en' 
+            ? 'Teacher has not started the session yet. You will enter the waiting room.' 
+            : 'Guru belum membuka sesi kelas. Anda tetap masuk ke ruang tunggu untuk menunggu sesi dimulai.',
+          [{ text: 'OK' }]
+        );
+        alertedRef.current = true;
+      }
+    } else if (session.isActive) {
+      alertedRef.current = false;
     }
   }, [session.isActive]);
-
   // Elapsed timer for teacher
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
@@ -155,39 +168,52 @@ export default function LiveScreen() {
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
 
-  const headerStyle = hc
-    ? { backgroundColor: '#1e293b', borderBottomColor: '#334155', borderBottomWidth: 1 }
-    : { backgroundColor: '#ffffff', borderBottomColor: '#e2e8f0', borderBottomWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 };
+  const headerStyle = {
+    backgroundColor: hc ? '#1e293b' : '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: hc ? '#334155' : '#e2e8f0',
+    ...getCardShadow(hc, 'sm'),
+  };
 
-  const ctrlStyle = hc
-    ? { backgroundColor: '#1e293b', borderTopColor: '#334155', borderTopWidth: 1 }
-    : { backgroundColor: '#ffffff', borderTopColor: '#e2e8f0', borderTopWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: -1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 };
+  const ctrlStyle = {
+    backgroundColor: hc ? '#1e293b' : '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: hc ? '#334155' : '#e2e8f0',
+    ...getCardShadow(hc, 'sm'),
+  };
 
-  const cardStyle = hc
-    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
-    : { backgroundColor: '#ffffff', borderColor: '#f1f5f9', borderWidth: 1, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 };
-
-  if (!session.isActive) return null;
+  const cardStyle = {
+    backgroundColor: hc ? '#1e293b' : '#ffffff',
+    borderRadius: 12,
+    ...getCardShadow(hc, 'md'),
+  };
 
   // ── Student Live View ─────────────────────────────────────────────────────
   const StudentLive = () => {
     const isSpeaking = session.interimTranscript.length > 0;
     const hasContent = session.transcript.length > 0 || session.interimTranscript.length > 0;
+    const activeFontSize = FontSizes[settings.fontSize] || FontSizes.normal;
 
     // Split completed transcript into sentences to style older sentences differently
-    const sentences = session.transcript.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const sentences = (session.transcript || '').split(/(?<=[.!?])\s+/).filter(Boolean);
 
     return (
       <View style={{ flex: 1, backgroundColor: bgColor }}>
         {/* Header */}
         <View style={[{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, headerStyle]}>
           <View>
-            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>Bu Sari Dewi</Text>
-            <Text style={{ fontSize: 12, color: mutedColor }}>Biologi — XII IPA 3</Text>
+            <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>
+              {session.isActive ? 'Bu Sari Dewi' : (appLang === 'en' ? 'No Active Teacher' : 'Belum Ada Guru')}
+            </Text>
+            <Text style={{ fontSize: 12, color: mutedColor }}>
+              {session.isActive ? `${session.subject} — ${session.classCode}` : (appLang === 'en' ? 'Waiting Room' : 'Ruang Tunggu')}
+            </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <PulseDot color="bg-red-500" />
-            <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }}>LIVE</Text>
+            <PulseDot color={session.isActive ? "bg-red-500" : "bg-amber-500"} />
+            <Text style={{ color: session.isActive ? '#ef4444' : '#f59e0b', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }}>
+              {session.isActive ? 'LIVE' : (appLang === 'en' ? 'WAITING' : 'MENUNGGU')}
+            </Text>
           </View>
         </View>
 
@@ -201,12 +227,20 @@ export default function LiveScreen() {
 
         {/* Speaking Indicator Bar */}
         <View style={{ paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: hc ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.6)', borderBottomWidth: 1, borderBottomColor: hc ? '#334155' : '#e2e8f0' }}>
-          <SpeakingBars active={isSpeaking && !paused} hc={hc} />
+          <SpeakingBars active={isSpeaking && !paused && session.isActive} hc={hc} />
           <View>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: isSpeaking && !paused ? (hc ? '#34d399' : '#059669') : mutedColor }}>
-              {isSpeaking && !paused ? (appLang === 'en' ? 'Speaking...' : 'Sedang berbicara...') : paused ? (appLang === 'en' ? '⏸ Paused' : '⏸ Dijeda') : (appLang === 'en' ? 'Waiting for teacher...' : 'Menunggu guru berbicara...')}
+            <Text style={{ fontSize: 12, fontWeight: '700', color: isSpeaking && !paused && session.isActive ? (hc ? '#34d399' : '#059669') : mutedColor }}>
+              {!session.isActive
+                ? (appLang === 'en' ? 'Waiting for class to start...' : 'Menunggu kelas dimulai...')
+                : isSpeaking && !paused 
+                  ? (appLang === 'en' ? 'Speaking...' : 'Sedang berbicara...') 
+                  : paused 
+                    ? (appLang === 'en' ? '⏸ Paused' : '⏸ Dijeda') 
+                    : (appLang === 'en' ? 'Waiting for teacher...' : 'Menunggu guru berbicara...')}
             </Text>
-            <Text style={{ fontSize: 10, color: mutedColor }}>Bu Sari Dewi • {appLang === 'en' ? 'Teacher' : 'Guru'}</Text>
+            <Text style={{ fontSize: 10, color: mutedColor }}>
+              {session.isActive ? 'Bu Sari Dewi' : (appLang === 'en' ? 'LENTERA System' : 'Sistem LENTERA')} • {appLang === 'en' ? 'Teacher' : 'Guru'}
+            </Text>
           </View>
         </View>
 
@@ -217,7 +251,21 @@ export default function LiveScreen() {
           contentContainerStyle={{ padding: 20, gap: 12 }}
           showsVerticalScrollIndicator={false}
         >
-          {!hasContent && !session.errorMessage ? (
+          {!session.isActive ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: hc ? '#1e293b' : '#eff6ff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <Mic size={24} color={hc ? '#60a5fa' : '#1d4ed8'} />
+              </View>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: textColor, textAlign: 'center' }}>
+                {appLang === 'en' ? 'Waiting for Teacher to Start Session' : 'Menunggu Guru Memulai Sesi'}
+              </Text>
+              <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', marginTop: 8, lineHeight: 22, paddingHorizontal: 20 }}>
+                {appLang === 'en' 
+                  ? "You will automatically receive the transcription once the teacher starts the live class." 
+                  : "Anda akan otomatis menerima transkripsi teks setelah guru memulai sesi kelas secara langsung."}
+              </Text>
+            </View>
+          ) : !hasContent && !session.errorMessage ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 }}>
               <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: hc ? '#1e293b' : '#dbeafe', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                 <Mic size={24} color={hc ? '#60a5fa' : '#1d4ed8'} />
@@ -242,7 +290,7 @@ export default function LiveScreen() {
                   text={sentence}
                   keywords={currentKeywords}
                   hc={hc}
-                  fontSize={FontSizes[settings.fontSize]}
+                  fontSize={activeFontSize}
                   isOld={!isLast}
                 />
               </View>
@@ -253,8 +301,8 @@ export default function LiveScreen() {
           {session.interimTranscript ? (
             <View style={{ marginTop: 4 }}>
               <Text style={{
-                fontSize: FontSizes[settings.fontSize].transcript,
-                lineHeight: FontSizes[settings.fontSize].lineHeight,
+                fontSize: activeFontSize.transcript,
+                lineHeight: activeFontSize.lineHeight,
                 color: hc ? '#cbd5e1' : '#475569',
                 fontStyle: 'italic',
                 fontWeight: '700',
@@ -467,6 +515,35 @@ export default function LiveScreen() {
       </View>
     </ScrollView>
   );
+
+  if (role === 'teacher' && !session.isActive) {
+    const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <View style={[{ padding: 24, alignItems: 'center', gap: 16, width: '100%' }, cardStyle]}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: hc ? '#1e3a8a' : '#dbeafe', alignItems: 'center', justifyContent: 'center' }}>
+            <Mic size={30} color={hc ? '#60a5fa' : '#1e3a8a'} />
+          </View>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: textColor, textAlign: 'center' }}>
+            {appLang === 'en' ? 'No Active Session' : 'Tidak Ada Sesi Aktif'}
+          </Text>
+          <Text style={{ fontSize: 14, color: mutedColor, textAlign: 'center', lineHeight: 22 }}>
+            {appLang === 'en' 
+              ? 'Please start a new session from the Home screen to begin transcription.' 
+              : 'Silakan mulai sesi baru dari halaman Beranda untuk mengaktifkan mikrofon dan transkripsi.'}
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.replace('/(tabs)/home')}
+            style={{ backgroundColor: '#1e3a8a', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, marginTop: 8 }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+              {appLang === 'en' ? 'Go to Home' : 'Ke Beranda'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
 

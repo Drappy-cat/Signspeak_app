@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
 import { DICT } from '../../constants/i18n';
+import { getCardShadow } from '../../utils/formatters';
 
 // Demo data
 const HISTORY_DATA = [
@@ -44,9 +45,11 @@ export default function HomeScreen() {
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textMain = hc ? "text-white" : "text-slate-900";
   
-  const cardStyle = hc
-    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
-    : { backgroundColor: '#ffffff', borderColor: '#f1f5f9', borderWidth: 1, borderRadius: 12, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 };
+  const cardStyle = {
+    backgroundColor: hc ? '#1e293b' : '#ffffff',
+    borderRadius: 12,
+    ...getCardShadow(hc, 'md'),
+  };
   
   const muted = hc ? "text-slate-400" : "text-slate-500";
   const iconBg = hc ? "bg-blue-800" : "bg-blue-50";

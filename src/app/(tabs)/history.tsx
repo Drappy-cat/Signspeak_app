@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView, Plat
 import { Search, BookOpen, Clock } from 'lucide-react-native';
 import { useSettings } from '../../contexts/SettingsContext';
 import { DICT } from '../../constants/i18n';
+import { getCardShadow } from '../../utils/formatters';
 
 // Using mock data to match prototype
 const HISTORY_DATA = [
@@ -22,13 +23,17 @@ export default function HistoryScreen() {
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
 
-  const cardStyle = hc
-    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
-    : { backgroundColor: '#ffffff', borderColor: '#f1f5f9', borderWidth: 1, borderRadius: 12, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 };
+  const cardStyle = {
+    backgroundColor: hc ? '#1e293b' : '#ffffff',
+    borderRadius: 12,
+    ...getCardShadow(hc, 'md'),
+  };
 
-  const searchStyle = hc
-    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
-    : { backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 12, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 };
+  const searchStyle = {
+    backgroundColor: hc ? '#1e293b' : '#ffffff',
+    borderRadius: 12,
+    ...getCardShadow(hc, 'sm'),
+  };
 
   const iconBgColor = hc ? '#1e3a8a' : '#eff6ff';
   const iconColor = hc ? "#93c5fd" : "#1d4ed8";

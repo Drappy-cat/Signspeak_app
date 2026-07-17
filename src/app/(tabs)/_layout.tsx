@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { Home, BookOpen, Settings, Mic, Radio } from 'lucide-react-native';
+import { Platform, Pressable } from 'react-native';
 
 export default function TabLayout() {
   const { role } = useAuth();
@@ -16,6 +17,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      sceneContainerStyle={{ backgroundColor: hc ? '#0f172a' : '#F0F7FF' }}
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
@@ -33,6 +35,12 @@ export default function TabLayout() {
           fontWeight: '900',
           fontSize: 10,
         },
+        tabBarButton: (props) => (
+          <Pressable 
+            {...props} 
+            style={[props.style, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}]} 
+          />
+        ),
       }}
     >
       <Tabs.Screen

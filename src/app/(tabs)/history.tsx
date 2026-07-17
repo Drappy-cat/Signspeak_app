@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView } from 'react-native';
 import { Search, BookOpen, Clock } from 'lucide-react-native';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -14,62 +14,87 @@ const HISTORY_DATA = [
 export default function HistoryScreen() {
   const { settings } = useSettings();
   const hc = settings.highContrast;
+  const bgColor = hc ? "#0f172a" : "#F0F7FF";
+  const textColor = hc ? '#f8fafc' : '#0f172a';
+  const mutedColor = hc ? '#94a3b8' : '#64748b';
 
-  const bg = hc ? "bg-slate-900" : "bg-[#F0F7FF]";
-  const textMain = hc ? "text-white" : "text-slate-900";
-  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100";
-  const muted = hc ? "text-slate-400" : "text-slate-500";
-  const searchBg = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200";
-  const iconBg = hc ? "bg-blue-900" : "bg-blue-50";
-  const iconColor = hc ? "#93c5fd" : "#1d4ed8"; // text-blue-300 / text-blue-700
-  const divider = hc ? "border-slate-700" : "border-slate-100";
-  const linkColor = hc ? "text-blue-400" : "text-blue-800";
+  const cardStyle = hc
+    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
+    : { backgroundColor: '#ffffff', borderColor: '#f1f5f9', borderWidth: 1, borderRadius: 12, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 };
+
+  const searchStyle = hc
+    ? { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 12 }
+    : { backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 12, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 };
+
+  const iconBgColor = hc ? '#1e3a8a' : '#eff6ff';
+  const iconColor = hc ? "#93c5fd" : "#1d4ed8";
+  const dividerColor = hc ? '#334155' : '#f1f5f9';
+  const linkColor = hc ? '#60a5fa' : '#1e40af';
 
   return (
-    <SafeAreaView className={`flex-1 ${bg}`}>
-      <View className="px-5 pt-3 pb-3">
-        <Text className={`text-xl font-black mb-3 ${textMain}`}>Riwayat Transkrip</Text>
-        <View className={`flex-row items-center gap-2 rounded-xl border px-3 py-2.5 ${searchBg}`}>
-          <Search size={15} color={hc ? "#94a3b8" : "#64748b"} />
-          <TextInput 
-            placeholder="Cari mata pelajaran atau kata kunci..." 
-            placeholderTextColor={hc ? "#64748b" : "#94a3b8"}
-            className={`flex-1 text-sm font-medium ${hc ? "text-white" : "text-slate-900"}`}
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 }}>
+        <Text style={{ fontSize: 20, fontWeight: '900', marginBottom: 12, color: textColor }}>Riwayat Transkrip</Text>
+        {/* Search bar */}
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }, searchStyle]}>
+          <Search size={15} color={mutedColor} />
+          <TextInput
+            placeholder="Cari mata pelajaran atau kata kunci..."
+            placeholderTextColor={mutedColor}
+            style={{ flex: 1, fontSize: 14, fontWeight: '500', color: textColor, padding: 0 }}
           />
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-5 pt-1 pb-10" contentContainerStyle={{ gap: 12 }}>
-        <Text className={`text-[10px] font-black uppercase tracking-widest ${muted}`}>Minggu Ini</Text>
-        
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, gap: 10 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', color: mutedColor, marginBottom: 2 }}>
+          Minggu Ini
+        </Text>
+
         {HISTORY_DATA.map(item => (
-          <View key={item.id} className={`rounded-xl border ${card}`}>
-            <View className="p-4 flex-row gap-3">
-              <View className={`w-10 h-10 rounded-xl items-center justify-center mt-0.5 ${iconBg}`}>
+          <View key={item.id} style={cardStyle}>
+            {/* Card body */}
+            <View style={{ padding: 16, flexDirection: 'row', gap: 12 }}>
+              <View style={{
+                width: 40, height: 40, borderRadius: 10,
+                backgroundColor: iconBgColor,
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
+              }}>
                 <BookOpen size={17} color={iconColor} />
               </View>
-              <View className="flex-1">
-                <Text className={`font-extrabold text-sm ${textMain}`}>{item.subject}</Text>
-                <Text className={`text-xs ${muted}`}>{item.teacher} · {item.kelas}</Text>
-                <View className="flex-row items-center gap-1 mt-1">
-                  <Clock size={10} color={hc ? "#94a3b8" : "#64748b"} />
-                  <Text className={`text-xs ${muted}`}>{item.date} · {item.duration}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{item.subject}</Text>
+                <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>{item.teacher} · {item.kelas}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                  <Clock size={10} color={mutedColor} />
+                  <Text style={{ fontSize: 12, color: mutedColor }}>{item.date} · {item.duration}</Text>
                 </View>
-                <Text className={`text-xs mt-1.5 italic leading-relaxed ${hc ? "text-slate-400" : "text-slate-500"}`} numberOfLines={2}>
+                <Text style={{ fontSize: 12, color: mutedColor, marginTop: 6, fontStyle: 'italic', lineHeight: 18 }} numberOfLines={2}>
                   {item.excerpt}
                 </Text>
               </View>
             </View>
-            <View className={`mx-4 pt-2.5 pb-3 border-t flex-row items-center justify-between ${divider}`}>
-              <View className="flex-row items-center gap-3">
-                <Text className={`text-xs font-bold ${muted}`}>{item.words.toLocaleString("id-ID")} kata</Text>
-                <View className={`w-1 h-1 rounded-full ${hc ? "bg-slate-600" : "bg-slate-300"}`} />
-                <View className={`px-2 py-0.5 rounded-md ${hc ? "bg-slate-700" : "bg-emerald-50"}`}>
-                  <Text className={`text-xs font-bold ${hc ? "text-slate-300" : "text-emerald-700"}`}>Selesai</Text>
+
+            {/* Card footer */}
+            <View style={{
+              marginHorizontal: 16, paddingTop: 10, paddingBottom: 12,
+              borderTopWidth: 1, borderTopColor: dividerColor,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>{item.words.toLocaleString('id-ID')} kata</Text>
+                <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: hc ? '#475569' : '#cbd5e1' }} />
+                <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: hc ? '#1e293b' : '#ecfdf5' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#94a3b8' : '#059669' }}>Selesai</Text>
                 </View>
               </View>
               <TouchableOpacity activeOpacity={0.7}>
-                <Text className={`text-xs font-extrabold ${linkColor}`}>Buka →</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: linkColor }}>Buka →</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -6,12 +6,19 @@ import { LANGUAGE_LABELS } from '../../constants/keywords';
 import { Type, Moon, Globe, Zap, User } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { Animated, Easing, Platform } from 'react-native';
 
 function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => void; hc: boolean }) {
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: withSpring(val ? 22 : 2, { stiffness: 400, damping: 28 }) }],
-  }));
+  const anim = React.useRef(new Animated.Value(val ? 22 : 2)).current;
+
+  React.useEffect(() => {
+    Animated.timing(anim, {
+      toValue: val ? 22 : 2,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [val]);
 
   return (
     <TouchableOpacity
@@ -19,7 +26,7 @@ function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => voi
       onPress={onChange}
       className={`w-12 h-7 rounded-full justify-center ${val ? "bg-blue-700" : hc ? "bg-slate-600" : "bg-slate-300"}`}
     >
-      <Animated.View style={animatedStyle} className="w-6 h-6 rounded-full bg-white shadow-sm" />
+      <Animated.View style={{ transform: [{ translateX: anim }] }} className="w-6 h-6 rounded-full bg-white shadow-sm" />
     </TouchableOpacity>
   );
 }
@@ -30,10 +37,9 @@ export default function SettingsScreen() {
   const router = useRouter();
 
   const hc = settings.highContrast;
-
-  const bg = hc ? "bg-slate-900" : "bg-[#F0F7FF]";
+  const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textMain = hc ? "text-white" : "text-slate-900";
-  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100";
+  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100 shadow-sm shadow-slate-200/50";
   const muted = hc ? "text-slate-400" : "text-slate-500";
   const activeBtn = hc ? "bg-blue-700" : "bg-blue-900";
   const activeBtnText = "text-white";
@@ -48,13 +54,13 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className={`flex-1 ${bg}`}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
       <View className="px-5 pt-3 pb-2">
         <Text className={`text-xl font-black ${textMain}`}>Aksesibilitas</Text>
         <Text className={`text-xs ${muted} mt-0.5`}>Sesuaikan tampilan sesuai kebutuhan Anda</Text>
       </View>
 
-      <ScrollView className="flex-1 px-5 pt-2 pb-10" contentContainerStyle={{ gap: 12 }}>
+      <ScrollView className="flex-1 px-5 pt-2 pb-10" contentContainerStyle={{ gap: 12, flexGrow: 1 }}>
         {/* Font size */}
         <View className={`rounded-xl border p-4 ${card}`}>
           <View className="flex-row items-center gap-2 mb-3">
@@ -145,7 +151,8 @@ export default function SettingsScreen() {
           <TouchableOpacity 
             activeOpacity={0.7}
             onPress={handleLogout}
-            className={`w-full py-2.5 rounded-xl items-center ${hc ? "bg-red-900/40" : "bg-red-50"}`}
+            className={`w-full py-2.5 rounded-xl items-center`}
+            style={{ backgroundColor: hc ? 'rgba(127, 29, 29, 0.4)' : '#fef2f2' }}
           >
             <Text className={`text-sm font-extrabold ${hc ? "text-red-400" : "text-red-600"}`}>
               Keluar dari Akun

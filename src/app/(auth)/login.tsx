@@ -15,13 +15,13 @@ export default function LoginScreen() {
   
   const hc = settings.highContrast;
 
-  const bg = hc ? "bg-slate-900" : "bg-[#F0F7FF]";
+  const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textMain = hc ? "text-white" : "text-slate-900";
-  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200";
+  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200 shadow-sm shadow-slate-200/50";
   const inpBg = hc ? "bg-slate-700 border-slate-600" : "bg-slate-50 border-slate-200";
   const inpText = hc ? "text-white" : "text-slate-900";
   const muted = hc ? "text-slate-400" : "text-slate-500";
-  const joinCard = hc ? "bg-slate-800 border-slate-700" : "bg-blue-50 border-blue-100";
+  const joinCard = hc ? "bg-slate-800 border-slate-700" : "bg-blue-50 border-blue-100 shadow-sm shadow-slate-200/50";
   const joinTitle = hc ? "text-slate-200" : "text-blue-900";
 
   const handleLogin = async () => {
@@ -38,8 +38,9 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className={`flex-1 ${bg}`}
+      style={{ flex: 1, backgroundColor: bgColor }}
     >
+      <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
       <View className="flex-1 px-6">
         <View className="items-center pt-16 pb-6 gap-3">
           <View className="w-16 h-16 rounded-2xl bg-blue-900 items-center justify-center shadow-lg shadow-blue-900/20">
@@ -110,6 +111,7 @@ export default function LoginScreen() {
 
         <View className="flex-1" />
       </View>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }

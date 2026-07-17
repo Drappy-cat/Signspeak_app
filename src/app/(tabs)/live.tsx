@@ -8,55 +8,62 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { KEYWORDS } from '../../constants/keywords';
 import { parseHighlights, formatDuration } from '../../utils/formatters';
 import { FontSizes } from '../../constants/theme';
-import Animated, { useAnimatedStyle, withRepeat, withTiming, withSequence, withDelay, Easing as REasing } from 'react-native-reanimated';
 
 function PulseDot() {
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: withRepeat(
-      withSequence(withTiming(0.4, { duration: 500 }), withTiming(1, { duration: 500 })),
-      -1,
-      true
-    ),
-  }));
-  return <Animated.View style={animatedStyle} className="w-2 h-2 rounded-full bg-red-500" />;
+  const anim = React.useRef(new RNAnimated.Value(0.4)).current;
+  React.useEffect(() => {
+    RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(anim, { toValue: 1, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        RNAnimated.timing(anim, { toValue: 0.4, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: false })
+      ])
+    ).start();
+  }, []);
+  return <RNAnimated.View style={{ opacity: anim }} className="w-2 h-2 rounded-full bg-red-500" />;
 }
 
 function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
   const ratios = [0.45, 0.75, 1.0, 0.85, 0.55, 0.9, 0.65, 0.8, 0.45];
   const color = hc ? "#34d399" : "#10b981";
   
+  const anims = React.useRef(ratios.map(() => new RNAnimated.Value(3))).current;
+
+  React.useEffect(() => {
+    if (!active) {
+      anims.forEach(a => RNAnimated.timing(a, { toValue: 3, duration: 300, useNativeDriver: false }).start());
+      return;
+    }
+
+    const animations = anims.map((anim, i) => {
+      const r = ratios[i];
+      return RNAnimated.sequence([
+        RNAnimated.delay(i * 110),
+        RNAnimated.loop(
+          RNAnimated.sequence([
+            RNAnimated.timing(anim, { toValue: r * 36, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+            RNAnimated.timing(anim, { toValue: r * 10, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+            RNAnimated.timing(anim, { toValue: r * 30, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+            RNAnimated.timing(anim, { toValue: r * 6, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false })
+          ])
+        )
+      ]);
+    });
+
+    RNAnimated.parallel(animations).start();
+
+    return () => {
+      anims.forEach(a => a.stopAnimation());
+    };
+  }, [active]);
+  
   return (
     <View className="flex-row items-end h-9" style={{ gap: 3 }}>
-      {ratios.map((r, i) => {
-        const animatedStyle = useAnimatedStyle(() => {
-          if (!active) {
-            return { height: withTiming(3, { duration: 300 }) };
-          }
-          return {
-            height: withDelay(
-              i * 110,
-              withRepeat(
-                withSequence(
-                  withTiming(r * 6, { duration: 250, easing: REasing.inOut(REasing.ease) }),
-                  withTiming(r * 36, { duration: 250, easing: REasing.inOut(REasing.ease) }),
-                  withTiming(r * 10, { duration: 250, easing: REasing.inOut(REasing.ease) }),
-                  withTiming(r * 30, { duration: 250, easing: REasing.inOut(REasing.ease) }),
-                  withTiming(r * 6, { duration: 250, easing: REasing.inOut(REasing.ease) })
-                ),
-                -1,
-                false
-              )
-            )
-          };
-        }, [active]);
-        
-        return (
-          <Animated.View
-            key={i}
-            style={[{ backgroundColor: color, width: 3, borderRadius: 99 }, animatedStyle]}
-          />
-        );
-      })}
+      {ratios.map((_, i) => (
+        <RNAnimated.View
+          key={i}
+          style={{ backgroundColor: color, width: 3, borderRadius: 99, height: anims[i] }}
+        />
+      ))}
     </View>
   );
 }
@@ -100,12 +107,12 @@ export default function LiveScreen() {
 
   const currentKeywords = KEYWORDS[session.language] || KEYWORDS['id'];
   const hc = settings.highContrast;
-  const bg = hc ? "bg-slate-900" : "bg-[#F0F7FF]";
+  const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textMain = hc ? "text-white" : "text-slate-900";
-  const headerBg = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200";
-  const ctrlBg = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200";
+  const headerBg = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200 shadow-sm shadow-slate-200/50";
+  const ctrlBg = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200 shadow-sm shadow-slate-200/50";
   const muted = hc ? "text-slate-400" : "text-slate-500";
-  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100";
+  const card = hc ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100 shadow-sm shadow-slate-200/50";
 
   if (!session.isActive) return null;
 
@@ -290,7 +297,7 @@ export default function LiveScreen() {
   );
 
   return (
-    <SafeAreaView className={`flex-1 ${bg}`}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
       {role === 'teacher' ? <TeacherLive /> : <StudentLive />}
     </SafeAreaView>
   );

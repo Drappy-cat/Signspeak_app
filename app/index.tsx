@@ -3,7 +3,7 @@ import { useAuth } from '../src/contexts/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function Index() {
-  const { isReady, hasOnboarded, user } = useAuth();
+  const { isReady, hasOnboarded, user, needsProfileCompletion } = useAuth();
 
   if (!isReady) {
     return (
@@ -19,6 +19,10 @@ export default function Index() {
 
   if (!user) {
     return <Redirect href="/(auth)/role-select" />;
+  }
+
+  if (needsProfileCompletion) {
+    return <Redirect href={"/(auth)/complete-profile" as any} />;
   }
 
   return <Redirect href="/(tabs)/home" />;

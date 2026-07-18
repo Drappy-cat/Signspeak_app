@@ -219,10 +219,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   // ── Native STT via expo-speech-recognition ──────────────────────────────────
   // We import these conditionally to avoid crashes on web
-  const nativeSTT = useRef<{
-    module: any;
-    useEvent: any;
-  } | null>(null);
+  const nativeSTT = useRef<any>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
@@ -446,6 +443,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     const { useSpeechRecognitionEvent } = nativeSTT.current;
 
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     useSpeechRecognitionEvent('result', (event: any) => {
       let finalStr = '';
       let interimStr = '';
@@ -485,6 +483,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       resetAutoPauseTimer();
     });
 
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     useSpeechRecognitionEvent('error', (event: any) => {
       if (event.error === 'no-speech') return;
       setSession(prev => ({

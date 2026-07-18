@@ -19,7 +19,7 @@ const HISTORY_DATA = [
 ];
 
 function PulseDot() {
-  const anim = React.useRef(new Animated.Value(0.4)).current;
+  const anim = React.useMemo(() => new Animated.Value(0.4), []);
 
   React.useEffect(() => {
     Animated.loop(
@@ -59,7 +59,7 @@ export default function HomeScreen() {
 
   const [selectedLang, setSelectedLang] = React.useState(settings.language || 'id');
 
-  const StudentHome = () => (
+  const renderStudentHome = () => (
     <View className="pb-10">
       {/* Header */}
       <View className="px-5 pt-3 pb-2 flex-row items-center justify-between">
@@ -72,7 +72,7 @@ export default function HomeScreen() {
           style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: bellBg,
-            alignItems: 'center', justify: 'center',
+            alignItems: 'center', justifyContent: 'center',
             shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
           }}
@@ -131,7 +131,7 @@ export default function HomeScreen() {
 
       {/* Recent history */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justify: 'space-between', marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Text style={{ fontWeight: '800', fontSize: 15, color: hc ? '#f8fafc' : '#0f172a' }}>{d.recentHistory}</Text>
           <TouchableOpacity onPress={() => router.push('/(tabs)/history')} activeOpacity={0.7}>
             <Text className={`text-sm font-bold ${linkColor}`}>{d.seeAll}</Text>
@@ -159,7 +159,7 @@ export default function HomeScreen() {
     </View>
   );
 
-  const TeacherHome = () => (
+  const renderTeacherHome = () => (
     <View className="pb-10">
       {/* Header */}
       <View className="px-5 pt-3 pb-2 flex-row items-center justify-between">
@@ -172,7 +172,7 @@ export default function HomeScreen() {
           style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: bellBg,
-            alignItems: 'center', justify: 'center',
+            alignItems: 'center', justifyContent: 'center',
             shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
           }}
@@ -329,7 +329,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        {role === 'teacher' ? <TeacherHome /> : <StudentHome />}
+        {role === 'teacher' ? renderTeacherHome() : renderStudentHome()}
       </ScrollView>
     </SafeAreaView>
   );

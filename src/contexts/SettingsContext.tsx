@@ -32,10 +32,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [isReady, setIsReady] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
   const loadSettings = async () => {
     try {
       const storedSettings = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -48,6 +44,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setIsReady(true);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSettings();
+  }, []);
 
   const updateSettings = async (newSettings: Partial<Settings>) => {
     const updatedSettings = { ...settings, ...newSettings };

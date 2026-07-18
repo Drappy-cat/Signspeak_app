@@ -28,7 +28,7 @@ export default function HistoryScreen() {
   const handleShare = async (item: SessionRecord) => {
     try {
       await Share.share({
-        message: \`Transkrip \${item.subject} - \${item.className}\nTanggal: \${item.date}\n\n\${item.transcriptFull || item.excerpt}\`,
+        message: `Transkrip ${item.subject} - ${item.className}\nTanggal: ${item.date}\n\n${item.transcriptFull || item.excerpt}`,
       });
     } catch (error) {
       console.error(error);

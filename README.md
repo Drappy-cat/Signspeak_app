@@ -1,9 +1,9 @@
-Speech Recognition untuk Siswa Tunarungu
+#Speech Recognition untuk Siswa Tunarungu
 
 Aplikasi transkripsi suara real-time yang membantu siswa Tunarungu memahami percakapan lisan di lingkungan pendidikan. Suara guru diubah menjadi teks secara langsung di layar siswa, dengan tampilan yang ramah aksesibilitas.
 
 
-✨ Fitur
+#✨ Fitur
 
 🔊 Transkripsi real-time — suara guru diubah jadi teks langsung di layar siswa
 🏫 Sesi kelas — guru membuat sesi dengan kode unik, siswa bergabung dengan kode tersebut
@@ -14,12 +14,12 @@ Aplikasi transkripsi suara real-time yang membantu siswa Tunarungu memahami perc
 
 
 
-🛠️ Tech stack
+#🛠️ Tech stack
 
 BagianTeknologiFrontendVite, React, TypeScriptInstallable appvite-plugin-pwaDatabase & realtimeSupabaseBackend (terpisah)LaravelSpeech-to-textAPI online (Google Cloud Speech-to-Text / alternatif)
 
 
-📁 Struktur folder
+#📁 Struktur folder
 
 src/
 ├─ pages/          # Login, DashboardGuru, DashboardSiswa, TranskripsiLive, Riwayat, Pengaturan
@@ -28,24 +28,24 @@ src/
 └─ App.tsx         # navigasi antar halaman
 
 
-🚀 Menjalankan di lokal
+#🚀 Menjalankan di lokal
 
-1. Clone repo dan install dependencies
+#1. Clone repo dan install dependencies
 
 bashgit clone <url-repo-ini>
 cd speech-recognition-app
 npm install
 
-2. Salin file environment dan isi kredensial Supabase
+#2. Salin file environment dan isi kredensial Supabase
 
 bashcp .env.example .env
 
-3. Jalankan development server
+#3. Jalankan development server
 
 bashnpm run dev
 
 
-📦 Build production
+#📦 Build production
 
 bashnpm run build
 npm run preview
@@ -53,7 +53,7 @@ npm run preview
 Buka hasil preview dari HP (satu jaringan wifi) lewat Chrome untuk mencoba opsi "Tambahkan ke layar utama".
 
 
-🧭 Status pengembangan
+#🧭 Status pengembangan
 
 Project ini masih dalam tahap awal. Yang masih perlu dikerjakan:
 

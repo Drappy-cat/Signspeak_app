@@ -9,6 +9,7 @@ import {
   upsertProfile,
   onAuthStateChange,
   getSession,
+  pingSupabase,
   type ProfileData,
 } from '../services/authService';
 
@@ -58,6 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Load cached auth state on mount ───────────────────────────────────────
   const loadAuthState = async () => {
+    // Keep Supabase active in the background
+    pingSupabase();
+
     try {
       const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
       const onboarded = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);

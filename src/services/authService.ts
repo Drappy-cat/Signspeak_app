@@ -94,14 +94,14 @@ export async function upsertProfile(userId: string, email: string, profileData: 
       id: userId,
       email,
       name: profileData.name,
-      role: profileData.role,
+      role: profileData.role || 'student',
       photo_uri: profileData.photoUri || null,
       school: profileData.school || null,
       class_name: profileData.className || null,
       subject: profileData.subject || null,
       teacher_id: profileData.teacherId || null,
       is_verified: profileData.isVerified ?? false,
-    }, { onConflict: 'id' });
+    } as any, { onConflict: 'id' });
 
   if (error) throw error;
   return data;

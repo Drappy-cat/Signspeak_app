@@ -1,14 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../services/supabase';
 
 export type Role = 'student' | 'teacher' | null;
 
 export interface User {
+  id?: string;
   name: string;
   email: string;
   role: Role;
   school?: string;
   className?: string;
+  joinedRoomCode?: string;
 }
 
 interface AuthContextType {
@@ -16,11 +19,12 @@ interface AuthContextType {
   role: Role;
   isReady: boolean;
   hasOnboarded: boolean;
-  login: (email: string, password?: string, classCode?: string, targetRole?: Role) => Promise<void>;
+  login: (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string) => Promise<void>;
   logout: () => Promise<void>;
   setRole: (role: Role) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   register: (name: string, email: string, password?: string, school?: string, className?: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,32 +62,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAuthState();
+    
+    // Listen to Supabase auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        await AsyncStorage.removeItem(USER_STORAGE_KEY);
+        setUser(null);
+        if (role === 'teacher') setRoleState(null);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password?: string, classCode?: string, targetRole?: Role) => {
+  const login = async (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string) => {
     const activeRole = targetRole || role;
     if (targetRole) {
       setRoleState(targetRole);
     }
-    // Mock login functionality
-    const mockUser: User = {
-      email,
-      name: activeRole === 'student' ? 'Budi Santoso' : 'Bu Sari Dewi',
-      role: activeRole,
-      school: 'SMAN 1 Surabaya',
-      className: activeRole === 'student' ? 'XII IPA 3' : undefined,
-    };
-
-    try {
+    
+    if (activeRole === 'student') {
+      // Students don't need Supabase Auth, they just need local state to join sessions
+      const mockUser: User = {
+        email: '',
+        name: name || 'Siswa Tanpa Nama',
+        role: 'student',
+        className: className || 'Kelas Umum',
+        joinedRoomCode: roomCode,
+      };
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
       setUser(mockUser);
-    } catch (e) {
-      console.error('Failed to save user', e);
+      return;
+    }
+    
+    // Teacher: Use Supabase Auth
+    if (!password) throw new Error('Password required for teacher login');
+    
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (authError) {
+      throw new Error(authError.message);
+    }
+    
+    // Fetch profile
+    if (authData.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+        
+      if (profileError) {
+        console.warn('Failed to fetch profile:', profileError);
+      }
+      
+      const teacherUser: User = {
+        id: authData.user.id,
+        email: authData.user.email || email,
+        name: profile?.name || 'Guru LENTERA',
+        role: 'teacher',
+        school: profile?.school || '',
+      };
+      
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(teacherUser));
+      setUser(teacherUser);
     }
   };
 
   const logout = async () => {
     try {
+      if (role === 'teacher') {
+        await supabase.auth.signOut();
+      }
       await AsyncStorage.removeItem(USER_STORAGE_KEY);
       setUser(null);
       setRoleState(null);
@@ -116,25 +169,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (name: string, email: string, password?: string, school?: string, className?: string) => {
     const activeRole = role;
+    
+    if (activeRole === 'student') {
+      throw new Error('Student registration is not required.');
+    }
+    
+    if (!password) throw new Error('Password required');
+
+    // Register with Supabase
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role: activeRole,
+          school,
+        },
+      },
+    });
+
+    if (authError) {
+      throw new Error(authError.message);
+    }
+    
+    // NOTE: We assume the public.handle_new_user() trigger from supabase_setup_guide.md 
+    // will automatically create the profile in public.profiles table.
+
     const newUser: User = {
+      id: authData.user?.id,
       email,
       name,
       role: activeRole,
       school,
-      className: activeRole === 'student' ? className : undefined,
     };
 
-    try {
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
-      setUser(newUser);
-    } catch (e) {
-      console.error('Failed to register user', e);
-      throw e;
+    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
+    setUser(newUser);
+  };
+
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // In a real app, you would point this to your deep link or website reset page
+      redirectTo: 'lentera://reset-password',
+    });
+    if (error) {
+      throw new Error(error.message);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding, register }}>
+    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding, register, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

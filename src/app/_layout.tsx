@@ -31,9 +31,12 @@ function FloatingDevMenu() {
 
   const handleSwitch = async (targetRole: 'student' | 'teacher') => {
     await setRole(targetRole);
-    await login(targetRole === 'student' ? 'siswa@lentera.sch.id' : 'guru@lentera.sch.id', undefined, undefined, targetRole);
     setOpen(false);
-    router.replace('/(tabs)/home');
+    if (targetRole === 'student') {
+      router.replace('/(auth)/login');
+    } else {
+      router.replace('/(auth)/login');
+    }
   };
 
   const handleReset = async () => {
@@ -181,8 +184,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           activeOpacity={0.8}
           onPress={async () => {
             await setRole('student');
-            await login('siswa@lentera.sch.id', undefined, undefined, 'student');
-            router.replace('/(tabs)/home');
+            router.replace('/(auth)/login');
           }}
           style={{
             backgroundColor: role === 'student' ? '#ffffff' : 'rgba(255,255,255,0.12)',
@@ -199,8 +201,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           activeOpacity={0.8}
           onPress={async () => {
             await setRole('teacher');
-            await login('guru@lentera.sch.id', undefined, undefined, 'teacher');
-            router.replace('/(tabs)/home');
+            router.replace('/(auth)/login');
           }}
           style={{
             backgroundColor: role === 'teacher' ? '#ffffff' : 'rgba(255,255,255,0.12)',

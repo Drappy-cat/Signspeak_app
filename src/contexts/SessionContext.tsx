@@ -5,6 +5,7 @@ import { getTime } from '../utils/formatters';
 import { Platform } from 'react-native';
 import { DEMO_SENTENCES } from '../constants/keywords';
 import { translateToMadurese } from '../utils/translator';
+import { supabase } from '../services/supabase';
 
 
 // ─── Language Mapping ─────────────────────────────────────────────────────────
@@ -17,7 +18,7 @@ const LANG_TO_BCP47: Record<string, string> = {
 
 export interface ActiveSession {
   isActive: boolean;
-  classCode: string | null;
+  roomCode: string | null;
   subject: string | null;
   language: string;
   transcript: string;
@@ -28,7 +29,7 @@ export interface ActiveSession {
 
 interface SessionContextType {
   session: ActiveSession;
-  startSession: (classCode: string, subject: string, language: string) => Promise<void>;
+  startSession: (roomCode: string, subject: string, language: string) => Promise<void>;
   endSession: () => Promise<void>;
   updateLanguage: (language: string) => void;
   pauseRecording: () => Promise<void>;
@@ -39,7 +40,7 @@ interface SessionContextType {
 
 const defaultSession: ActiveSession = {
   isActive: false,
-  classCode: null,
+  roomCode: null,
   subject: null,
   language: 'id',
   transcript: '',
@@ -217,6 +218,71 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // ── Supabase Student Subscription ─────────────────────────────────────────────
+  useEffect(() => {
+    let channel: any = null;
+    if (role === 'student' && user?.joinedRoomCode) {
+      const roomCode = user.joinedRoomCode;
+      
+      const fetchInitial = async () => {
+        const { data } = await supabase.from('active_sessions').select('*').eq('class_code', roomCode).eq('is_active', true).maybeSingle();
+        if (data) {
+          setSession({
+            isActive: true,
+            roomCode: data.class_code,
+            subject: data.subject,
+            language: 'id',
+            transcript: data.transcript,
+            interimTranscript: data.interim_transcript,
+            errorMessage: null,
+            startTime: new Date(data.started_at).getTime(),
+          });
+        }
+      };
+      fetchInitial();
+      
+      channel = supabase
+        .channel(`room_${roomCode}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'active_sessions', filter: `class_code=eq.${roomCode}` },
+          (payload) => {
+            const updated = payload.new;
+            if (!updated.is_active) {
+              setSession(prev => ({ ...prev, isActive: false, errorMessage: 'Sesi telah diakhiri oleh guru.' }));
+            } else {
+              setSession(prev => ({
+                ...prev,
+                transcript: updated.transcript,
+                interimTranscript: updated.interim_transcript,
+              }));
+            }
+          }
+        )
+        .subscribe();
+    }
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [role, user?.joinedRoomCode]);
+
+  // ── Supabase Teacher Sync ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (role === 'teacher' && session.isActive && session.roomCode) {
+      const timer = setTimeout(() => {
+        supabase.from('active_sessions').update({
+          transcript: session.transcript,
+          interim_transcript: session.interimTranscript,
+        }).eq('class_code', session.roomCode).then(({ error }) => {
+          if (error) console.warn('[Supabase] Sync Error:', error);
+        });
+      }, 500); // Debounce interval
+      return () => clearTimeout(timer);
+    }
+  }, [session.transcript, session.interimTranscript, session.isActive, session.roomCode, role]);
+
   // ── Native STT via expo-speech-recognition ──────────────────────────────────
   // We import these conditionally to avoid crashes on web
   const nativeSTT = useRef<{
@@ -375,11 +441,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Session Lifecycle ────────────────────────────────────────────────────────
-  const startSession = async (classCode: string, subject: string, language: string) => {
+  const startSession = async (roomCode: string, subject: string, language: string) => {
     accumulatedTranscriptRef.current = '';
+    
+    if (user?.id) {
+      const { error } = await supabase.from('active_sessions').insert({
+        class_code: roomCode,
+        teacher_id: user.id,
+        subject: subject,
+        is_active: true,
+        transcript: '',
+        interim_transcript: ''
+      });
+      if (error) {
+        console.error('[Supabase] Failed to start session', error);
+      }
+    }
+
     setSession({
       isActive: true,
-      classCode,
+      roomCode,
       subject,
       language,
       transcript: '',
@@ -400,6 +481,27 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         ? translateToMadurese(accumulatedTranscriptRef.current)
         : accumulatedTranscriptRef.current;
       const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
+
+      // End session in active_sessions
+      if (session.roomCode) {
+        await supabase.from('active_sessions').update({ is_active: false }).eq('class_code', session.roomCode);
+      }
+
+      // Save to sessions table in Supabase
+      if (user?.id) {
+        await supabase.from('sessions').insert({
+          subject: session.subject || 'Sesi Tanpa Judul',
+          class_name: session.roomCode || 'Kelas Umum', // Mapping room code to class_name for now
+          teacher_name: user?.name || 'Guru',
+          teacher_id: user.id,
+          date: `Hari ini, ${getTime()}`,
+          duration,
+          word_count: wordCount,
+          language: session.language,
+          excerpt: text.substring(0, 120) + (text.length > 120 ? '...' : ''),
+          transcript_full: text,
+        });
+      }
 
       try {
         await saveSession({

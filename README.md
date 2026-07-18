@@ -2,8 +2,6 @@
 
 Aplikasi transkripsi suara real-time yang membantu siswa Tunarungu memahami percakapan lisan di lingkungan pendidikan. Suara guru diubah menjadi teks secara langsung di layar siswa, dengan tampilan yang ramah aksesibilitas.
 
-> Proyek riset kolaborasi dengan Program Studi Teknologi Pendidikan.
-
 ---
 
 ## ✨ Fitur

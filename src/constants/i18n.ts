@@ -56,6 +56,13 @@ export const DICT = {
     loginRegister: "Daftar Gratis",
     loginJoinCode: "Bergabung via Kode Kelas",
     loginJoinCodeSub: "Masukkan kode dari guru tanpa perlu daftar",
+    registerTitle: "Daftar Akun",
+    registerBtn: "Daftar Sekarang",
+    registerName: "Nama Lengkap",
+    registerSchool: "Nama Sekolah",
+    registerClass: "Nama Kelas (contoh: XII IPA 3)",
+    registerHasAccount: "Sudah memiliki akun?",
+    registerLogin: "Masuk di sini",
   },
   en: {
     studentView: "Student View",
@@ -114,5 +121,12 @@ export const DICT = {
     loginRegister: "Sign Up for Free",
     loginJoinCode: "Join via Class Code",
     loginJoinCodeSub: "Enter the code from your teacher without signing up",
+    registerTitle: "Register Account",
+    registerBtn: "Register Now",
+    registerName: "Full Name",
+    registerSchool: "School Name",
+    registerClass: "Class Name (e.g. XII IPA 3)",
+    registerHasAccount: "Already have an account?",
+    registerLogin: "Log In here",
   }
 };

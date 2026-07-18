@@ -20,6 +20,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   setRole: (role: Role) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  register: (name: string, email: string, password?: string, school?: string, className?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,10 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<Role>(null);
   const [isReady, setIsReady] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
-
-  useEffect(() => {
-    loadAuthState();
-  }, []);
 
   const loadAuthState = async () => {
     try {
@@ -57,6 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsReady(true);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAuthState();
+  }, []);
 
   const login = async (email: string, password?: string, classCode?: string, targetRole?: Role) => {
     const activeRole = targetRole || role;
@@ -112,8 +114,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const register = async (name: string, email: string, password?: string, school?: string, className?: string) => {
+    const activeRole = role;
+    const newUser: User = {
+      email,
+      name,
+      role: activeRole,
+      school,
+      className: activeRole === 'student' ? className : undefined,
+    };
+
+    try {
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
+      setUser(newUser);
+    } catch (e) {
+      console.error('Failed to register user', e);
+      throw e;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding }}>
+    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding, register }}>
       {children}
     </AuthContext.Provider>
   );

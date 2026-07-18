@@ -19,12 +19,12 @@ const SHOW_DEV_MENU = false;
 SplashScreen.preventAutoHideAsync();
 
 function FloatingDevMenu() {
-  if (!SHOW_DEV_MENU) return null;
-
   const [open, setOpen] = useState(false);
   const { role, setRole, login } = useAuth();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
+
+  if (!SHOW_DEV_MENU) return null;
   
   const appLang = settings.appLang || 'id';
   const d = DICT[appLang];

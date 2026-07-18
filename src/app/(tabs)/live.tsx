@@ -14,7 +14,7 @@ import { getCardShadow } from '../../utils/formatters';
 
 // ── PulseDot ──────────────────────────────────────────────────────────────────
 function PulseDot({ color = 'bg-red-500' }: { color?: string }) {
-  const anim = React.useRef(new RNAnimated.Value(0.4)).current;
+  const anim = React.useMemo(() => new RNAnimated.Value(0.4), []);
   React.useEffect(() => {
     RNAnimated.loop(
       RNAnimated.sequence([
@@ -30,7 +30,7 @@ function PulseDot({ color = 'bg-red-500' }: { color?: string }) {
 function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
   const ratios = [0.45, 0.75, 1.0, 0.85, 0.55, 0.9, 0.65, 0.8, 0.45];
   const color = hc ? "#34d399" : "#10b981";
-  const anims = React.useRef(ratios.map(() => new RNAnimated.Value(3))).current;
+  const anims = React.useMemo(() => ratios.map(() => new RNAnimated.Value(3)), []);
 
   React.useEffect(() => {
     if (!active) {
@@ -113,7 +113,7 @@ export default function LiveScreen() {
   const [paused, setPaused] = useState(false);
   const [studentQuestion, setStudentQuestion] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
-  const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+  const pulseAnim = React.useMemo(() => new RNAnimated.Value(1), []);
 
   const handleSpeakQuestion = async () => {
     if (!studentQuestion.trim()) return;
@@ -223,7 +223,7 @@ export default function LiveScreen() {
   };
 
   // ── Student Live View ─────────────────────────────────────────────────────
-  const StudentLive = () => {
+  const renderStudentLive = () => {
     const isSpeaking = session.interimTranscript.length > 0;
     const hasContent = session.transcript.length > 0 || session.interimTranscript.length > 0;
     const activeFontSize = FontSizes[settings.fontSize] || FontSizes.normal;
@@ -422,7 +422,7 @@ export default function LiveScreen() {
   };
 
   // ── Teacher Live View ─────────────────────────────────────────────────────
-  const TeacherLive = () => (
+  const renderTeacherLive = () => (
     <ScrollView
       style={{ flex: 1, backgroundColor: bgColor }}
       contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}
@@ -637,7 +637,7 @@ export default function LiveScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
-      {role === 'teacher' ? <TeacherLive /> : <StudentLive />}
+      {role === 'teacher' ? renderTeacherLive() : renderStudentLive()}
     </SafeAreaView>
   );
 }

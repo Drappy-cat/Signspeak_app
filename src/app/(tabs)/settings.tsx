@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { Animated, Easing } from 'react-native';
 
 function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => void; hc: boolean }) {
-  const anim = React.useRef(new Animated.Value(val ? 22 : 2)).current;
+  const anim = React.useMemo(() => new Animated.Value(val ? 22 : 2), []);
 
   React.useEffect(() => {
     Animated.timing(anim, {

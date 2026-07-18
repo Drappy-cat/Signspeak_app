@@ -1,56 +1,65 @@
-# Welcome to your Expo app 👋
+Speech Recognition untuk Siswa Tunarungu
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplikasi transkripsi suara real-time yang membantu siswa Tunarungu memahami percakapan lisan di lingkungan pendidikan. Suara guru diubah menjadi teks secara langsung di layar siswa, dengan tampilan yang ramah aksesibilitas.
 
-## Get started
 
-1. Install dependencies
+✨ Fitur
 
-   ```bash
-   npm install
-   ```
+🔊 Transkripsi real-time — suara guru diubah jadi teks langsung di layar siswa
+🏫 Sesi kelas — guru membuat sesi dengan kode unik, siswa bergabung dengan kode tersebut
+📜 Riwayat transkrip — siswa bisa membuka ulang transkrip sesi sebelumnya
+⚙️ Pengaturan aksesibilitas — ukuran font, mode kontras tinggi, pilihan bahasa
+📲 Installable ke HP — dibangun sebagai PWA, bisa ditambahkan ke home screen tanpa Play Store
+🪶 Ringan — dioptimasi untuk device dengan spesifikasi rendah
 
-2. Start the app
 
-   ```bash
-   npx expo start
-   ```
 
-In the output, you'll find options to open the app in a
+🛠️ Tech stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+BagianTeknologiFrontendVite, React, TypeScriptInstallable appvite-plugin-pwaDatabase & realtimeSupabaseBackend (terpisah)LaravelSpeech-to-textAPI online (Google Cloud Speech-to-Text / alternatif)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-## Get a fresh project
+📁 Struktur folder
 
-When you're ready, run:
+src/
+├─ pages/          # Login, DashboardGuru, DashboardSiswa, TranskripsiLive, Riwayat, Pengaturan
+├─ lib/supabase.ts # koneksi ke Supabase
+├─ types/          # tipe data (UserProfile, SesiKelas, TranskripEntry, dst)
+└─ App.tsx         # navigasi antar halaman
 
-```bash
-npm run reset-project
-```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+🚀 Menjalankan di lokal
 
-### Other setup steps
+1. Clone repo dan install dependencies
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+bashgit clone <url-repo-ini>
+cd speech-recognition-app
+npm install
 
-## Learn more
+2. Salin file environment dan isi kredensial Supabase
 
-To learn more about developing your project with Expo, look at the following resources:
+bashcp .env.example .env
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+3. Jalankan development server
 
-## Join the community
+bashnpm run dev
 
-Join our community of developers creating universal apps.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+📦 Build production
+
+bashnpm run build
+npm run preview
+
+Buka hasil preview dari HP (satu jaringan wifi) lewat Chrome untuk mencoba opsi "Tambahkan ke layar utama".
+
+
+🧭 Status pengembangan
+
+Project ini masih dalam tahap awal. Yang masih perlu dikerjakan:
+
+
+ Integrasi Supabase Auth (saat ini halaman login masih dummy)
+ Backend Laravel untuk menerima audio stream & memanggil speech-to-text API
+ Broadcast hasil transkrip ke channel Supabase Realtime
+ Styling sesuai desain Figma
+ Testing di device spesifikasi rendah

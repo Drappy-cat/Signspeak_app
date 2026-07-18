@@ -11,7 +11,9 @@
       "icon": "./assets/expo.icon",
       "infoPlist": {
         "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone.",
+        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photo library to set your profile picture.",
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to take a photo for your profile picture."
       }
     },
     "android": {

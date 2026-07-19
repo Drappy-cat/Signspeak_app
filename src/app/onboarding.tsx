@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import { useState } from 'react';
 import { Dimensions, Image, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut, FadeOutUp } from 'react-native-reanimated';
 import { DICT } from '../constants/i18n';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -68,19 +68,22 @@ export default function OnboardingScreen() {
   const slides = [
     {
       colors: ['#13388e', '#13388e'] as const,
-      image: require('../assets/images/ob1.jpg'),
+      imageId: require('../assets/images/ob1.jpg'),
+      imageEn: require('../assets/images/1.jpg'),
       title: d.obTitle1,
       sub: d.obSub1,
     },
     {
       colors: ['#13388e', '#13388e'] as const,
-      image: require('../assets/images/ob2.jpg'),
+      imageId: require('../assets/images/ob2.jpg'),
+      imageEn: require('../assets/images/2.jpg'),
       title: d.obTitle2,
       sub: d.obSub2,
     },
     {
       colors: ['#13388e', '#13388e'] as const,
-      image: require('../assets/images/ob3.jpg'),
+      imageId: require('../assets/images/ob3.jpg'),
+      imageEn: require('../assets/images/3.jpg'),
       title: d.obTitle3,
       sub: d.obSub3,
     },
@@ -98,14 +101,31 @@ export default function OnboardingScreen() {
     <View style={{ flex: 1, backgroundColor: s.colors[0] }}>
       <LangToggle />
 
-      <Animated.Image
-        key={slide}
-        source={s.image}
-        entering={FadeInDown.duration(320).springify()}
-        exiting={FadeOutUp.duration(320)}
-        style={{ position: 'absolute', width: '100%', height: '100%' }}
-        resizeMode="stretch"
-      />
+      {appLang === 'en' ? (
+        s.imageEn ? (
+          <Animated.Image
+            key={`en-${slide}`}
+            source={s.imageEn}
+            entering={FadeIn.duration(400)}
+            exiting={FadeOut.duration(400)}
+            style={{ position: 'absolute', width: '100%', height: '100%' }}
+            resizeMode="stretch"
+          />
+        ) : (
+          <View style={{ flex: 1, backgroundColor: s.colors[0], alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold', opacity: 0.5 }}>Belum Ada Foto (EN)</Text>
+          </View>
+        )
+      ) : (
+        <Animated.Image
+          key={`id-${slide}`}
+          source={s.imageId}
+          entering={FadeIn.duration(400)}
+          exiting={FadeOut.duration(400)}
+          style={{ position: 'absolute', width: '100%', height: '100%' }}
+          resizeMode="stretch"
+        />
+      )}
 
       <View style={{ position: 'absolute', bottom: 16, width: '100%', paddingHorizontal: 32, gap: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 4 }}>

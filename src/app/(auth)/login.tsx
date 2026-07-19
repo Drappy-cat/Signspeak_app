@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Headphones } from 'lucide-react-native';
+import { Headphones, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
@@ -16,6 +16,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
+  const [showPass, setShowPass] = useState(false);
   const [classCode, setClassCode] = useState('');
   const [studentName, setStudentName] = useState('');
   const [studentClass, setStudentClass] = useState('');
@@ -295,17 +296,29 @@ export default function LoginScreen() {
                 {/* Password */}
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.loginPass}</Text>
-                  <TextInput
-                    value={pass}
-                    onChangeText={setPass}
-                    placeholder="••••••••"
-                    placeholderTextColor={mutedColor}
-                    secureTextEntry
-                    style={[{
-                      borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
-                      fontSize: 14, fontWeight: '500',
-                    }, inputStyle]}
-                  />
+                  <View style={[{
+                    flexDirection: 'row', alignItems: 'center',
+                    borderRadius: 12, paddingRight: 16,
+                  }, inputStyle]}>
+                    <TextInput
+                      value={pass}
+                      onChangeText={setPass}
+                      placeholder="••••••••"
+                      placeholderTextColor={mutedColor}
+                      secureTextEntry={!showPass}
+                      style={{
+                        flex: 1, paddingHorizontal: 16, paddingVertical: 12,
+                        fontSize: 14, fontWeight: '500', color: textColor,
+                      }}
+                    />
+                    <TouchableOpacity activeOpacity={0.7} onPress={() => setShowPass(!showPass)}>
+                      {showPass ? (
+                        <EyeOff size={20} color={mutedColor} />
+                      ) : (
+                        <Eye size={20} color={mutedColor} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
                   <View style={{ alignItems: 'flex-end', marginTop: 2 }}>
                     <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/(auth)/forgot-password')}>
                       <Text style={{ color: '#3b82f6', fontSize: 13, fontWeight: '700' }}>

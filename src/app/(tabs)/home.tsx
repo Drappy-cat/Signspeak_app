@@ -18,6 +18,21 @@ const HISTORY_DATA = [
   { id: 3, subject: "Fisika", kelas: "XII IPA 3", teacher: "Pak Ahmad Rizki", date: "Senin, 11:00", duration: "45 mnt", words: 1100, excerpt: "...hukum Newton tentang gerak, gaya, dan percepatan..." },
 ];
 
+const getGreeting = (lang: string) => {
+  const hour = new Date().getHours();
+  if (lang === 'en') {
+    if (hour < 12) return 'Good Morning,';
+    if (hour < 15) return 'Good Afternoon,';
+    if (hour < 18) return 'Good Evening,';
+    return 'Good Night,';
+  } else {
+    if (hour < 11) return 'Selamat Pagi,';
+    if (hour < 15) return 'Selamat Siang,';
+    if (hour < 18) return 'Selamat Sore,';
+    return 'Selamat Malam,';
+  }
+};
+
 function PulseDot() {
   const anim = React.useMemo(() => new Animated.Value(0.4), []);
 
@@ -33,7 +48,7 @@ function PulseDot() {
 }
 
 export default function HomeScreen() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { startSession } = useSession();
   const { settings } = useSettings();
   const router = useRouter();
@@ -63,9 +78,16 @@ export default function HomeScreen() {
     <View className="pb-10">
       {/* Header */}
       <View className="px-5 pt-3 pb-2 flex-row items-center justify-between">
-        <View>
-          <Text className={`text-xs font-bold ${muted}`}>{d.welcome}</Text>
-          <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>Budi Santoso</Text>
+        <View style={{ flex: 1, marginRight: 16 }}>
+          <Text className={`text-xs font-bold ${muted}`}>{getGreeting(appLang)}</Text>
+          <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>
+            {user?.name || 'Budi Santoso'}
+          </Text>
+          {(user?.className || user?.school) && (
+            <Text className={`text-xs ${muted} mt-0.5`} numberOfLines={1}>
+              {[user.className, user.school].filter(Boolean).join(' • ')}
+            </Text>
+          )}
         </View>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -163,9 +185,16 @@ export default function HomeScreen() {
     <View className="pb-10">
       {/* Header */}
       <View className="px-5 pt-3 pb-2 flex-row items-center justify-between">
-        <View>
-          <Text className={`text-xs font-bold ${muted}`}>{d.teacher}</Text>
-          <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>Bu Sari Dewi</Text>
+        <View style={{ flex: 1, marginRight: 16 }}>
+          <Text className={`text-xs font-bold ${muted}`}>{getGreeting(appLang)}</Text>
+          <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>
+            {user?.name || 'Bu Sari Dewi'}
+          </Text>
+          {user?.school && (
+            <Text className={`text-xs ${muted} mt-0.5`} numberOfLines={1}>
+              {user.school}
+            </Text>
+          )}
         </View>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -218,7 +247,8 @@ export default function HomeScreen() {
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => {
-            startSession('Biologi', 'XII IPA 3', selectedLang);
+            const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            startSession(roomCode, 'Biologi', selectedLang);
             router.push('/(tabs)/live');
           }}
         >

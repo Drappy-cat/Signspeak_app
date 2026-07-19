@@ -1,25 +1,26 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, ScrollView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Headphones, ArrowLeft } from 'lucide-react-native';
-import { useAuth } from '../../contexts/AuthContext';
+import { Camera, User as UserIcon } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth, type Role } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { DICT } from '../../constants/i18n';
 import { getCardShadow } from '../../utils/formatters';
+import { saveProfilePhotoLocally, uploadProfilePhoto } from '../../services/storageService';
 
-export default function RegisterScreen() {
+export default function CompleteProfileScreen() {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [pass, setPass] = useState('');
   const [school, setSchool] = useState('');
   const [className, setClassName] = useState('');
   const [subject, setSubject] = useState('');
   const [teacherNip, setTeacherNip] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const router = useRouter();
-  const { register, loginWithGoogle, role } = useAuth();
+  const { role, completeProfile } = useAuth();
   const { settings } = useSettings();
 
   const hc = settings.highContrast;
@@ -40,18 +41,23 @@ export default function RegisterScreen() {
     ? { backgroundColor: '#334155', borderColor: '#475569', borderWidth: 1, color: '#f8fafc' }
     : { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1, color: '#0f172a' };
 
-  const handleRegister = async () => {
+  const pickPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setPhotoUri(result.assets[0].uri);
+    }
+  };
+
+  const handleComplete = async () => {
     setErrorMsg('');
     if (!name.trim()) {
       setErrorMsg(appLang === 'en' ? 'Full Name is required' : 'Nama Lengkap wajib diisi');
-      return;
-    }
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMsg(appLang === 'en' ? 'Valid Email is required' : 'Email valid wajib diisi');
-      return;
-    }
-    if (pass.length < 6) {
-      setErrorMsg(appLang === 'en' ? 'Password must be at least 6 characters' : 'Kata Sandi minimal harus 6 karakter');
       return;
     }
     if (!school.trim()) {
@@ -66,23 +72,30 @@ export default function RegisterScreen() {
     setLoading(true);
 
     try {
-      await register(name.trim(), email.trim(), pass, school.trim(), className.trim());
+      let finalPhotoUri: string | undefined;
+
+      // Save photo locally (and prepare for cloud upload later)
+      if (photoUri) {
+        const localPath = await saveProfilePhotoLocally(photoUri, `profile-${Date.now()}`);
+        finalPhotoUri = await uploadProfilePhoto(localPath, `profile-${Date.now()}`);
+      }
+
+      await completeProfile({
+        name: name.trim(),
+        role: role as Role,
+        photoUri: finalPhotoUri,
+        school: school.trim(),
+        className: role === 'student' ? className.trim() : undefined,
+        subject: role === 'teacher' ? subject.trim() || undefined : undefined,
+        teacherId: role === 'teacher' ? teacherNip.trim() || undefined : undefined,
+        isVerified: false,
+      });
+
       setLoading(false);
       router.replace('/(tabs)/home');
     } catch (e: any) {
       setLoading(false);
-      setErrorMsg(e.message || (appLang === 'en' ? 'Registration failed' : 'Pendaftaran gagal'));
-    }
-  };
-
-  const handleGoogleRegister = async () => {
-    setLoading(true);
-    try {
-      await loginWithGoogle();
-      setLoading(false);
-    } catch (error) {
-      setLoading(false);
-      console.error('Google register failed:', error);
+      setErrorMsg(e.message || (appLang === 'en' ? 'Failed to save profile' : 'Gagal menyimpan profil'));
     }
   };
 
@@ -95,48 +108,58 @@ export default function RegisterScreen() {
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-          {/* Header Back Button */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 16, paddingBottom: 8 }}>
-            <TouchableOpacity 
-              activeOpacity={0.7} 
-              onPress={() => router.back()}
-              style={{
-                width: 40, height: 40, borderRadius: 12,
-                backgroundColor: hc ? '#1e293b' : '#ffffff',
-                alignItems: 'center', justifyContent: 'center',
-                ...getCardShadow(hc, 'sm'),
-              }}
-            >
-              <ArrowLeft size={20} color={textColor} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Logo area */}
-          <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 16, gap: 8 }}>
-            <View style={{
-              width: 52, height: 52, borderRadius: 14,
-              backgroundColor: '#1e3a8a',
-              alignItems: 'center', justifyContent: 'center',
-              shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
-            }}>
-              <Headphones size={26} color="#ffffff" />
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 20, fontWeight: '900', color: '#1e3a8a', letterSpacing: 0.5 }}>LENTERA</Text>
-              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 4, fontWeight: '600' }}>
-                {d.registerTitle} <Text style={{ fontWeight: '800' }}>{role === 'student' ? d.student : d.teacher}</Text>
-              </Text>
-            </View>
+          {/* Header */}
+          <View style={{ alignItems: 'center', paddingTop: 32, paddingBottom: 20, gap: 8 }}>
+            <Text style={{ fontSize: 22, fontWeight: '900', color: '#1e3a8a', letterSpacing: 0.5 }}>
+              {d.completeProfileTitle}
+            </Text>
+            <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center' }}>
+              {d.completeProfileSub}
+            </Text>
           </View>
 
           {/* Form card */}
-          <View style={[{ padding: 20, gap: 12 }, cardStyle]}>
+          <View style={[{ padding: 20, gap: 16 }, cardStyle]}>
             {errorMsg ? (
               <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
                 {errorMsg}
               </Text>
             ) : null}
+
+            {/* Profile Photo */}
+            <View style={{ alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>{d.profilePhoto}</Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={pickPhoto}
+                style={{
+                  width: 96, height: 96, borderRadius: 48,
+                  backgroundColor: hc ? '#334155' : '#f1f5f9',
+                  borderWidth: 2, borderColor: hc ? '#475569' : '#e2e8f0',
+                  borderStyle: 'dashed',
+                  alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {photoUri ? (
+                  <Image source={{ uri: photoUri }} style={{ width: 96, height: 96, borderRadius: 48 }} />
+                ) : (
+                  <View style={{ alignItems: 'center', gap: 4 }}>
+                    <Camera size={24} color={mutedColor} />
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: mutedColor }}>
+                      {d.profilePhotoAdd}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {photoUri ? (
+                <TouchableOpacity activeOpacity={0.7} onPress={pickPhoto}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1e40af' }}>
+                    {d.profilePhotoChange}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
 
             {/* Nama Lengkap */}
             <View style={{ gap: 4 }}>
@@ -146,39 +169,6 @@ export default function RegisterScreen() {
                 onChangeText={setName}
                 placeholder="Budi Santoso"
                 placeholderTextColor={mutedColor}
-                style={[{
-                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
-                  fontSize: 14, fontWeight: '500',
-                }, inputStyle]}
-              />
-            </View>
-
-            {/* Email */}
-            <View style={{ gap: 4 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>{d.loginEmail}</Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="nama@sekolah.sch.id"
-                placeholderTextColor={mutedColor}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={[{
-                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
-                  fontSize: 14, fontWeight: '500',
-                }, inputStyle]}
-              />
-            </View>
-
-            {/* Password */}
-            <View style={{ gap: 4 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>{d.loginPass}</Text>
-              <TextInput
-                value={pass}
-                onChangeText={setPass}
-                placeholder="••••••••"
-                placeholderTextColor={mutedColor}
-                secureTextEntry
                 style={[{
                   borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
                   fontSize: 14, fontWeight: '500',
@@ -218,7 +208,7 @@ export default function RegisterScreen() {
               </View>
             ) : null}
 
-            {/* Mata Pelajaran — Khusus Guru (opsional) */}
+            {/* Mata Pelajaran & NIP — Khusus Guru */}
             {role === 'teacher' ? (
               <>
                 <View style={{ gap: 4 }}>
@@ -234,7 +224,6 @@ export default function RegisterScreen() {
                     }, inputStyle]}
                   />
                 </View>
-                {/* NIP / ID Guru — opsional */}
                 <View style={{ gap: 4 }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>{d.teacherNip}</Text>
                   <TextInput
@@ -251,13 +240,13 @@ export default function RegisterScreen() {
               </>
             ) : null}
 
-            {/* Register button */}
+            {/* Save & Continue button */}
             <TouchableOpacity
-              onPress={handleRegister}
+              onPress={handleComplete}
               disabled={loading}
               activeOpacity={0.9}
               style={{
-                width: '100%', paddingVertical: 12, borderRadius: 12,
+                width: '100%', paddingVertical: 14, borderRadius: 12,
                 alignItems: 'center', justifyContent: 'center', marginTop: 8,
                 backgroundColor: loading ? 'rgba(30,58,138,0.5)' : '#1e3a8a',
               }}
@@ -265,40 +254,8 @@ export default function RegisterScreen() {
               {loading ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 15 }}>{d.registerBtn}</Text>
+                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 15 }}>{d.completeProfileBtn}</Text>
               )}
-            </TouchableOpacity>
-
-            {/* Divider — atau / or */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-              <Text style={{ marginHorizontal: 12, fontSize: 12, fontWeight: '600', color: mutedColor }}>{d.orDivider}</Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-            </View>
-
-            {/* Google Sign-Up button */}
-            <TouchableOpacity
-              onPress={handleGoogleRegister}
-              disabled={loading}
-              activeOpacity={0.9}
-              style={{
-                width: '100%', paddingVertical: 12, borderRadius: 12,
-                alignItems: 'center', justifyContent: 'center',
-                backgroundColor: hc ? '#334155' : '#ffffff',
-                borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
-                flexDirection: 'row', gap: 10,
-              }}
-            >
-              <Text style={{ fontSize: 18 }}>G</Text>
-              <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.registerWithGoogle}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Login link */}
-          <View style={{ marginTop: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ fontSize: 14, color: mutedColor }}>{d.registerHasAccount} </Text>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()}>
-              <Text style={{ color: '#1e40af', fontWeight: '800', fontSize: 14 }}>{d.registerLogin}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

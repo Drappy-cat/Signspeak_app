@@ -21,6 +21,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      // @ts-ignore
       sceneContainerStyle={{ backgroundColor: hc ? '#0f172a' : '#F0F7FF' }}
       screenOptions={{
         headerShown: false,
@@ -39,7 +40,7 @@ export default function TabLayout() {
           fontWeight: '900',
           fontSize: 10,
         },
-        tabBarButton: (props) => (
+        tabBarButton: (props: any) => (
           <Pressable 
             {...props} 
             style={[props.style, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}]} 

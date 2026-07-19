@@ -94,7 +94,7 @@ export default function HomeScreen() {
           style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: bellBg,
-            alignItems: 'center', justify: 'center',
+            alignItems: 'center', justifyContent: 'center',
             shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
           }}
@@ -153,7 +153,7 @@ export default function HomeScreen() {
 
       {/* Recent history */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justify: 'space-between', marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Text style={{ fontWeight: '800', fontSize: 15, color: hc ? '#f8fafc' : '#0f172a' }}>{d.recentHistory}</Text>
           <TouchableOpacity onPress={() => router.push('/(tabs)/history')} activeOpacity={0.7}>
             <Text className={`text-sm font-bold ${linkColor}`}>{d.seeAll}</Text>
@@ -201,7 +201,7 @@ export default function HomeScreen() {
           style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: bellBg,
-            alignItems: 'center', justify: 'center',
+            alignItems: 'center', justifyContent: 'center',
             shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
           }}

@@ -10,7 +10,9 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  photoUri?: string;
   school?: string;
+  // Student-specific
   className?: string;
   joinedRoomCode?: string;
 }
@@ -38,20 +40,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<Role>(null);
   const [isReady, setIsReady] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
 
+  // ── Load cached auth state on mount ───────────────────────────────────────
   const loadAuthState = async () => {
     try {
       const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
       const onboarded = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
-      
+
       if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
+        const parsedUser: User = JSON.parse(storedUser);
         setUser(parsedUser);
         setRoleState(parsedUser.role);
       }
-      
+
       if (onboarded === 'true') {
         setHasOnboarded(true);
+      }
+
+      // Try to sync with Supabase session if available
+      try {
+        const session = await getSession();
+        if (session?.user) {
+          const profile = await getProfile(session.user.id);
+          if (profile && profile.name) {
+            const syncedUser: User = {
+              id: session.user.id,
+              email: session.user.email || '',
+              name: profile.name,
+              role: profile.role as Role,
+              photoUri: profile.photo_uri || profile.photoUri,
+              school: profile.school,
+              className: profile.class_name || profile.className,
+              subject: profile.subject,
+              teacherId: profile.teacher_id || profile.teacherId,
+              isVerified: profile.is_verified ?? profile.isVerified ?? false,
+            };
+            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(syncedUser));
+            setUser(syncedUser);
+            setRoleState(syncedUser.role);
+            setNeedsProfileCompletion(false);
+          } else if (!storedUser) {
+            // User is authenticated but has no profile yet
+            setNeedsProfileCompletion(true);
+          }
+        }
+      } catch {
+        // Supabase not reachable — use cached local data, which is fine
+        console.log('Supabase session sync skipped (offline or not configured)');
       }
     } catch (e) {
       console.error('Failed to load auth state', e);
@@ -61,7 +97,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAuthState();
     
     // Listen to Supabase auth changes
@@ -133,6 +168,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ── Login with Google ─────────────────────────────────────────────────────
+  const loginWithGoogle = async () => {
+    try {
+      await signInWithGoogle();
+      // The auth state change listener will handle the rest
+      // (setting user, checking profile, etc.)
+    } catch (error) {
+      console.error('Google login failed:', error);
+      throw error;
+    }
+  };
+
+  // ── Logout ────────────────────────────────────────────────────────────────
   const logout = async () => {
     try {
       if (role === 'teacher') {
@@ -144,30 +192,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error('Failed to logout', e);
     }
+    await AsyncStorage.removeItem(USER_STORAGE_KEY);
+    setUser(null);
+    setRoleState(null);
+    setNeedsProfileCompletion(false);
   };
 
+  // ── Set Role ──────────────────────────────────────────────────────────────
   const setRole = async (newRole: Role) => {
     setRoleState(newRole);
     if (user) {
       const updatedUser = { ...user, role: newRole };
-      try {
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
-        setUser(updatedUser);
-      } catch (e) {
-        console.error('Failed to update role', e);
-      }
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+      setUser(updatedUser);
     }
   };
 
+  // ── Complete Onboarding ───────────────────────────────────────────────────
   const completeOnboarding = async () => {
-    try {
-      await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
-      setHasOnboarded(true);
-    } catch (e) {
-      console.error('Failed to complete onboarding', e);
-    }
+    await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+    setHasOnboarded(true);
   };
 
+  // ── Register with Email ───────────────────────────────────────────────────
   const register = async (name: string, email: string, password?: string, school?: string, className?: string) => {
     const activeRole = role;
     

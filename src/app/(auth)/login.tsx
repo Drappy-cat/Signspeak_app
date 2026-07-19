@@ -53,7 +53,7 @@ export default function LoginScreen() {
   }, [showModal, modalScale, modalOpacity]);
 
   const router = useRouter();
-  const { login, role } = useAuth();
+  const { login, loginWithGoogle, role } = useAuth();
   const { settings } = useSettings();
   
   const hc = settings.highContrast;
@@ -211,7 +211,7 @@ export default function LoginScreen() {
             </View>
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 22, fontWeight: '900', color: '#1e3a8a', letterSpacing: 1 }}>LENTERA</Text>
-              <Text style={{ fontSize: 9, fontWeight: '800', color: mutedColor, textTransform: 'uppercase', tracking: 1.5, textAlign: 'center', marginTop: 2 }}>
+              <Text style={{ fontSize: 9, fontWeight: '800', color: mutedColor, textTransform: 'uppercase', letterSpacing: 1.5, textAlign: 'center', marginTop: 2 }}>
                 Learning Text &{'\n'}Real-time Accessibility
               </Text>
               <Text style={{ fontSize: 12, color: mutedColor, marginTop: 12 }}>
@@ -335,6 +335,30 @@ export default function LoginScreen() {
                 </Text>
               )}
             </TouchableOpacity>
+
+            {/* Divider — atau / or */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
+              <Text style={{ marginHorizontal: 12, fontSize: 12, fontWeight: '600', color: mutedColor }}>{d.orDivider}</Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
+            </View>
+
+            {/* Google Sign-In button */}
+            <TouchableOpacity
+              onPress={handleGoogleLogin}
+              disabled={loading}
+              activeOpacity={0.9}
+              style={{
+                width: '100%', paddingVertical: 14, borderRadius: 12,
+                alignItems: 'center', justifyContent: 'center',
+                backgroundColor: hc ? '#334155' : '#ffffff',
+                borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
+                flexDirection: 'row', gap: 10,
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>G</Text>
+              <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.loginWithGoogle}</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Register link - Teacher Only */}
@@ -353,3 +377,4 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
+

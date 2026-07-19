@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
 import { supabase } from '../services/supabase';
 
 export type Role = 'student' | 'teacher' | null;
@@ -209,9 +210,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
+    const redirectUrl = Linking.createURL('/update-password');
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // In a real app, you would point this to your deep link or website reset page
-      redirectTo: 'lentera://reset-password',
+      redirectTo: redirectUrl,
     });
     if (error) {
       throw new Error(error.message);

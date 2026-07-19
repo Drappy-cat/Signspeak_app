@@ -18,6 +18,21 @@ const HISTORY_DATA = [
   { id: 3, subject: "Fisika", kelas: "XII IPA 3", teacher: "Pak Ahmad Rizki", date: "Senin, 11:00", duration: "45 mnt", words: 1100, excerpt: "...hukum Newton tentang gerak, gaya, dan percepatan..." },
 ];
 
+const getGreeting = (lang: string) => {
+  const hour = new Date().getHours();
+  if (lang === 'en') {
+    if (hour < 12) return 'Good Morning,';
+    if (hour < 15) return 'Good Afternoon,';
+    if (hour < 18) return 'Good Evening,';
+    return 'Good Night,';
+  } else {
+    if (hour < 11) return 'Selamat Pagi,';
+    if (hour < 15) return 'Selamat Siang,';
+    if (hour < 18) return 'Selamat Sore,';
+    return 'Selamat Malam,';
+  }
+};
+
 function PulseDot() {
   const anim = React.useMemo(() => new Animated.Value(0.4), []);
 
@@ -64,7 +79,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View className="px-5 pt-3 pb-2 flex-row items-center justify-between">
         <View style={{ flex: 1, marginRight: 16 }}>
-          <Text className={`text-xs font-bold ${muted}`}>{d.welcome}</Text>
+          <Text className={`text-xs font-bold ${muted}`}>{getGreeting(appLang)}</Text>
           <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>
             {user?.name || 'Budi Santoso'}
           </Text>
@@ -171,7 +186,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View className="px-5 pt-3 pb-2 flex-row items-center justify-between">
         <View style={{ flex: 1, marginRight: 16 }}>
-          <Text className={`text-xs font-bold ${muted}`}>{d.teacher}</Text>
+          <Text className={`text-xs font-bold ${muted}`}>{getGreeting(appLang)}</Text>
           <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>
             {user?.name || 'Bu Sari Dewi'}
           </Text>

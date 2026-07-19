@@ -1,29 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Headphones, ArrowLeft, Mail } from 'lucide-react-native';
+import { Headphones, ArrowLeft, KeyRound } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
 import { getCardShadow } from '../../utils/formatters';
+import { supabase } from '../../services/supabase';
 
-export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState('');
+export default function UpdatePasswordScreen() {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (countdown > 0) {
-      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [countdown]);
 
   const router = useRouter();
-  const { resetPassword, role } = useAuth();
   const { settings } = useSettings();
 
   const hc = settings.highContrast;
@@ -43,42 +35,37 @@ export default function ForgotPasswordScreen() {
     ? { backgroundColor: '#334155', borderColor: '#475569', borderWidth: 1, color: '#f8fafc' }
     : { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1, color: '#0f172a' };
 
-  const handleReset = async () => {
+  const handleUpdate = async () => {
     setErrorMsg('');
     setSuccessMsg('');
     
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMsg(appLang === 'en' ? 'Valid email is required' : 'Email valid wajib diisi');
+    if (!password || password.length < 6) {
+      setErrorMsg(appLang === 'en' ? 'Password must be at least 6 characters' : 'Kata Sandi minimal 6 karakter');
       return;
     }
     
-    if (countdown > 0) return;
+    if (password !== confirmPassword) {
+      setErrorMsg(appLang === 'en' ? 'Passwords do not match' : 'Kata Sandi tidak cocok');
+      return;
+    }
 
     setLoading(true);
     try {
-      await resetPassword(email.trim());
+      const { error } = await supabase.auth.updateUser({ password });
+      
+      if (error) throw error;
+      
       setLoading(false);
-      setCountdown(60);
       setSuccessMsg(appLang === 'en' 
-        ? 'Password reset email sent! Please check your inbox.' 
-        : 'Email pemulihan sandi telah dikirim! Silakan periksa kotak masuk Anda.');
+        ? 'Password updated successfully! You can now log in.' 
+        : 'Sandi berhasil diperbarui! Anda kini dapat masuk dengan sandi baru.');
+        
+      setTimeout(() => {
+        router.replace('/(auth)/login');
+      }, 3000);
     } catch (e: any) {
       setLoading(false);
-      let errorText = e.message || '';
-      if (typeof errorText === 'object') errorText = JSON.stringify(errorText);
-      if (errorText === '{}' || !errorText) {
-        errorText = appLang === 'en' ? 'SMTP Configuration Error' : 'Kesalahan Konfigurasi SMTP (Gagal Mengirim)';
-      }
-      
-      const errMsg = errorText.toLowerCase();
-      if (errMsg.includes('rate limit')) {
-        setCountdown(60);
-        setErrorMsg(appLang === 'en' 
-          ? 'Email rate limit exceeded. If you just requested a reset, please check your inbox or wait a moment.' 
-          : 'Batas pengiriman email tercapai. Jika Anda baru saja meminta pemulihan, mohon periksa kotak masuk Anda atau tunggu beberapa saat.');
-      } else {
-        setErrorMsg(errorText);
-      }
+      setErrorMsg(e.message || (appLang === 'en' ? 'Failed to update password' : 'Gagal memperbarui sandi'));
     }
   };
 
@@ -97,7 +84,7 @@ export default function ForgotPasswordScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 16, paddingBottom: 8 }}>
             <TouchableOpacity 
               activeOpacity={0.7} 
-              onPress={() => router.back()}
+              onPress={() => router.replace('/(auth)/login')}
               style={{
                 width: 40, height: 40, borderRadius: 12,
                 backgroundColor: hc ? '#1e293b' : '#ffffff',
@@ -123,7 +110,7 @@ export default function ForgotPasswordScreen() {
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 20, fontWeight: '900', color: '#1e3a8a', letterSpacing: 0.5 }}>LENTERA</Text>
               <Text style={{ fontSize: 12, color: mutedColor, marginTop: 4, fontWeight: '600' }}>
-                {appLang === 'en' ? 'Reset Password' : 'Lupa Kata Sandi'}
+                {appLang === 'en' ? 'Update Password' : 'Perbarui Sandi'}
               </Text>
             </View>
           </View>
@@ -132,12 +119,12 @@ export default function ForgotPasswordScreen() {
           <View style={[{ padding: 20, gap: 16 }, cardStyle]}>
             <View style={{ alignItems: 'center', marginBottom: 8 }}>
               <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: hc ? '#334155' : '#eff6ff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                <Mail size={24} color="#3b82f6" />
+                <KeyRound size={24} color="#3b82f6" />
               </View>
               <Text style={{ color: mutedColor, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
                 {appLang === 'en' 
-                  ? 'Enter the email associated with your account and we will send an email with instructions to reset your password.'
-                  : 'Masukkan email yang terkait dengan akun Anda dan kami akan mengirimkan email berisi instruksi pemulihan.'}
+                  ? 'Enter your new password below to recover your account.'
+                  : 'Masukkan kata sandi baru Anda di bawah ini untuk memulihkan akun.'}
               </Text>
             </View>
 
@@ -159,15 +146,31 @@ export default function ForgotPasswordScreen() {
 
             <View style={{ gap: 4 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>
-                {appLang === 'en' ? 'Email Address' : 'Alamat Email'}
+                {appLang === 'en' ? 'New Password' : 'Sandi Baru'}
               </Text>
               <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="nama@sekolah.sch.id"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••••"
                 placeholderTextColor={mutedColor}
-                keyboardType="email-address"
-                autoCapitalize="none"
+                secureTextEntry
+                style={[{
+                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+                  fontSize: 14, fontWeight: '500',
+                }, inputStyle]}
+              />
+            </View>
+            
+            <View style={{ gap: 4 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>
+                {appLang === 'en' ? 'Confirm Password' : 'Konfirmasi Sandi'}
+              </Text>
+              <TextInput
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="••••••••"
+                placeholderTextColor={mutedColor}
+                secureTextEntry
                 style={[{
                   borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                   fontSize: 14, fontWeight: '500',
@@ -177,10 +180,10 @@ export default function ForgotPasswordScreen() {
 
             <TouchableOpacity 
               activeOpacity={0.8}
-              onPress={handleReset}
-              disabled={loading || countdown > 0}
+              onPress={handleUpdate}
+              disabled={loading || !!successMsg}
               style={{
-                backgroundColor: (loading || countdown > 0) ? '#93c5fd' : '#3b82f6',
+                backgroundColor: (loading || !!successMsg) ? '#93c5fd' : '#3b82f6',
                 paddingVertical: 14,
                 borderRadius: 12,
                 alignItems: 'center',
@@ -188,11 +191,9 @@ export default function ForgotPasswordScreen() {
               }}
             >
               <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800' }}>
-                {countdown > 0 
-                  ? (appLang === 'en' ? `Wait ${countdown}s` : `Tunggu ${countdown}d`)
-                  : loading 
-                    ? (appLang === 'en' ? 'Sending...' : 'Mengirim...') 
-                    : (appLang === 'en' ? 'Send Reset Link' : 'Kirim Tautan Pemulihan')
+                {loading 
+                  ? (appLang === 'en' ? 'Updating...' : 'Memperbarui...') 
+                  : (appLang === 'en' ? 'Update Password' : 'Ubah Kata Sandi')
                 }
               </Text>
             </TouchableOpacity>

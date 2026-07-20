@@ -34,7 +34,13 @@ export default function AboutScreen() {
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, gap: 12 }}>
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/settings');
+            }
+          }}
           style={{
             width: 40,
             height: 40,
@@ -99,7 +105,7 @@ export default function AboutScreen() {
               />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontWeight: '800', fontSize: 16, color: textColor }}>
-                  Adhitya Adhitya Amarulloh
+                  Adhitya Amarulloh
                 </Text>
                 <Text style={{ fontSize: 13, color: mutedColor, marginTop: 2 }}>
                   Universitas Negeri Surabaya

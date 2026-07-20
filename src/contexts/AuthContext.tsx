@@ -46,10 +46,7 @@ interface AuthContextType {
   register: (name: string, email: string, password?: string, school?: string, className?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-<<<<<<< HEAD
   completeProfile: (profileData: ProfileData) => Promise<void>;
-=======
->>>>>>> 265cabd62411530526bcbbc1cfc49e35b3b96611
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -322,11 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-<<<<<<< HEAD
     <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, needsProfileCompletion, login, logout, setRole, completeOnboarding, register, resetPassword, loginWithGoogle, completeProfile }}>
-=======
-    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding, register, resetPassword, loginWithGoogle }}>
->>>>>>> 265cabd62411530526bcbbc1cfc49e35b3b96611
       {children}
     </AuthContext.Provider>
   );

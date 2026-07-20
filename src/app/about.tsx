@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSettings } from '../contexts/SettingsContext';
 import { DICT } from '../constants/i18n';
 import { getCardShadow } from '../utils/formatters';
-import { ArrowLeft, Info, Users } from 'lucide-react-native';
+import { ArrowLeft, Info, Users, Mail, GraduationCap, Globe, User } from 'lucide-react-native';
 
 export default function AboutScreen() {
   const router = useRouter();
@@ -18,26 +18,12 @@ export default function AboutScreen() {
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
   const iconColor = hc ? '#60a5fa' : '#1e40af';
-  const borderColor = hc ? '#334155' : '#cbd5e1';
 
   const cardStyle = {
     backgroundColor: hc ? '#1e293b' : '#ffffff',
     borderRadius: 16,
     padding: 20,
     ...getCardShadow(hc, 'lg'),
-  };
-
-  const placeholderCardStyle = {
-    backgroundColor: 'transparent',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderStyle: 'dashed' as const,
-    borderColor: borderColor,
-    padding: 32,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    minHeight: 180,
-    marginTop: 8,
   };
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
@@ -90,8 +76,8 @@ export default function AboutScreen() {
           </View>
         </View>
 
-        {/* Research Team Placeholder Section */}
-        <View style={{ gap: 6 }}>
+        {/* Research Team Section */}
+        <View style={{ gap: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
             <Users size={16} color={iconColor} />
             <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>
@@ -99,15 +85,103 @@ export default function AboutScreen() {
             </Text>
           </View>
           
-          <View style={placeholderCardStyle}>
-            <Text style={{ color: mutedColor, fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 4 }}>
-              {appLang === 'en' ? 'No Team Data' : 'Belum Ada Data Tim'}
-            </Text>
-            <Text style={{ color: mutedColor, fontSize: 11, textAlign: 'center', maxWidth: 220, lineHeight: 16 }}>
-              {appLang === 'en' 
-                ? 'Information about the research team members will be updated soon.' 
-                : 'Informasi mengenai anggota tim peneliti akan diperbarui segera.'}
-            </Text>
+          <View style={cardStyle}>
+            {/* Profile Info */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontWeight: '800', fontSize: 16, color: textColor }}>
+                Adhitya Adhitya Amarulloh
+              </Text>
+              <Text style={{ fontSize: 13, color: mutedColor, marginTop: 2 }}>
+                Universitas Negeri Surabaya
+              </Text>
+            </View>
+
+            {/* Email Contact Button */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => Linking.openURL('mailto:adhityaamarulloh@unesa.ac.id')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 16,
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 12,
+                backgroundColor: hc ? '#1e3a8a' : '#f1f5f9',
+              }}
+            >
+              <Mail size={15} color={iconColor} />
+              <Text style={{ fontSize: 13, color: textColor, fontWeight: '700' }}>
+                adhityaamarulloh@unesa.ac.id
+              </Text>
+            </TouchableOpacity>
+
+            {/* Profile Links Button Grid */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {/* Google Scholar */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => Linking.openURL('https://scholar.google.com/citations?hl=en&user=AUhf9PUAAAAJ')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  backgroundColor: hc ? 'transparent' : '#ffffff',
+                  ...getCardShadow(hc, 'sm'),
+                }}
+              >
+                <GraduationCap size={14} color="#3b82f6" />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: textColor }}>
+                  Google Scholar
+                </Text>
+              </TouchableOpacity>
+
+              {/* LinkedIn */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => Linking.openURL('https://www.linkedin.com/in/adhitya-a-67a6818a/')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  backgroundColor: hc ? 'transparent' : '#ffffff',
+                  ...getCardShadow(hc, 'sm'),
+                }}
+              >
+                <User size={14} color="#0077b5" />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: textColor }}>
+                  LinkedIn
+                </Text>
+              </TouchableOpacity>
+
+              {/* Scopus */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => Linking.openURL('https://www.scopus.com/authid/detail.uri?authorId=59235408300')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  backgroundColor: hc ? 'transparent' : '#ffffff',
+                  ...getCardShadow(hc, 'sm'),
+                }}
+              >
+                <Globe size={14} color="#eab308" />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: textColor }}>
+                  Scopus
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>

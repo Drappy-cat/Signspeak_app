@@ -1,58 +1,90 @@
-import dictData from '../assets/dictionary_id_mad.json';
+import dictDataMad from '../assets/dictionary_id_mad.json';
+import dictDataJv from '../assets/dictionary_id_jv.json';
 
-const dictionary: Record<string, string> = dictData;
-let cachedRegex: RegExp | null = null;
+const dictionaryMad: Record<string, string> = dictDataMad;
+const dictionaryJv: Record<string, string> = dictDataJv;
+
+let cachedRegexMad: RegExp | null = null;
+let cachedRegexJv: RegExp | null = null;
 
 /**
  * Menerjemahkan kalimat Bahasa Indonesia ke Bahasa Madura secara real-time kata demi kata & frasa demi frasa.
- * Mempertahankan tanda baca, spasi, dan gaya penulisan huruf besar/kecil.
  */
 export function translateToMadurese(text: string): string {
   if (!text) return '';
 
-  if (!cachedRegex) {
-    // Urutkan kunci berdasarkan panjang karakter menurun agar frasa panjang (e.g. "kemarin malam")
-    // dicocokkan terlebih dahulu sebelum kata tunggal (e.g. "malam")
-    const sortedKeys = Object.keys(dictionary).sort((a, b) => b.length - a.length);
+  if (!cachedRegexMad) {
+    const sortedKeys = Object.keys(dictionaryMad).sort((a, b) => b.length - a.length);
     const escapedKeys = sortedKeys.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
-    // Compile semua kunci menjadi satu regular expression state machine untuk pencarian O(N) instan
-    cachedRegex = new RegExp(`\\b(${escapedKeys.join('|')})\\b`, 'gi');
+    cachedRegexMad = new RegExp(`\\b(${escapedKeys.join('|')})\\b`, 'gi');
   }
 
-  return text.replace(cachedRegex, (match) => {
+  return text.replace(cachedRegexMad, (match) => {
     const lowerMatch = match.toLowerCase();
-    const translation = dictionary[lowerMatch];
+    const translation = dictionaryMad[lowerMatch];
     
     if (translation) {
-      // Pertahankan huruf besar jika kata asli menggunakan huruf besar semua
-      if (match === match.toUpperCase()) {
-        return translation.toUpperCase();
-      }
-      // Pertahankan huruf besar di awal kata (Capitalized)
-      if (match[0] === match[0].toUpperCase()) {
-        return translation[0].toUpperCase() + translation.slice(1);
-      }
+      if (match === match.toUpperCase()) return translation.toUpperCase();
+      if (match[0] === match[0].toUpperCase()) return translation[0].toUpperCase() + translation.slice(1);
       return translation;
     }
-    
     return match;
   });
 }
 
-let cachedReverseDict: Record<string, string> | null = null;
+/**
+ * Menerjemahkan kalimat Bahasa Indonesia ke Bahasa Jawa secara real-time kata demi kata & frasa demi frasa.
+ */
+export function translateToJavanese(text: string): string {
+  if (!text) return '';
+
+  if (!cachedRegexJv) {
+    const sortedKeys = Object.keys(dictionaryJv).sort((a, b) => b.length - a.length);
+    const escapedKeys = sortedKeys.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+    cachedRegexJv = new RegExp(`\\b(${escapedKeys.join('|')})\\b`, 'gi');
+  }
+
+  return text.replace(cachedRegexJv, (match) => {
+    const lowerMatch = match.toLowerCase();
+    const translation = dictionaryJv[lowerMatch];
+    
+    if (translation) {
+      if (match === match.toUpperCase()) return translation.toUpperCase();
+      if (match[0] === match[0].toUpperCase()) return translation[0].toUpperCase() + translation.slice(1);
+      return translation;
+    }
+    return match;
+  });
+}
+
+let cachedReverseDictMad: Record<string, string> | null = null;
+let cachedReverseDictJv: Record<string, string> | null = null;
 
 /**
- * Mencari kata asli Bahasa Indonesia dari kata terjemahan Bahasa Madura (Reverse Lookup)
+ * Mencari kata asli Bahasa Indonesia dari kata terjemahan Bahasa Madura/Jawa (Reverse Lookup)
  */
-export function getOriginalIndonesianWord(madureseWord: string): string | null {
-  if (!madureseWord) return null;
+export function getOriginalIndonesianWord(translatedWord: string, lang: string): string | null {
+  if (!translatedWord) return null;
   
-  if (!cachedReverseDict) {
-    cachedReverseDict = {};
-    for (const [indo, mad] of Object.entries(dictionary)) {
-      cachedReverseDict[mad.toLowerCase()] = indo;
+  if (lang === 'mad') {
+    if (!cachedReverseDictMad) {
+      cachedReverseDictMad = {};
+      for (const [indo, mad] of Object.entries(dictionaryMad)) {
+        cachedReverseDictMad[mad.toLowerCase()] = indo;
+      }
     }
+    return cachedReverseDictMad[translatedWord.toLowerCase()] || null;
   }
   
-  return cachedReverseDict[madureseWord.toLowerCase()] || null;
+  if (lang === 'jv') {
+    if (!cachedReverseDictJv) {
+      cachedReverseDictJv = {};
+      for (const [indo, jv] of Object.entries(dictionaryJv)) {
+        cachedReverseDictJv[jv.toLowerCase()] = indo;
+      }
+    }
+    return cachedReverseDictJv[translatedWord.toLowerCase()] || null;
+  }
+  
+  return null;
 }

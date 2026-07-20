@@ -146,7 +146,9 @@ export default function LiveScreen() {
     
     // Check if it has a glossary definition
     let def = null;
-    if (GLOSSARY[cleanWord]) {
+    if (session.customGlossary && session.customGlossary[cleanWord]) {
+      def = session.customGlossary[cleanWord];
+    } else if (GLOSSARY[cleanWord]) {
       def = GLOSSARY[cleanWord][appLang] || GLOSSARY[cleanWord]['id'];
     }
     setGlossaryDef(def);
@@ -255,7 +257,8 @@ export default function LiveScreen() {
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
   }, [session.transcript, session.interimTranscript]);
 
-  const currentKeywords = KEYWORDS[session.language] || KEYWORDS['id'];
+  const defaultKeywords = KEYWORDS[session.language] || KEYWORDS['id'];
+  const currentKeywords = [...defaultKeywords, ...(session.customKeywords || [])];
   const hc = settings.highContrast;
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textColor = hc ? '#f8fafc' : '#0f172a';

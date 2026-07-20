@@ -40,11 +40,13 @@ export interface ActiveSession {
   errorMessage: string | null;
   startTime: number | null;
   participants: Participant[];
+  customKeywords: string[];
+  customGlossary: Record<string, string>;
 }
 
 interface SessionContextType {
   session: ActiveSession;
-  startSession: (roomCode: string, subject: string, language: string) => Promise<void>;
+  startSession: (roomCode: string, subject: string, language: string, customGlossaryList?: Array<{ word: string; definition: string }>) => Promise<void>;
   endSession: () => Promise<void>;
   updateLanguage: (language: string) => void;
   pauseRecording: () => Promise<void>;
@@ -63,6 +65,8 @@ const defaultSession: ActiveSession = {
   errorMessage: null,
   startTime: null,
   participants: [],
+  customKeywords: [],
+  customGlossary: {},
 };
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -180,6 +184,7 @@ class WebSpeechEngine {
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<ActiveSession>(defaultSession);
   const [isRecording, setIsRecording] = useState(false);
+  const [isSttReady, setIsSttReady] = useState(false);
   const { user, role } = useAuth();
 
   // Refs for side-effect objects
@@ -187,6 +192,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const webMockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accumulatedTranscriptRef = useRef<string>('');
+  const customGlossaryRef = useRef<{ keywords: string[]; glossary: Record<string, string> }>({ keywords: [], glossary: {} });
 
   // Initialize Web Speech Engine once
   useEffect(() => {
@@ -250,6 +256,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             errorMessage: null,
             startTime: new Date(data.started_at).getTime(),
             participants: [],
+            customKeywords: [],
+            customGlossary: {},
           });
         }
       };
@@ -271,6 +279,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                 interimTranscript: updated.interim_transcript,
               }));
             }
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'sync_glossary' },
+          (payload) => {
+            const data = payload.payload;
+            setSession(prev => ({
+              ...prev,
+              customKeywords: data.keywords || [],
+              customGlossary: data.glossary || {},
+            }));
           }
         )
         .subscribe((status) => {
@@ -365,6 +385,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                 participants: updatedParticipants
               };
             });
+
+            // Send back the current glossary to this student!
+            if (customGlossaryRef.current.keywords.length > 0) {
+              channel.send({
+                type: 'broadcast',
+                event: 'sync_glossary',
+                payload: {
+                  keywords: customGlossaryRef.current.keywords,
+                  glossary: customGlossaryRef.current.glossary,
+                }
+              });
+            }
           }
         )
         .subscribe();
@@ -413,6 +445,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           module: mod.ExpoSpeechRecognitionModule,
           useEvent: mod.useSpeechRecognitionEvent,
         };
+        setIsSttReady(true);
       } catch (e) {
         console.warn('[STT] expo-speech-recognition not available');
       }
@@ -552,8 +585,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Session Lifecycle ────────────────────────────────────────────────────────
-  const startSession = async (roomCode: string, subject: string, language: string) => {
+  const startSession = async (
+    roomCode: string, 
+    subject: string, 
+    language: string, 
+    customGlossaryList?: Array<{ word: string; definition: string }>
+  ) => {
     accumulatedTranscriptRef.current = '';
+    
+    // Parse custom glossary list to active state
+    const keywords: string[] = [];
+    const glossary: Record<string, string> = {};
+    if (customGlossaryList && customGlossaryList.length > 0) {
+      customGlossaryList.forEach(item => {
+        if (item.word.trim()) {
+          const lowerWord = item.word.toLowerCase().trim();
+          keywords.push(lowerWord);
+          glossary[lowerWord] = item.definition.trim();
+        }
+      });
+    }
+    
+    customGlossaryRef.current = { keywords, glossary };
     
     if (user?.id) {
       const { error } = await supabase.from('active_sessions').insert({
@@ -579,6 +632,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       errorMessage: null,
       startTime: Date.now(),
       participants: [],
+      customKeywords: keywords,
+      customGlossary: glossary,
     });
 
     await startRecording(language);
@@ -597,6 +652,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         await supabase.from('active_sessions').update({ is_active: false }).eq('class_code', session.roomCode);
       }
 
+      // Serialize glossary metadata if there is a custom glossary
+      let finalTranscriptText = text;
+      if (session.customGlossary && Object.keys(session.customGlossary).length > 0) {
+        finalTranscriptText = text + "\n\n---GLOSSARY---\n" + JSON.stringify(session.customGlossary);
+      }
+
       // Save to sessions table in Supabase
       if (user?.id) {
         await supabase.from('sessions').insert({
@@ -609,7 +670,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           word_count: wordCount,
           language: session.language,
           excerpt: text.substring(0, 120) + (text.length > 120 ? '...' : ''),
-          transcript_full: text,
+          transcript_full: finalTranscriptText,
         });
       }
 
@@ -623,7 +684,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           wordCount,
           language: session.language,
           excerpt: text.substring(0, 120) + (text.length > 120 ? '...' : ''),
-          transcriptFull: text,
+          transcriptFull: finalTranscriptText,
         });
       } catch (e) {
         console.error('[DB] Failed to save session:', e);
@@ -631,6 +692,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     accumulatedTranscriptRef.current = '';
+    customGlossaryRef.current = { keywords: [], glossary: {} };
     setSession(defaultSession);
     setIsRecording(false);
   };
@@ -654,11 +716,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Native event hooks (only used when running natively) ─────────────────────
   // We can't call hooks conditionally, so we always register but they only fire natively
   const NativeEventBridge = () => {
-    if (Platform.OS === 'web' || !nativeSTT.current?.useEvent) return null;
+    const { useSpeechRecognitionEvent } = nativeSTT.current!;
 
-    const { useSpeechRecognitionEvent } = nativeSTT.current;
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useSpeechRecognitionEvent('result', (event: any) => {
       let finalStr = '';
       let interimStr = '';
@@ -693,7 +752,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       resetAutoPauseTimer();
     });
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useSpeechRecognitionEvent('error', (event: any) => {
       if (event.error === 'no-speech') return;
       setSession(prev => ({
@@ -717,7 +775,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       toggleRecording,
     }}>
       {children}
-      <NativeEventBridge />
+      {Platform.OS !== 'web' && isSttReady && <NativeEventBridge />}
     </SessionContext.Provider>
   );
 }

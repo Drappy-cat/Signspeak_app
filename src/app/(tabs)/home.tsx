@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check } from 'lucide-react-native';
+import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -72,10 +72,16 @@ export default function HomeScreen() {
   const linkColor = hc ? "text-blue-400" : "text-blue-800";
   const bellBg = hc ? "#1e293b" : "#ffffff";
 
+  const textColorVal = hc ? '#f8fafc' : '#0f172a';
+  const mutedColorVal = hc ? '#94a3b8' : '#64748b';
+
   const [selectedLang, setSelectedLang] = React.useState(settings.language || 'id');
   const [startModalVisible, setStartModalVisible] = React.useState(false);
   const [selectedSubject, setSelectedSubject] = React.useState('Biologi');
   const [selectedClass, setSelectedClass] = React.useState('XII IPA 3');
+  const [customGlossaryList, setCustomGlossaryList] = React.useState<Array<{ word: string; definition: string }>>([]);
+  const [newWord, setNewWord] = React.useState('');
+  const [newDefinition, setNewDefinition] = React.useState('');
 
   const SUBJECTS = ['Biologi', 'Fisika', 'Kimia', 'Matematika', 'Bahasa Indonesia', 'Bahasa Inggris'];
   const CLASSES = ['X IPA 1', 'XI IPA 2', 'XII IPA 3', 'X IPS 1', 'XI IPS 2', 'XII IPS 3'];
@@ -254,7 +260,10 @@ export default function HomeScreen() {
       <View className="px-5 pt-2">
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => setStartModalVisible(true)}
+          onPress={() => {
+            setCustomGlossaryList([]);
+            setStartModalVisible(true);
+          }}
         >
           <LinearGradient
             colors={['#1e3a8a', '#1e40af']}
@@ -417,75 +426,158 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Subject Selection */}
-            <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
-              {appLang === 'en' ? 'Select Subject' : 'Pilih Mata Pelajaran'}
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-              {SUBJECTS.map((subj) => {
-                const isSelected = selectedSubject === subj;
-                return (
-                  <TouchableOpacity
-                    key={subj}
-                    activeOpacity={0.8}
-                    onPress={() => setSelectedSubject(subj)}
-                    style={{
-                      paddingVertical: 10,
-                      paddingHorizontal: 16,
-                      borderRadius: 12,
-                      backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    {isSelected && <Check size={12} color="#ffffff" />}
-                    <Text style={{
-                      fontSize: 12,
-                      fontWeight: '800',
-                      color: isSelected ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
-                    }}>
-                      {subj}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <ScrollView 
+              showsVerticalScrollIndicator={false} 
+              style={{ maxHeight: 380, marginBottom: 16 }}
+              contentContainerStyle={{ paddingBottom: 10 }}
+            >
+              {/* Subject Selection */}
+              <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
+                {appLang === 'en' ? 'Select Subject' : 'Pilih Mata Pelajaran'}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                {SUBJECTS.map((subj) => {
+                  const isSelected = selectedSubject === subj;
+                  return (
+                    <TouchableOpacity
+                      key={subj}
+                      activeOpacity={0.8}
+                      onPress={() => setSelectedSubject(subj)}
+                      style={{
+                        paddingVertical: 10,
+                        paddingHorizontal: 16,
+                        borderRadius: 12,
+                        backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      {isSelected && <Check size={12} color="#ffffff" />}
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: '800',
+                        color: isSelected ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+                      }}>
+                        {subj}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-            {/* Class Selection */}
-            <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
-              {appLang === 'en' ? 'Select Class' : 'Pilih Kelas'}
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-              {CLASSES.map((cls) => {
-                const isSelected = selectedClass === cls;
-                return (
+              {/* Class Selection */}
+              <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
+                {appLang === 'en' ? 'Select Class' : 'Pilih Kelas'}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                {CLASSES.map((cls) => {
+                  const isSelected = selectedClass === cls;
+                  return (
+                    <TouchableOpacity
+                      key={cls}
+                      activeOpacity={0.8}
+                      onPress={() => setSelectedClass(cls)}
+                      style={{
+                        paddingVertical: 10,
+                        paddingHorizontal: 16,
+                        borderRadius: 12,
+                        backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      {isSelected && <Check size={12} color="#ffffff" />}
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: '800',
+                        color: isSelected ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+                      }}>
+                        {cls}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Custom Glossary Section */}
+              <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
+                {appLang === 'en' ? 'Custom Glossary (Optional)' : 'Daftar Istilah Kustom (Opsional)'}
+              </Text>
+              <View style={{ gap: 8, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    value={newWord}
+                    onChangeText={setNewWord}
+                    placeholder={appLang === 'en' ? 'Keyword (e.g. Mitosis)' : 'Kata Penting (misal: Mitosis)'}
+                    placeholderTextColor={mutedColorVal}
+                    style={[{
+                      flex: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+                      fontSize: 12, fontWeight: '500',
+                    }, hc ? { backgroundColor: '#334155', color: '#f8fafc', borderWidth: 1, borderColor: '#475569' } : { backgroundColor: '#f1f5f9', color: '#0f172a' }]}
+                  />
                   <TouchableOpacity
-                    key={cls}
                     activeOpacity={0.8}
-                    onPress={() => setSelectedClass(cls)}
+                    onPress={() => {
+                      if (newWord.trim() && newDefinition.trim()) {
+                        setCustomGlossaryList(prev => [...prev, { word: newWord.trim(), definition: newDefinition.trim() }]);
+                        setNewWord('');
+                        setNewDefinition('');
+                      }
+                    }}
                     style={{
-                      paddingVertical: 10,
-                      paddingHorizontal: 16,
-                      borderRadius: 12,
-                      backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
+                      backgroundColor: '#1e40af', paddingHorizontal: 16, borderRadius: 10,
+                      alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4,
                     }}
                   >
-                    {isSelected && <Check size={12} color="#ffffff" />}
-                    <Text style={{
-                      fontSize: 12,
-                      fontWeight: '800',
-                      color: isSelected ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
-                    }}>
-                      {cls}
-                    </Text>
+                    <Plus size={14} color="#ffffff" />
+                    <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>{appLang === 'en' ? 'Add' : 'Tambah'}</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
+                </View>
+                <TextInput
+                  value={newDefinition}
+                  onChangeText={setNewDefinition}
+                  placeholder={appLang === 'en' ? 'Definition / Explanation...' : 'Penjelasan / Arti kata...' }
+                  placeholderTextColor={mutedColorVal}
+                  multiline={true}
+                  numberOfLines={2}
+                  style={[{
+                    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+                    fontSize: 12, fontWeight: '500', height: 48, textAlignVertical: 'top',
+                  }, hc ? { backgroundColor: '#334155', color: '#f8fafc', borderWidth: 1, borderColor: '#475569' } : { backgroundColor: '#f1f5f9', color: '#0f172a' }]}
+                />
+              </View>
+
+              {/* Custom Glossary List */}
+              {customGlossaryList.length > 0 && (
+                <View style={{ marginBottom: 8, borderTopWidth: 1, borderTopColor: hc ? '#334155' : '#e2e8f0', paddingTop: 10 }}>
+                  <View style={{ gap: 6 }}>
+                    {customGlossaryList.map((item, index) => (
+                      <View
+                        key={index}
+                        style={{
+                          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                          padding: 8, borderRadius: 8, backgroundColor: hc ? '#334155' : '#f8fafc',
+                        }}
+                      >
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: textColorVal }}>{item.word}</Text>
+                          <Text style={{ fontSize: 10, color: mutedColorVal, marginTop: 2 }}>{item.definition}</Text>
+                        </View>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => setCustomGlossaryList(prev => prev.filter((_, i) => i !== index))}
+                          style={{ padding: 4 }}
+                        >
+                          <Trash2 size={14} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </ScrollView>
 
             {/* Action - Confirm Start */}
             <TouchableOpacity
@@ -494,7 +586,7 @@ export default function HomeScreen() {
                 setStartModalVisible(false);
                 const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
                 const sessionSubject = `${selectedSubject} (${selectedClass})`;
-                startSession(roomCode, sessionSubject, selectedLang);
+                startSession(roomCode, sessionSubject, selectedLang, customGlossaryList);
                 router.push('/(tabs)/live');
               }}
             >

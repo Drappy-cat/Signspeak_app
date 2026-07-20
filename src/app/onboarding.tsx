@@ -143,6 +143,10 @@ export default function OnboardingScreen() {
             </Text>
           </TouchableOpacity>
         )}
+
+        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, textAlign: 'center', marginTop: 6 }}>
+          © Team Peneliti PUI Disabilitas Universitas Negeri Surabaya
+        </Text>
       </View>
     </View>
   );

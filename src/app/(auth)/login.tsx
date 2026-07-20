@@ -149,15 +149,15 @@ export default function LoginScreen() {
     } catch (e: any) {
       setLoading(false);
       const errMsg = e.message?.toLowerCase() || '';
+      setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
       if (errMsg.includes('invalid login credentials')) {
-        setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
         setModalMsg(appLang === 'en' 
           ? 'Account unrecognized or incorrect password. Please register as a teacher first.' 
           : 'Akun tidak dikenali atau sandi salah. Silakan mendaftar sebagai guru terlebih dahulu.');
-        setShowModal(true);
       } else {
-        setErrorMsg(e.message || (appLang === 'en' ? 'Login failed' : 'Masuk gagal'));
+        setModalMsg(e.message || (appLang === 'en' ? 'Login failed' : 'Masuk gagal'));
       }
+      setShowModal(true);
     }
   };
   
@@ -170,7 +170,9 @@ export default function LoginScreen() {
       router.replace('/(tabs)/home');
     } catch (e: any) {
       setLoading(false);
-      setErrorMsg(e.message || (appLang === 'en' ? 'Google login failed' : 'Masuk Google gagal'));
+      setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
+      setModalMsg(e.message || (appLang === 'en' ? 'Google login failed' : 'Masuk Google gagal'));
+      setShowModal(true);
     }
   };
 

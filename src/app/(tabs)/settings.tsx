@@ -5,7 +5,7 @@ import { FontSizeLabels, FontSizeKey, FontSizes } from '../../constants/theme';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
 import { DICT } from '../../constants/i18n';
 import { getCardShadow } from '../../utils/formatters';
-import { Type, Moon, Globe, Zap, User } from 'lucide-react-native';
+import { Type, Moon, Globe, Zap, User, Info, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { Animated, Easing } from 'react-native';
@@ -221,6 +221,34 @@ export default function SettingsScreen() {
           </View>
           <CustomToggle val={settings.vibrate} onChange={() => updateSettings({ vibrate: !settings.vibrate })} hc={hc} />
         </View>
+
+        {/* Tentang Aplikasi / About App Link */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.push('/about')}
+          style={[
+            {
+              padding: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            },
+            cardStyle,
+          ]}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+            <Info size={15} color={iconColor} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>
+                {appLang === 'en' ? 'About App' : 'Tentang Aplikasi'}
+              </Text>
+              <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
+                {appLang === 'en' ? 'App details, research team & funding' : 'Detail aplikasi, tim peneliti & pendanaan'}
+              </Text>
+            </View>
+          </View>
+          <ChevronRight size={18} color={mutedColor} />
+        </TouchableOpacity>
 
         {/* Profile */}
         <View style={[{ padding: 16 }, cardStyle]}>

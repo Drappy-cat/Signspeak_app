@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar, Linking, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSettings } from '../contexts/SettingsContext';
 import { DICT } from '../constants/i18n';
@@ -86,14 +86,25 @@ export default function AboutScreen() {
           </View>
           
           <View style={cardStyle}>
-            {/* Profile Info */}
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontWeight: '800', fontSize: 16, color: textColor }}>
-                Adhitya Adhitya Amarulloh
-              </Text>
-              <Text style={{ fontSize: 13, color: mutedColor, marginTop: 2 }}>
-                Universitas Negeri Surabaya
-              </Text>
+            {/* Profile Info with Image */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              <Image
+                source={require('../assets/images/researcher_adhitya.jpg')}
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
+                }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontWeight: '800', fontSize: 16, color: textColor }}>
+                  Adhitya Adhitya Amarulloh
+                </Text>
+                <Text style={{ fontSize: 13, color: mutedColor, marginTop: 2 }}>
+                  Universitas Negeri Surabaya
+                </Text>
+              </View>
             </View>
 
             {/* Email Contact Button */}

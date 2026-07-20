@@ -122,6 +122,10 @@ export default function RoleSelectScreen() {
       <Text style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 12, marginTop: 32 }}>
         {d.rsFooter}
       </Text>
+
+      <Text style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 9, marginTop: 20 }}>
+        © Team Peneliti PUI Disabilitas Universitas Negeri Surabaya
+      </Text>
     </LinearGradient>
   );
 }

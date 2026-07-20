@@ -38,3 +38,21 @@ export function translateToMadurese(text: string): string {
     return match;
   });
 }
+
+let cachedReverseDict: Record<string, string> | null = null;
+
+/**
+ * Mencari kata asli Bahasa Indonesia dari kata terjemahan Bahasa Madura (Reverse Lookup)
+ */
+export function getOriginalIndonesianWord(madureseWord: string): string | null {
+  if (!madureseWord) return null;
+  
+  if (!cachedReverseDict) {
+    cachedReverseDict = {};
+    for (const [indo, mad] of Object.entries(dictionary)) {
+      cachedReverseDict[mad.toLowerCase()] = indo;
+    }
+  }
+  
+  return cachedReverseDict[madureseWord.toLowerCase()] || null;
+}

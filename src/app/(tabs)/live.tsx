@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2 } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { KEYWORDS, LANGUAGE_LABELS } from '../../constants/keywords';
+import { KEYWORDS, LANGUAGE_LABELS, GLOSSARY } from '../../constants/keywords';
+import { getOriginalIndonesianWord } from '../../utils/translator';
 import { parseHighlights, formatDuration } from '../../utils/formatters';
 import { FontSizes } from '../../constants/theme';
 import { DICT } from '../../constants/i18n';
@@ -66,9 +67,10 @@ function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
 
 // ── Highlighted Transcript Text ───────────────────────────────────────────────
 function HighlightText({
-  text, keywords, hc, fontSize, isOld = false, customColor = null,
+  text, keywords, hc, fontSize, isOld = false, customColor = null, onWordLongPress,
 }: {
   text: string; keywords: string[]; hc: boolean; fontSize: any; isOld?: boolean; customColor?: string | null;
+  onWordLongPress?: (word: string) => void;
 }) {
   const parts = parseHighlights(text, keywords);
   const defaultTextColor = customColor || (hc ? '#f8fafc' : '#0f172a');
@@ -77,27 +79,47 @@ function HighlightText({
 
   return (
     <Text style={{ fontSize: isOld ? fs.transcript * 0.85 : fs.transcript, lineHeight: isOld ? fs.lineHeight * 0.85 : fs.lineHeight }}>
-      {parts.map((part, i) =>
-        part.isKeyword ? (
-          <Text
-            key={i}
-            style={{
-              fontWeight: '800', fontStyle: 'italic',
-              backgroundColor: isOld 
-                ? (hc ? 'rgba(245,158,11,0.15)' : 'rgba(254,243,199,0.5)')
-                : (hc ? '#f59e0b' : '#fef3c7'),
-              color: isOld 
-                ? (hc ? '#94a3b8' : '#b45309')
-                : (hc ? '#1c1917' : '#92400e'),
-              borderRadius: 3, paddingHorizontal: 2,
-            }}
-          >
-            {part.text}
-          </Text>
-        ) : (
-          <Text key={i} style={{ color: textColorStr }}>{part.text}</Text>
-        )
-      )}
+      {parts.map((part, i) => {
+        if (part.isKeyword) {
+          return (
+            <Text
+              key={i}
+              onLongPress={onWordLongPress ? () => onWordLongPress(part.text) : undefined}
+              style={{
+                fontWeight: '800', fontStyle: 'italic',
+                backgroundColor: isOld 
+                  ? (hc ? 'rgba(245,158,11,0.15)' : 'rgba(254,243,199,0.5)')
+                  : (hc ? '#f59e0b' : '#fef3c7'),
+                color: isOld 
+                  ? (hc ? '#94a3b8' : '#b45309')
+                  : (hc ? '#1c1917' : '#92400e'),
+                borderRadius: 3, paddingHorizontal: 2,
+              }}
+            >
+              {part.text}
+            </Text>
+          );
+        } else {
+          // Split regular text into individual words so they can be long-pressed too!
+          const words = part.text.split(/(\s+)/);
+          return words.map((word, wi) => {
+            if (word.trim() === '') {
+              return <Text key={`${i}-${wi}`} style={{ color: textColorStr }}>{word}</Text>;
+            }
+            // Clean word from punctuation
+            const cleanWord = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
+            return (
+              <Text
+                key={`${i}-${wi}`}
+                onLongPress={onWordLongPress ? () => onWordLongPress(cleanWord) : undefined}
+                style={{ color: textColorStr }}
+              >
+                {word}
+              </Text>
+            );
+          });
+        }
+      })}
     </Text>
   );
 }
@@ -108,6 +130,44 @@ export default function LiveScreen() {
   const { session, endSession, isRecording, toggleRecording, updateLanguage } = useSession();
   const { settings } = useSettings();
   const router = useRouter();
+  const appLang = settings.appLang || 'id';
+
+  // Glossary and Word Info Modal states
+  const [glossaryVisible, setGlossaryVisible] = useState(false);
+  const [selectedWord, setSelectedWord] = useState('');
+  const [glossaryDef, setGlossaryDef] = useState<string | null>(null);
+  const [originalIndoWord, setOriginalIndoWord] = useState<string | null>(null);
+
+  const handleWordLongPress = async (word: string) => {
+    if (!word) return;
+    
+    const cleanWord = word.toLowerCase().trim();
+    setSelectedWord(word);
+    
+    // Check if it has a glossary definition
+    let def = null;
+    if (GLOSSARY[cleanWord]) {
+      def = GLOSSARY[cleanWord][appLang] || GLOSSARY[cleanWord]['id'];
+    }
+    setGlossaryDef(def);
+    
+    // Check if it's a translated word (Madurese)
+    let original = null;
+    if (session.language === 'mad') {
+      original = getOriginalIndonesianWord(cleanWord);
+    }
+    setOriginalIndoWord(original);
+    
+    // Only show modal if we either have a glossary definition or a translation reverse lookup
+    if (def || original) {
+      if (settings.vibrate) {
+        try {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } catch (_) {}
+      }
+      setGlossaryVisible(true);
+    }
+  };
 
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -147,7 +207,6 @@ export default function LiveScreen() {
     setStudentQuestion('');
   };
 
-  const appLang = settings.appLang || 'id';
   const d = DICT[appLang];
   const alertedRef = useRef(false);
 
@@ -326,6 +385,7 @@ export default function LiveScreen() {
                   hc={hc}
                   fontSize={activeFontSize}
                   isOld={!isLast}
+                  onWordLongPress={handleWordLongPress}
                 />
               </View>
             );
@@ -644,6 +704,95 @@ export default function LiveScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
       {role === 'teacher' ? renderTeacherLive() : renderStudentLive()}
+
+      {/* Glossary & Definition Modal */}
+      <Modal transparent visible={glossaryVisible} animationType="fade" onRequestClose={() => setGlossaryVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 340,
+            backgroundColor: hc ? '#1e293b' : '#ffffff',
+            borderRadius: 24,
+            padding: 24,
+            ...getCardShadow(hc, 'lg'),
+          }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <View style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <HelpCircle size={20} color={hc ? '#60a5fa' : '#1e40af'} />
+              </View>
+              <Text style={{ fontSize: 16, fontWeight: '900', color: textColor }}>
+                {appLang === 'en' ? 'Word Info' : 'Keterangan Kata'}
+              </Text>
+            </View>
+
+            {/* Content: Selected Word */}
+            <Text style={{ fontSize: 22, fontWeight: '900', color: textColor, marginBottom: 4 }}>
+              {selectedWord}
+            </Text>
+
+            {/* Translation details if available */}
+            {originalIndoWord ? (
+              <View style={{
+                backgroundColor: hc ? 'rgba(59,130,246,0.1)' : '#f0f7ff',
+                borderRadius: 12,
+                padding: 12,
+                marginVertical: 12,
+              }}>
+                <Text style={{ fontSize: 11, color: mutedColor, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {appLang === 'en' ? 'Original Word (Indonesian)' : 'Kata Asli (Bahasa Indonesia)'}
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: hc ? '#60a5fa' : '#1e40af', marginTop: 2 }}>
+                  {originalIndoWord}
+                </Text>
+                <Text style={{ fontSize: 11, color: mutedColor, marginTop: 4 }}>
+                  {appLang === 'en' 
+                    ? `Translated to ${LANGUAGE_LABELS[session.language || 'id']} in transcript` 
+                    : `Diterjemahkan ke Bahasa ${LANGUAGE_LABELS[session.language || 'id']} pada transkrip`}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Glossary Definition if available */}
+            {glossaryDef ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ fontSize: 11, color: mutedColor, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                  {appLang === 'en' ? 'Definition / Explanation' : 'Definisi / Penjelasan'}
+                </Text>
+                <Text style={{ fontSize: 13, color: textColor, lineHeight: 18 }}>
+                  {glossaryDef}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Dismiss Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setGlossaryVisible(false)}
+              style={{
+                width: '100%',
+                backgroundColor: '#1e3a8a',
+                paddingVertical: 12,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 20,
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+                {appLang === 'en' ? 'Close' : 'Tutup'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

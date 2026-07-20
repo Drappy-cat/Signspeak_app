@@ -151,10 +151,10 @@ export default function LiveScreen() {
     }
     setGlossaryDef(def);
     
-    // Check if it's a translated word (Madurese)
+    // Check if it's a translated word (Madurese or Javanese)
     let original = null;
-    if (session.language === 'mad') {
-      original = getOriginalIndonesianWord(cleanWord);
+    if (session.language === 'mad' || session.language === 'jv') {
+      original = getOriginalIndonesianWord(cleanWord, session.language);
     }
     setOriginalIndoWord(original);
     
@@ -591,8 +591,10 @@ export default function LiveScreen() {
             })}
           </View>
           <Text style={{ fontSize: 11, color: mutedColor, marginTop: 8, textAlign: 'center' }}>
-            {session.language === 'mad' 
-              ? (appLang === 'en' ? '⚠️ Madurese uses Indonesian engine' : '⚠️ Madura menggunakan engine Indonesia') 
+            {session.language === 'mad' || session.language === 'jv'
+              ? (appLang === 'en' 
+                ? `⚠️ ${LANGUAGE_LABELS[session.language]} uses Indonesian engine` 
+                : `⚠️ Bahasa ${LANGUAGE_LABELS[session.language]} menggunakan engine Indonesia`) 
               : `${appLang === 'en' ? 'Using engine' : 'Menggunakan engine'} ${LANGUAGE_LABELS[session.language]}`}
           </Text>
         </View>

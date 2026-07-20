@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
 import { Platform } from 'react-native';
 import { DEMO_SENTENCES } from '../constants/keywords';
-import { translateToMadurese } from '../utils/translator';
+import { translateToMadurese, translateToJavanese } from '../utils/translator';
 import { supabase } from '../services/supabase';
 
 
@@ -12,9 +12,15 @@ import { supabase } from '../services/supabase';
 // Maps our internal language codes to BCP-47 tags recognized by Web Speech API & Android STT
 const LANG_TO_BCP47: Record<string, string> = {
   id: 'id-ID',   // Bahasa Indonesia — full support in Chrome, Edge, Android
-  jv: 'jv-ID',   // Bahasa Jawa — supported on Android, fallback to id-ID on web
+  jv: 'id-ID',   // Bahasa Jawa — fallback to id-ID for dictionary translation
   mad: 'id-ID',  // Bahasa Madura — no dedicated STT yet, fallback to id-ID
 };
+
+function translateText(text: string, lang: string): string {
+  if (lang === 'mad') return translateToMadurese(text);
+  if (lang === 'jv') return translateToJavanese(text);
+  return text;
+}
 
 export interface ActiveSession {
   isActive: boolean;
@@ -186,13 +192,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           }
 
           setSession(prev => {
-            const isMad = prev.language === 'mad';
-            const finalTranscript = isMad 
-              ? translateToMadurese(accumulatedTranscriptRef.current) 
-              : accumulatedTranscriptRef.current;
-            const finalInterim = isMad 
-              ? translateToMadurese(interimText) 
-              : interimText;
+            const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language);
+            const finalInterim = translateText(interimText, prev.language);
 
             return {
               ...prev,
@@ -386,10 +387,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         accumulatedTranscriptRef.current = baseText;
 
         setSession(prev => {
-          const isMad = prev.language === 'mad';
-          const finalTranscript = isMad 
-            ? translateToMadurese(baseText) 
-            : baseText;
+          const finalTranscript = translateText(baseText, prev.language);
 
           return {
             ...prev,
@@ -475,9 +473,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     if (session.isActive && accumulatedTranscriptRef.current.length > 0 && role === 'teacher') {
       const duration = Math.floor((Date.now() - (session.startTime || Date.now())) / 1000);
-      const text = session.language === 'mad'
-        ? translateToMadurese(accumulatedTranscriptRef.current)
-        : accumulatedTranscriptRef.current;
+      const text = translateText(accumulatedTranscriptRef.current, session.language);
       const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
 
       // End session in active_sessions
@@ -567,13 +563,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSession(prev => {
-        const isMad = prev.language === 'mad';
-        const finalTranscript = isMad 
-          ? translateToMadurese(accumulatedTranscriptRef.current) 
-          : accumulatedTranscriptRef.current;
-        const finalInterim = isMad 
-          ? translateToMadurese(interimStr.trim()) 
-          : interimStr.trim();
+        const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language);
+        const finalInterim = translateText(interimStr.trim(), prev.language);
 
         return {
           ...prev,

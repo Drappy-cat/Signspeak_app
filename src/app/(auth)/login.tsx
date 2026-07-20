@@ -230,15 +230,11 @@ export default function LoginScreen() {
         <View style={{ flex: 1, paddingHorizontal: 24 }}>
           {/* Logo area */}
           <View style={{ alignItems: 'center', paddingTop: 40, paddingBottom: 20, gap: 12 }}>
-            <View style={{
-              width: 64, height: 64, borderRadius: 16,
-              backgroundColor: '#1e3a8a',
-              alignItems: 'center', justifyContent: 'center',
-              shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
-            }}>
-              <Headphones size={32} color="#ffffff" />
-            </View>
+            <Image 
+              source={require('../../../assets/images/app-icon.png')} 
+              style={{ width: 80, height: 80 }}
+              resizeMode="contain"
+            />
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 22, fontWeight: '900', color: '#1e3a8a', letterSpacing: 1 }}>LENTERA</Text>
               <Text style={{ fontSize: 9, fontWeight: '800', color: mutedColor, textTransform: 'uppercase', letterSpacing: 1.5, textAlign: 'center', marginTop: 2 }}>
@@ -273,6 +269,19 @@ export default function LoginScreen() {
                       fontSize: 14, fontWeight: '700', letterSpacing: 2, textAlign: 'center',
                     }, inputStyle]}
                   />
+                  <View style={{ 
+                    marginTop: 8, padding: 12, borderRadius: 8, 
+                    backgroundColor: hc ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
+                    borderWidth: 1, borderColor: hc ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe',
+                    flexDirection: 'row', alignItems: 'center', gap: 10
+                  }}>
+                    <Text style={{ fontSize: 16 }}>ℹ️</Text>
+                    <Text style={{ flex: 1, fontSize: 12, color: hc ? '#93c5fd' : '#1e40af', lineHeight: 18 }}>
+                      {appLang === 'en' 
+                        ? 'You can get this class code directly from your teacher. Please ask your teacher to provide the code to join their session.' 
+                        : 'Kode kelas ini bisa Anda dapatkan dari guru Anda. Silakan minta kode tersebut kepada guru agar Anda bisa bergabung ke dalam sesi.'}
+                    </Text>
+                  </View>
                 </View>
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerName}</Text>
@@ -443,32 +452,36 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Divider — atau / or */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-              <Text style={{ marginHorizontal: 12, fontSize: 12, fontWeight: '600', color: mutedColor }}>{d.orDivider}</Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-            </View>
+            {/* Google Sign-In button - Teacher Only */}
+            {role !== 'student' && (
+              <>
+                {/* Divider — atau / or */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
+                  <Text style={{ marginHorizontal: 12, fontSize: 12, fontWeight: '600', color: mutedColor }}>{d.orDivider}</Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
+                </View>
 
-            {/* Google Sign-In button */}
-            <TouchableOpacity
-              onPress={handleGoogleLogin}
-              disabled={loading}
-              activeOpacity={0.9}
-              style={{
-                width: '100%', paddingVertical: 14, borderRadius: 12,
-                alignItems: 'center', justifyContent: 'center',
-                backgroundColor: hc ? '#334155' : '#ffffff',
-                borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
-                flexDirection: 'row', gap: 10,
-              }}
-            >
-              <Image 
-                source={{ uri: GOOGLE_LOGO_BASE64 }} 
-                style={{ width: 24, height: 24 }} 
-              />
-              <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.loginWithGoogle}</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleGoogleLogin}
+                  disabled={loading}
+                  activeOpacity={0.9}
+                  style={{
+                    width: '100%', paddingVertical: 14, borderRadius: 12,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: hc ? '#334155' : '#ffffff',
+                    borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
+                    flexDirection: 'row', gap: 10,
+                  }}
+                >
+                  <Image 
+                    source={{ uri: GOOGLE_LOGO_BASE64 }} 
+                    style={{ width: 24, height: 24 }} 
+                  />
+                  <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.loginWithGoogle}</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
           {/* Register link - Teacher Only */}

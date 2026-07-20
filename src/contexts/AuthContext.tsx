@@ -40,6 +40,7 @@ interface AuthContextType {
   completeOnboarding: () => Promise<void>;
   register: (name: string, email: string, password?: string, school?: string, className?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -282,7 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding, register, resetPassword }}>
+    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding, register, resetPassword, loginWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );

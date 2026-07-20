@@ -27,6 +27,7 @@ export interface User {
   // Student-specific
   className?: string;
   joinedRoomCode?: string;
+  absen?: string; // Attendance number
   // Teacher-specific
   subject?: string;
   teacherId?: string;
@@ -39,7 +40,7 @@ interface AuthContextType {
   isReady: boolean;
   hasOnboarded: boolean;
   needsProfileCompletion: boolean;
-  login: (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string) => Promise<void>;
+  login: (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string, absen?: string) => Promise<void>;
   logout: () => Promise<void>;
   setRole: (role: Role) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -133,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string) => {
+  const login = async (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string, absen?: string) => {
     const activeRole = targetRole || role;
     if (targetRole) {
       setRoleState(targetRole);
@@ -147,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'student',
         className: className || 'Kelas Umum',
         joinedRoomCode: roomCode,
+        absen: absen || '0',
       };
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
       setUser(mockUser);

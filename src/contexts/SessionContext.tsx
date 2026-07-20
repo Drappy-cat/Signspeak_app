@@ -22,6 +22,14 @@ function translateText(text: string, lang: string): string {
   return text;
 }
 
+export interface Participant {
+  name: string;
+  absen: string;
+  className: string;
+  status: 'online' | 'offline';
+  lastSeen: number;
+}
+
 export interface ActiveSession {
   isActive: boolean;
   roomCode: string | null;
@@ -31,6 +39,7 @@ export interface ActiveSession {
   interimTranscript: string;
   errorMessage: string | null;
   startTime: number | null;
+  participants: Participant[];
 }
 
 interface SessionContextType {
@@ -53,6 +62,7 @@ const defaultSession: ActiveSession = {
   interimTranscript: '',
   errorMessage: null,
   startTime: null,
+  participants: [],
 };
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -222,6 +232,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Supabase Student Subscription ─────────────────────────────────────────────
   useEffect(() => {
     let channel: any = null;
+    let heartbeatTimer: any = null;
+
     if (role === 'student' && user?.joinedRoomCode) {
       const roomCode = user.joinedRoomCode;
       
@@ -237,6 +249,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             interimTranscript: data.interim_transcript || '',
             errorMessage: null,
             startTime: new Date(data.started_at).getTime(),
+            participants: [],
           });
         }
       };
@@ -260,14 +273,43 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            // Broadcast initial presence
+            channel.send({
+              type: 'broadcast',
+              event: 'student_presence',
+              payload: {
+                name: user?.name || 'Siswa',
+                absen: user?.absen || '0',
+                className: user?.className || '',
+                status: 'online'
+              }
+            });
+            
+            // Set periodic presence heartbeat
+            heartbeatTimer = setInterval(() => {
+              channel.send({
+                type: 'broadcast',
+                event: 'student_presence',
+                payload: {
+                  name: user?.name || 'Siswa',
+                  absen: user?.absen || '0',
+                  className: user?.className || '',
+                  status: 'online'
+                }
+              });
+            }, 15000);
+          }
+        });
     }
     return () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
-  }, [role, user?.joinedRoomCode]);
+  }, [role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
 
   // ── Supabase Teacher Sync ───────────────────────────────────────────────────
   useEffect(() => {
@@ -283,7 +325,80 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }, 500); // Debounce interval
       return () => clearTimeout(timer);
     }
-  }, [session.transcript, session.interimTranscript, session.isActive, session.roomCode, role]);
+  }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript]);
+
+  // ── Supabase Teacher Participants Receiver ──────────────────────────────────
+  useEffect(() => {
+    let channel: any = null;
+    if (role === 'teacher' && session.isActive && session.roomCode) {
+      const roomCode = session.roomCode;
+      
+      channel = supabase
+        .channel(`room_${roomCode}`)
+        .on(
+          'broadcast',
+          { event: 'student_presence' },
+          (payload) => {
+            const student = payload.payload;
+            setSession(prev => {
+              const currentParticipants = prev.participants || [];
+              const idx = currentParticipants.findIndex(p => p.absen === student.absen && p.name === student.name);
+              let updatedParticipants;
+              if (idx > -1) {
+                updatedParticipants = [...currentParticipants];
+                updatedParticipants[idx] = {
+                  ...updatedParticipants[idx],
+                  status: 'online' as const,
+                  lastSeen: Date.now()
+                };
+              } else {
+                updatedParticipants = [...currentParticipants, {
+                  name: student.name,
+                  absen: student.absen,
+                  className: student.className,
+                  status: 'online' as const,
+                  lastSeen: Date.now()
+                }];
+              }
+              return {
+                ...prev,
+                participants: updatedParticipants
+              };
+            });
+          }
+        )
+        .subscribe();
+        
+      // Periodically mark students as offline
+      const timer = setInterval(() => {
+        setSession(prev => {
+          const currentParticipants = prev.participants || [];
+          const updatedParticipants = currentParticipants.map(p => {
+            if (p.status === 'online' && Date.now() - p.lastSeen > 30000) {
+              return { ...p, status: 'offline' as const };
+            }
+            return p;
+          });
+          return {
+            ...prev,
+            participants: updatedParticipants
+          };
+        });
+      }, 10000);
+      
+      return () => {
+        clearInterval(timer);
+        if (channel) supabase.removeChannel(channel);
+      };
+    } else {
+      setSession(prev => {
+        if (prev.participants && prev.participants.length > 0) {
+          return { ...prev, participants: [] };
+        }
+        return prev;
+      });
+    }
+  }, [role, session.isActive, session.roomCode]);
 
   // ── Native STT via expo-speech-recognition ──────────────────────────────────
   // We import these conditionally to avoid crashes on web
@@ -463,6 +578,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       interimTranscript: '',
       errorMessage: null,
       startTime: Date.now(),
+      participants: [],
     });
 
     await startRecording(language);

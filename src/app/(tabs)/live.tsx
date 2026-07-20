@@ -612,11 +612,13 @@ export default function LiveScreen() {
                 {appLang === 'en' ? 'Participants Joined' : 'Peserta Bergabung'}
               </Text>
               <Text style={{ fontSize: 12, color: mutedColor }}>
-                {appLang === 'en' ? 'out of 28 registered students' : 'dari 28 siswa terdaftar'}
+                {appLang === 'en' ? 'active students in session' : 'siswa aktif dalam sesi ini'}
               </Text>
             </View>
           </View>
-          <Text style={{ fontSize: 30, fontWeight: '900', color: hc ? '#60a5fa' : '#1e3a8a' }}>8</Text>
+          <Text style={{ fontSize: 30, fontWeight: '900', color: hc ? '#60a5fa' : '#1e3a8a' }}>
+            {session.participants ? session.participants.length : 0}
+          </Text>
         </View>
 
         {/* Join code */}
@@ -634,7 +636,9 @@ export default function LiveScreen() {
               </View>
             </View>
             <View>
-              <Text style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: 22, letterSpacing: 4, color: textColor }}>BIO-4821</Text>
+              <Text style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: 22, letterSpacing: 4, color: textColor }}>
+                {session.roomCode || '---'}
+              </Text>
               <Text style={{ fontSize: 12, color: mutedColor, marginTop: 4 }}>
                 {appLang === 'en' ? 'Share with students to join' : 'Bagikan ke siswa untuk bergabung'}
               </Text>
@@ -642,19 +646,80 @@ export default function LiveScreen() {
           </View>
         </View>
 
-        {/* Siswa Online chips */}
+        {/* Siswa Online Table */}
         <View style={[{ padding: 16 }, cardStyle]}>
-          <Text style={{ fontWeight: '800', fontSize: 14, marginBottom: 10, color: textColor }}>
-            {appLang === 'en' ? 'Online Students' : 'Siswa Online'}
+          <Text style={{ fontWeight: '800', fontSize: 14, marginBottom: 14, color: textColor }}>
+            {appLang === 'en' ? 'Online Student List' : 'Daftar Kehadiran Siswa'}
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {['Andi', 'Siti', 'Budi', 'Rina', 'Doni', 'Maya', 'Heri', 'Lina'].map((name, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: hc ? '#334155' : '#eff6ff' }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' }} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#cbd5e1' : '#1e40af' }}>{name}</Text>
-              </View>
-            ))}
+
+          {/* Table Header */}
+          <View style={{
+            flexDirection: 'row',
+            borderBottomWidth: 1,
+            borderBottomColor: hc ? '#334155' : '#e2e8f0',
+            paddingBottom: 8,
+            marginBottom: 8,
+          }}>
+            <Text style={{ width: 30, fontSize: 11, fontWeight: '800', color: mutedColor }}>No.</Text>
+            <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: mutedColor }}>{appLang === 'en' ? 'Name' : 'Nama'}</Text>
+            <Text style={{ width: 60, fontSize: 11, fontWeight: '800', color: mutedColor, textAlign: 'center' }}>{appLang === 'en' ? 'Abs' : 'Absen'}</Text>
+            <Text style={{ width: 80, fontSize: 11, fontWeight: '800', color: mutedColor, textAlign: 'right' }}>{appLang === 'en' ? 'Status' : 'Status'}</Text>
           </View>
+
+          {/* Table Body */}
+          {(!session.participants || session.participants.length === 0) ? (
+            <Text style={{ fontSize: 12, color: mutedColor, textAlign: 'center', paddingVertical: 16 }}>
+              {appLang === 'en' ? 'No students joined yet.' : 'Belum ada siswa yang bergabung.'}
+            </Text>
+          ) : (
+            session.participants.map((student, index) => {
+              const isOnline = student.status === 'online';
+              return (
+                <View 
+                  key={student.name + student.absen} 
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 10,
+                    borderBottomWidth: index === session.participants.length - 1 ? 0 : 1,
+                    borderBottomColor: hc ? '#1e293b' : '#f1f5f9',
+                  }}
+                >
+                  {/* Number */}
+                  <Text style={{ width: 30, fontSize: 13, fontWeight: '700', color: textColor }}>
+                    {index + 1}.
+                  </Text>
+                  
+                  {/* Name */}
+                  <Text style={{ flex: 1, fontSize: 13, fontWeight: '800', color: textColor }} numberOfLines={1}>
+                    {student.name}
+                  </Text>
+                  
+                  {/* Attendance Number */}
+                  <Text style={{ width: 60, fontSize: 13, color: textColor, textAlign: 'center', fontWeight: '700' }}>
+                    {student.absen}
+                  </Text>
+                  
+                  {/* Status Indicator */}
+                  <View style={{ width: 80, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                    <View style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: isOnline ? '#22c55e' : '#ef4444',
+                    }} />
+                    <Text style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: isOnline ? (hc ? '#4ade80' : '#166534') : (hc ? '#f87171' : '#991b1b'),
+                    }}>
+                      {isOnline ? (appLang === 'en' ? 'Online' : 'Online') : (appLang === 'en' ? 'Offline' : 'Offline')}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
         {/* End Session */}

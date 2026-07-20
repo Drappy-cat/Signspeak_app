@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe } from 'lucide-react-native';
+import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -73,6 +73,12 @@ export default function HomeScreen() {
   const bellBg = hc ? "#1e293b" : "#ffffff";
 
   const [selectedLang, setSelectedLang] = React.useState(settings.language || 'id');
+  const [startModalVisible, setStartModalVisible] = React.useState(false);
+  const [selectedSubject, setSelectedSubject] = React.useState('Biologi');
+  const [selectedClass, setSelectedClass] = React.useState('XII IPA 3');
+
+  const SUBJECTS = ['Biologi', 'Fisika', 'Kimia', 'Matematika', 'Bahasa Indonesia', 'Bahasa Inggris'];
+  const CLASSES = ['X IPA 1', 'XI IPA 2', 'XII IPA 3', 'X IPS 1', 'XI IPS 2', 'XII IPS 3'];
 
   const renderStudentHome = () => (
     <View className="pb-10">
@@ -248,11 +254,7 @@ export default function HomeScreen() {
       <View className="px-5 pt-2">
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => {
-            const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-            startSession(roomCode, 'Biologi', selectedLang);
-            router.push('/(tabs)/live');
-          }}
+          onPress={() => setStartModalVisible(true)}
         >
           <LinearGradient
             colors={['#1e3a8a', '#1e40af']}
@@ -363,6 +365,157 @@ export default function HomeScreen() {
       >
         {role === 'teacher' ? renderTeacherHome() : renderStudentHome()}
       </ScrollView>
+
+      {/* Configure Live Session Modal (Inline View constrained to App Boundaries) */}
+      {startModalVisible && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)', // Glassmorphic translucent dark background
+          justifyContent: 'flex-end',
+          zIndex: 1000,
+        }}>
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={() => setStartModalVisible(false)} 
+            style={{ flex: 1 }} 
+          />
+          
+          <View style={{
+            backgroundColor: hc ? '#1e293b' : '#ffffff',
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            paddingHorizontal: 24,
+            paddingTop: 24,
+            paddingBottom: Platform.OS === 'ios' ? 44 : 32,
+            ...getCardShadow(hc, 'lg'),
+          }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Mic size={20} color={hc ? '#60a5fa' : '#1e40af'} />
+                <Text style={{ fontSize: 18, fontWeight: '900', color: hc ? '#ffffff' : '#0f172a' }}>
+                  {appLang === 'en' ? 'Configure Live Session' : 'Pengaturan Sesi Live'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setStartModalVisible(false)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: hc ? '#334155' : '#f1f5f9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={16} color={hc ? '#94a3b8' : '#64748b'} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Subject Selection */}
+            <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
+              {appLang === 'en' ? 'Select Subject' : 'Pilih Mata Pelajaran'}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+              {SUBJECTS.map((subj) => {
+                const isSelected = selectedSubject === subj;
+                return (
+                  <TouchableOpacity
+                    key={subj}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedSubject(subj)}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      borderRadius: 12,
+                      backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    {isSelected && <Check size={12} color="#ffffff" />}
+                    <Text style={{
+                      fontSize: 12,
+                      fontWeight: '800',
+                      color: isSelected ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+                    }}>
+                      {subj}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Class Selection */}
+            <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
+              {appLang === 'en' ? 'Select Class' : 'Pilih Kelas'}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+              {CLASSES.map((cls) => {
+                const isSelected = selectedClass === cls;
+                return (
+                  <TouchableOpacity
+                    key={cls}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedClass(cls)}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      borderRadius: 12,
+                      backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    {isSelected && <Check size={12} color="#ffffff" />}
+                    <Text style={{
+                      fontSize: 12,
+                      fontWeight: '800',
+                      color: isSelected ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+                    }}>
+                      {cls}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Action - Confirm Start */}
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                setStartModalVisible(false);
+                const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const sessionSubject = `${selectedSubject} (${selectedClass})`;
+                startSession(roomCode, sessionSubject, selectedLang);
+                router.push('/(tabs)/live');
+              }}
+            >
+              <LinearGradient
+                colors={['#1e3a8a', '#1e40af']}
+                style={{
+                  borderRadius: 14,
+                  padding: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  ...getCardShadow(hc, 'md'),
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>
+                  {appLang === 'en' ? 'Start Session Now' : 'Mulai Sesi Sekarang'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

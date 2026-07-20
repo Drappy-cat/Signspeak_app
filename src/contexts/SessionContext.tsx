@@ -503,7 +503,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       try {
         await saveSession({
           subject: session.subject || 'Sesi Tanpa Judul',
-          className: session.classCode || 'Kelas Umum',
+          className: session.roomCode || 'Kelas Umum',
           teacherName: user?.name || 'Guru',
           date: `Hari ini, ${getTime()}`,
           duration,

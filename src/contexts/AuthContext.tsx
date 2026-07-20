@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import { supabase } from '../services/supabase';
+import { getSession, getProfile, signInWithGoogle, signOut } from '../services/authService';
 
 export type Role = 'student' | 'teacher' | null;
 
@@ -15,6 +16,10 @@ export interface User {
   // Student-specific
   className?: string;
   joinedRoomCode?: string;
+  // Teacher-specific
+  subject?: string;
+  teacherId?: string;
+  isVerified?: boolean;
 }
 
 interface AuthContextType {
@@ -23,11 +28,14 @@ interface AuthContextType {
   isReady: boolean;
   hasOnboarded: boolean;
   login: (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   setRole: (role: Role) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   register: (name: string, email: string, password?: string, school?: string, className?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  needsProfileCompletion: boolean;
+  completeProfile: (profile: Partial<User>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -172,10 +180,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async () => {
     try {
       await signInWithGoogle();
-      // The auth state change listener will handle the rest
-      // (setting user, checking profile, etc.)
     } catch (error) {
-      console.error('Google login failed:', error);
+      console.error('Google login error:', error);
       throw error;
     }
   };
@@ -184,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       if (role === 'teacher') {
-        await supabase.auth.signOut();
+        await signOut();
       }
       await AsyncStorage.removeItem(USER_STORAGE_KEY);
       setUser(null);
@@ -266,8 +272,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const completeProfile = async (profileUpdate: Partial<User>) => {
+    if (!user) return;
+    const updatedUser = { ...user, ...profileUpdate };
+    
+    if (updatedUser.id) {
+       await supabase.from('profiles').update({
+         school: updatedUser.school,
+         class_name: updatedUser.className,
+         subject: updatedUser.subject,
+         teacher_id: updatedUser.teacherId,
+       }).eq('id', updatedUser.id);
+    }
+    
+    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+    setUser(updatedUser);
+    setNeedsProfileCompletion(false);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding, register, resetPassword }}>
+    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, loginWithGoogle, logout, setRole, completeOnboarding, register, resetPassword, needsProfileCompletion, completeProfile }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Headphones, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,6 +7,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
 import { supabase } from '../../services/supabase';
 import { DICT } from '../../constants/i18n';
+import { GOOGLE_LOGO_BASE64 } from '../../constants/assets';
 import { getCardShadow } from '../../utils/formatters';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -159,6 +160,23 @@ export default function LoginScreen() {
       } else {
         setErrorMsg(e.message || (appLang === 'en' ? 'Login failed' : 'Masuk gagal'));
       }
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      if (loginWithGoogle) {
+        await loginWithGoogle();
+      } else {
+        throw new Error(appLang === 'en' ? 'Google Sign-In is not configured' : 'Masuk dengan Google belum dikonfigurasi');
+      }
+    } catch (e: any) {
+      setModalTitle(appLang === 'en' ? 'Error' : 'Kesalahan');
+      setModalMsg(e.message || (appLang === 'en' ? 'Google Sign-In failed' : 'Gagal masuk dengan Google'));
+      setShowModal(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -369,7 +387,10 @@ export default function LoginScreen() {
                 flexDirection: 'row', gap: 10,
               }}
             >
-              <Text style={{ fontSize: 18 }}>G</Text>
+              <Image 
+                source={{ uri: GOOGLE_LOGO_BASE64 }} 
+                style={{ width: 24, height: 24 }} 
+              />
               <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.loginWithGoogle}</Text>
             </TouchableOpacity>
           </View>

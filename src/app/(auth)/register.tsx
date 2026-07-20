@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, ScrollView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Headphones, ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { DICT } from '../../constants/i18n';
+import { GOOGLE_LOGO_BASE64 } from '../../constants/assets';
 import { getCardShadow } from '../../utils/formatters';
 
 export default function RegisterScreen() {
@@ -79,11 +80,15 @@ export default function RegisterScreen() {
   const handleGoogleRegister = async () => {
     setLoading(true);
     try {
-      await loginWithGoogle();
+      if (loginWithGoogle) {
+        await loginWithGoogle();
+      } else {
+        throw new Error(appLang === 'en' ? 'Google Sign-Up is not configured' : 'Daftar dengan Google belum dikonfigurasi');
+      }
+    } catch (e: any) {
+      setErrorMsg(e.message || (appLang === 'en' ? 'Google Sign-Up failed' : 'Gagal mendaftar dengan Google'));
+    } finally {
       setLoading(false);
-    } catch (error) {
-      setLoading(false);
-      console.error('Google register failed:', error);
     }
   };
 
@@ -141,11 +146,15 @@ export default function RegisterScreen() {
 
             {/* Nama Lengkap */}
             <View style={{ gap: 4 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>{d.registerName}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>
+                {role === 'teacher' 
+                  ? (appLang === 'en' ? 'Full Name and Degree' : 'Nama Lengkap beserta Gelar') 
+                  : d.registerName}
+              </Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
-                placeholder="Budi Santoso"
+                placeholder={role === 'teacher' ? "Budi Santoso, S.Pd." : "Budi Santoso"}
                 placeholderTextColor={mutedColor}
                 style={[{
                   borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
@@ -302,7 +311,10 @@ export default function RegisterScreen() {
                 flexDirection: 'row', gap: 10,
               }}
             >
-              <Text style={{ fontSize: 18 }}>G</Text>
+              <Image 
+                source={{ uri: GOOGLE_LOGO_BASE64 }} 
+                style={{ width: 24, height: 24 }} 
+              />
               <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.registerWithGoogle}</Text>
             </TouchableOpacity>
           </View>

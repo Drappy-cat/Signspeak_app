@@ -180,6 +180,7 @@ class WebSpeechEngine {
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<ActiveSession>(defaultSession);
   const [isRecording, setIsRecording] = useState(false);
+  const [isSttReady, setIsSttReady] = useState(false);
   const { user, role } = useAuth();
 
   // Refs for side-effect objects
@@ -413,6 +414,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           module: mod.ExpoSpeechRecognitionModule,
           useEvent: mod.useSpeechRecognitionEvent,
         };
+        setIsSttReady(true);
       } catch (e) {
         console.warn('[STT] expo-speech-recognition not available');
       }
@@ -654,11 +656,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Native event hooks (only used when running natively) ─────────────────────
   // We can't call hooks conditionally, so we always register but they only fire natively
   const NativeEventBridge = () => {
-    if (Platform.OS === 'web' || !nativeSTT.current?.useEvent) return null;
+    const { useSpeechRecognitionEvent } = nativeSTT.current!;
 
-    const { useSpeechRecognitionEvent } = nativeSTT.current;
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useSpeechRecognitionEvent('result', (event: any) => {
       let finalStr = '';
       let interimStr = '';
@@ -693,7 +692,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       resetAutoPauseTimer();
     });
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useSpeechRecognitionEvent('error', (event: any) => {
       if (event.error === 'no-speech') return;
       setSession(prev => ({
@@ -717,7 +715,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       toggleRecording,
     }}>
       {children}
-      <NativeEventBridge />
+      {Platform.OS !== 'web' && isSttReady && <NativeEventBridge />}
     </SessionContext.Provider>
   );
 }

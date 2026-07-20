@@ -94,14 +94,14 @@ export async function upsertProfile(userId: string, email: string, profileData: 
       id: userId,
       email,
       name: profileData.name,
-      role: profileData.role,
+      role: profileData.role || 'student',
       photo_uri: profileData.photoUri || null,
       school: profileData.school || null,
       class_name: profileData.className || null,
       subject: profileData.subject || null,
       teacher_id: profileData.teacherId || null,
       is_verified: profileData.isVerified ?? false,
-    }, { onConflict: 'id' });
+    } as any, { onConflict: 'id' });
 
   if (error) throw error;
   return data;
@@ -112,3 +112,15 @@ export function onAuthStateChange(callback: (event: string, session: any) => voi
   const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
   return subscription;
 }
+
+/** Silent ping to keep the free-tier Supabase database awake and prevent it from pausing */
+export async function pingSupabase() {
+  try {
+    // Perform a minimal read on profiles table
+    await supabase.from('profiles').select('id').limit(1);
+    console.log('[Supabase] Silent ping successful. Database project active.');
+  } catch (err) {
+    console.warn('[Supabase] Silent ping failed:', err);
+  }
+}
+

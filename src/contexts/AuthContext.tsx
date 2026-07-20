@@ -1,5 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  signInWithEmail,
+  signUpWithEmail,
+  signInWithGoogle,
+  signOut as supabaseSignOut,
+  getProfile,
+  upsertProfile,
+  onAuthStateChange,
+  getSession,
+  pingSupabase,
+  type ProfileData,
+} from '../services/authService';
 import * as Linking from 'expo-linking';
 import { supabase } from '../services/supabase';
 import { getSession, getProfile, signInWithGoogle, signOut } from '../services/authService';
@@ -52,6 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Load cached auth state on mount ───────────────────────────────────────
   const loadAuthState = async () => {
+    // Keep Supabase active in the background
+    pingSupabase();
+
     try {
       const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
       const onboarded = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
@@ -119,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string) => {
+  const login = async (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string, absen?: string) => {
     const activeRole = targetRole || role;
     if (targetRole) {
       setRoleState(targetRole);
@@ -133,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'student',
         className: className || 'Kelas Umum',
         joinedRoomCode: roomCode,
+        absen: absen || '0',
       };
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
       setUser(mockUser);

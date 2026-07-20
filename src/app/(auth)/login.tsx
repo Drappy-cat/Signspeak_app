@@ -21,6 +21,8 @@ export default function LoginScreen() {
   const [classCode, setClassCode] = useState('');
   const [studentName, setStudentName] = useState('');
   const [studentClass, setStudentClass] = useState('');
+  const [studentAbsen, setStudentAbsen] = useState('');
+  const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [studentStep, setStudentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -85,39 +87,33 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     setErrorMsg('');
     if (role === 'student') {
-      if (studentStep === 1) {
-        if (!classCode.trim() || classCode.trim().length < 6) {
-          setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
-          setModalMsg(appLang === 'en' ? 'Valid class code (min 6 chars) is required' : 'Kode kelas valid (min 6 karakter) wajib diisi');
-          setShowModal(true);
-          return;
-        }
-        
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('active_sessions')
-          .select('class_code')
-          .eq('class_code', classCode.trim().toUpperCase())
-          .eq('is_active', true)
-          .maybeSingle();
-        setLoading(false);
-        
-        if (error || !data) {
-          setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
-          setModalMsg(appLang === 'en' ? 'Room Code not found or session ended' : 'Kode Ruangan tidak ditemukan atau sesi telah berakhir');
-          setShowModal(true);
-          return;
-        }
-        
-        setStudentStep(2);
+      if (!classCode.trim() || classCode.trim().length < 6) {
+        setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
+        setModalMsg(appLang === 'en' ? 'Valid class code (min 6 chars) is required' : 'Kode kelas valid (min 6 karakter) wajib diisi');
+        setShowModal(true);
         return;
-      } else {
-        if (!studentName.trim() || !studentClass.trim()) {
-          setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
-          setModalMsg(appLang === 'en' ? 'Name and Class are required' : 'Nama dan Kelas wajib diisi');
-          setShowModal(true);
-          return;
-        }
+      }
+      if (!studentName.trim() || !studentClass.trim() || !studentAbsen.trim()) {
+        setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
+        setModalMsg(appLang === 'en' ? 'Name, Class and Attendance Number are required' : 'Nama, Kelas dan Nomor Absen wajib diisi');
+        setShowModal(true);
+        return;
+      }
+      
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('active_sessions')
+        .select('class_code')
+        .eq('class_code', classCode.trim().toUpperCase())
+        .eq('is_active', true)
+        .maybeSingle();
+      setLoading(false);
+      
+      if (error || !data) {
+        setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
+        setModalMsg(appLang === 'en' ? 'Room Code not found or session ended' : 'Kode Ruangan tidak ditemukan atau sesi telah berakhir');
+        setShowModal(true);
+        return;
       }
     } else {
       if (!email.trim() || !email.includes('@')) {
@@ -142,7 +138,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (role === 'student') {
-        await login('', undefined, classCode.trim(), 'student', studentName.trim(), studentClass.trim());
+        await login('', undefined, classCode.trim(), 'student', studentName.trim(), studentClass.trim(), studentAbsen.trim());
       } else {
         await login(email.trim(), pass, undefined, 'teacher');
       }
@@ -151,15 +147,30 @@ export default function LoginScreen() {
     } catch (e: any) {
       setLoading(false);
       const errMsg = e.message?.toLowerCase() || '';
+      setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
       if (errMsg.includes('invalid login credentials')) {
-        setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
         setModalMsg(appLang === 'en' 
           ? 'Account unrecognized or incorrect password. Please register as a teacher first.' 
           : 'Akun tidak dikenali atau sandi salah. Silakan mendaftar sebagai guru terlebih dahulu.');
-        setShowModal(true);
       } else {
-        setErrorMsg(e.message || (appLang === 'en' ? 'Login failed' : 'Masuk gagal'));
+        setModalMsg(e.message || (appLang === 'en' ? 'Login failed' : 'Masuk gagal'));
       }
+      setShowModal(true);
+    }
+  };
+  
+  const handleGoogleLogin = async () => {
+    setErrorMsg('');
+    setLoading(true);
+    try {
+      await loginWithGoogle();
+      setLoading(false);
+      router.replace('/(tabs)/home');
+    } catch (e: any) {
+      setLoading(false);
+      setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
+      setModalMsg(e.message || (appLang === 'en' ? 'Google login failed' : 'Masuk Google gagal'));
+      setShowModal(true);
     }
   };
 
@@ -248,7 +259,7 @@ export default function LoginScreen() {
             ) : null}
             {/* Conditional Form Fields */}
             {role === 'student' ? (
-              studentStep === 1 ? (
+              <>
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{(d as any).loginClassCode || 'Kode Kelas'}</Text>
                   <TextInput
@@ -263,36 +274,101 @@ export default function LoginScreen() {
                     }, inputStyle]}
                   />
                 </View>
-              ) : (
-                <>
-                  <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerName}</Text>
-                    <TextInput
-                      value={studentName}
-                      onChangeText={setStudentName}
-                      placeholder={appLang === 'en' ? "E.g. Budi Santoso" : "Misal: Budi Santoso"}
-                      placeholderTextColor={mutedColor}
-                      style={[{
-                        borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
-                        fontSize: 14, fontWeight: '500',
-                      }, inputStyle]}
-                    />
-                  </View>
-                  <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerClass}</Text>
-                    <TextInput
-                      value={studentClass}
-                      onChangeText={setStudentClass}
-                      placeholder={appLang === 'en' ? "E.g. XII IPA 3" : "Misal: XII IPA 3"}
-                      placeholderTextColor={mutedColor}
-                      style={[{
-                        borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
-                        fontSize: 14, fontWeight: '500',
-                      }, inputStyle]}
-                    />
-                  </View>
-                </>
-              )
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerName}</Text>
+                  <TextInput
+                    value={studentName}
+                    onChangeText={setStudentName}
+                    placeholder={appLang === 'en' ? "E.g. Budi Santoso" : "Misal: Budi Santoso"}
+                    placeholderTextColor={mutedColor}
+                    style={[{
+                      borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+                      fontSize: 14, fontWeight: '500',
+                    }, inputStyle]}
+                  />
+                </View>
+                <View style={{ gap: 6, zIndex: 10 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerClass}</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setShowClassDropdown(!showClassDropdown)}
+                    style={[{
+                      borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                      borderWidth: 1, borderColor: hc ? '#334155' : '#cbd5e1',
+                    }, inputStyle]}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '500', color: studentClass ? textColor : mutedColor }}>
+                      {studentClass || (appLang === 'en' ? 'Select Class' : 'Pilih Kelas')}
+                    </Text>
+                    <ChevronDown size={16} color={mutedColor} />
+                  </TouchableOpacity>
+
+                  {showClassDropdown && (
+                    <View style={{
+                      backgroundColor: hc ? '#1e293b' : '#ffffff',
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: hc ? '#334155' : '#cbd5e1',
+                      marginTop: 4,
+                      maxHeight: 180,
+                      overflow: 'hidden',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 8,
+                      elevation: 4,
+                    }}>
+                      <ScrollView nestedScrollEnabled={true}>
+                        {[
+                          'X IPA 1', 'X IPA 2', 'X IPA 3', 'X IPS 1', 'X IPS 2', 'X IPS 3',
+                          'XI IPA 1', 'XI IPA 2', 'XI IPA 3', 'XI IPS 1', 'XI IPS 2', 'XI IPS 3',
+                          'XII IPA 1', 'XII IPA 2', 'XII IPA 3', 'XII IPS 1', 'XII IPS 2', 'XII IPS 3'
+                        ].map((cls) => (
+                          <TouchableOpacity
+                            key={cls}
+                            onPress={() => {
+                              setStudentClass(cls);
+                              setShowClassDropdown(false);
+                            }}
+                            style={{
+                              paddingHorizontal: 16,
+                              paddingVertical: 12,
+                              borderBottomWidth: 1,
+                              borderBottomColor: hc ? '#334155' : '#f1f5f9',
+                              backgroundColor: studentClass === cls ? (hc ? '#1e3b8a' : '#eff6ff') : 'transparent',
+                            }}
+                          >
+                            <Text style={{
+                              fontSize: 14,
+                              fontWeight: studentClass === cls ? '700' : '500',
+                              color: studentClass === cls ? (hc ? '#ffffff' : '#1e3a8a') : textColor,
+                            }}>
+                              {cls}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>
+                    {appLang === 'en' ? "Attendance Number" : "Nomor Absen"}
+                  </Text>
+                  <TextInput
+                    value={studentAbsen}
+                    onChangeText={setStudentAbsen}
+                    placeholder={appLang === 'en' ? "E.g. 14" : "Misal: 14"}
+                    placeholderTextColor={mutedColor}
+                    keyboardType="numeric"
+                    style={[{
+                      borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+                      fontSize: 14, fontWeight: '500',
+                    }, inputStyle]}
+                  />
+                </View>
+              </>
             ) : (
               <>
                 {/* Email */}
@@ -362,7 +438,7 @@ export default function LoginScreen() {
                 <ActivityIndicator color="white" />
               ) : (
                 <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>
-                  {role === 'student' && studentStep === 1 ? (appLang === 'en' ? 'Next' : 'Lanjut') : d.loginBtn}
+                  {appLang === 'en' ? 'Join Class' : 'Masuk Kelas'}
                 </Text>
               )}
             </TouchableOpacity>

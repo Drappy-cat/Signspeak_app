@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
 import { Platform } from 'react-native';
 import { DEMO_SENTENCES } from '../constants/keywords';
-import { translateToMadurese } from '../utils/translator';
+import { translateToMadurese, translateToJavanese } from '../utils/translator';
 import { supabase } from '../services/supabase';
 
 
@@ -12,9 +12,23 @@ import { supabase } from '../services/supabase';
 // Maps our internal language codes to BCP-47 tags recognized by Web Speech API & Android STT
 const LANG_TO_BCP47: Record<string, string> = {
   id: 'id-ID',   // Bahasa Indonesia — full support in Chrome, Edge, Android
-  jv: 'jv-ID',   // Bahasa Jawa — supported on Android, fallback to id-ID on web
+  jv: 'id-ID',   // Bahasa Jawa — fallback to id-ID for dictionary translation
   mad: 'id-ID',  // Bahasa Madura — no dedicated STT yet, fallback to id-ID
 };
+
+function translateText(text: string, lang: string): string {
+  if (lang === 'mad') return translateToMadurese(text);
+  if (lang === 'jv') return translateToJavanese(text);
+  return text;
+}
+
+export interface Participant {
+  name: string;
+  absen: string;
+  className: string;
+  status: 'online' | 'offline';
+  lastSeen: number;
+}
 
 export interface ActiveSession {
   isActive: boolean;
@@ -25,11 +39,14 @@ export interface ActiveSession {
   interimTranscript: string;
   errorMessage: string | null;
   startTime: number | null;
+  participants: Participant[];
+  customKeywords: string[];
+  customGlossary: Record<string, string>;
 }
 
 interface SessionContextType {
   session: ActiveSession;
-  startSession: (roomCode: string, subject: string, language: string) => Promise<void>;
+  startSession: (roomCode: string, subject: string, language: string, customGlossaryList?: Array<{ word: string; definition: string }>) => Promise<void>;
   endSession: () => Promise<void>;
   updateLanguage: (language: string) => void;
   pauseRecording: () => Promise<void>;
@@ -47,6 +64,9 @@ const defaultSession: ActiveSession = {
   interimTranscript: '',
   errorMessage: null,
   startTime: null,
+  participants: [],
+  customKeywords: [],
+  customGlossary: {},
 };
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -164,6 +184,7 @@ class WebSpeechEngine {
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<ActiveSession>(defaultSession);
   const [isRecording, setIsRecording] = useState(false);
+  const [isSttReady, setIsSttReady] = useState(false);
   const { user, role } = useAuth();
 
   // Refs for side-effect objects
@@ -171,6 +192,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const webMockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accumulatedTranscriptRef = useRef<string>('');
+  const customGlossaryRef = useRef<{ keywords: string[]; glossary: Record<string, string> }>({ keywords: [], glossary: {} });
 
   // Initialize Web Speech Engine once
   useEffect(() => {
@@ -186,13 +208,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           }
 
           setSession(prev => {
-            const isMad = prev.language === 'mad';
-            const finalTranscript = isMad 
-              ? translateToMadurese(accumulatedTranscriptRef.current) 
-              : accumulatedTranscriptRef.current;
-            const finalInterim = isMad 
-              ? translateToMadurese(interimText) 
-              : interimText;
+            const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language);
+            const finalInterim = translateText(interimText, prev.language);
 
             return {
               ...prev,
@@ -221,6 +238,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Supabase Student Subscription ─────────────────────────────────────────────
   useEffect(() => {
     let channel: any = null;
+    let heartbeatTimer: any = null;
+
     if (role === 'student' && user?.joinedRoomCode) {
       const roomCode = user.joinedRoomCode;
       
@@ -232,10 +251,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             roomCode: data.class_code,
             subject: data.subject,
             language: 'id',
-            transcript: data.transcript,
-            interimTranscript: data.interim_transcript,
+            transcript: data.transcript || '',
+            interimTranscript: data.interim_transcript || '',
             errorMessage: null,
             startTime: new Date(data.started_at).getTime(),
+            participants: [],
+            customKeywords: [],
+            customGlossary: {},
           });
         }
       };
@@ -259,29 +281,156 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }
           }
         )
-        .subscribe();
+        .on(
+          'broadcast',
+          { event: 'sync_glossary' },
+          (payload) => {
+            const data = payload.payload;
+            setSession(prev => ({
+              ...prev,
+              customKeywords: data.keywords || [],
+              customGlossary: data.glossary || {},
+            }));
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            // Broadcast initial presence
+            channel.send({
+              type: 'broadcast',
+              event: 'student_presence',
+              payload: {
+                name: user?.name || 'Siswa',
+                absen: user?.absen || '0',
+                className: user?.className || '',
+                status: 'online'
+              }
+            });
+            
+            // Set periodic presence heartbeat
+            heartbeatTimer = setInterval(() => {
+              channel.send({
+                type: 'broadcast',
+                event: 'student_presence',
+                payload: {
+                  name: user?.name || 'Siswa',
+                  absen: user?.absen || '0',
+                  className: user?.className || '',
+                  status: 'online'
+                }
+              });
+            }, 15000);
+          }
+        });
     }
     return () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
-  }, [role, user?.joinedRoomCode]);
+  }, [role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
 
   // ── Supabase Teacher Sync ───────────────────────────────────────────────────
   useEffect(() => {
     if (role === 'teacher' && session.isActive && session.roomCode) {
+      const roomCode = session.roomCode;
       const timer = setTimeout(() => {
         supabase.from('active_sessions').update({
           transcript: session.transcript,
           interim_transcript: session.interimTranscript,
-        }).eq('class_code', session.roomCode).then(({ error }) => {
+        }).eq('class_code', roomCode).then(({ error }) => {
           if (error) console.warn('[Supabase] Sync Error:', error);
         });
       }, 500); // Debounce interval
       return () => clearTimeout(timer);
     }
-  }, [session.transcript, session.interimTranscript, session.isActive, session.roomCode, role]);
+  }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript]);
+
+  // ── Supabase Teacher Participants Receiver ──────────────────────────────────
+  useEffect(() => {
+    let channel: any = null;
+    if (role === 'teacher' && session.isActive && session.roomCode) {
+      const roomCode = session.roomCode;
+      
+      channel = supabase
+        .channel(`room_${roomCode}`)
+        .on(
+          'broadcast',
+          { event: 'student_presence' },
+          (payload) => {
+            const student = payload.payload;
+            setSession(prev => {
+              const currentParticipants = prev.participants || [];
+              const idx = currentParticipants.findIndex(p => p.absen === student.absen && p.name === student.name);
+              let updatedParticipants;
+              if (idx > -1) {
+                updatedParticipants = [...currentParticipants];
+                updatedParticipants[idx] = {
+                  ...updatedParticipants[idx],
+                  status: 'online' as const,
+                  lastSeen: Date.now()
+                };
+              } else {
+                updatedParticipants = [...currentParticipants, {
+                  name: student.name,
+                  absen: student.absen,
+                  className: student.className,
+                  status: 'online' as const,
+                  lastSeen: Date.now()
+                }];
+              }
+              return {
+                ...prev,
+                participants: updatedParticipants
+              };
+            });
+
+            // Send back the current glossary to this student!
+            if (customGlossaryRef.current.keywords.length > 0) {
+              channel.send({
+                type: 'broadcast',
+                event: 'sync_glossary',
+                payload: {
+                  keywords: customGlossaryRef.current.keywords,
+                  glossary: customGlossaryRef.current.glossary,
+                }
+              });
+            }
+          }
+        )
+        .subscribe();
+        
+      // Periodically mark students as offline
+      const timer = setInterval(() => {
+        setSession(prev => {
+          const currentParticipants = prev.participants || [];
+          const updatedParticipants = currentParticipants.map(p => {
+            if (p.status === 'online' && Date.now() - p.lastSeen > 30000) {
+              return { ...p, status: 'offline' as const };
+            }
+            return p;
+          });
+          return {
+            ...prev,
+            participants: updatedParticipants
+          };
+        });
+      }, 10000);
+      
+      return () => {
+        clearInterval(timer);
+        if (channel) supabase.removeChannel(channel);
+      };
+    } else {
+      setSession(prev => {
+        if (prev.participants && prev.participants.length > 0) {
+          return { ...prev, participants: [] };
+        }
+        return prev;
+      });
+    }
+  }, [role, session.isActive, session.roomCode]);
 
   // ── Native STT via expo-speech-recognition ──────────────────────────────────
   // We import these conditionally to avoid crashes on web
@@ -296,6 +445,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           module: mod.ExpoSpeechRecognitionModule,
           useEvent: mod.useSpeechRecognitionEvent,
         };
+        setIsSttReady(true);
       } catch (e) {
         console.warn('[STT] expo-speech-recognition not available');
       }
@@ -385,10 +535,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         accumulatedTranscriptRef.current = baseText;
 
         setSession(prev => {
-          const isMad = prev.language === 'mad';
-          const finalTranscript = isMad 
-            ? translateToMadurese(baseText) 
-            : baseText;
+          const finalTranscript = translateText(baseText, prev.language);
 
           return {
             ...prev,
@@ -438,8 +585,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Session Lifecycle ────────────────────────────────────────────────────────
-  const startSession = async (roomCode: string, subject: string, language: string) => {
+  const startSession = async (
+    roomCode: string, 
+    subject: string, 
+    language: string, 
+    customGlossaryList?: Array<{ word: string; definition: string }>
+  ) => {
     accumulatedTranscriptRef.current = '';
+    
+    // Parse custom glossary list to active state
+    const keywords: string[] = [];
+    const glossary: Record<string, string> = {};
+    if (customGlossaryList && customGlossaryList.length > 0) {
+      customGlossaryList.forEach(item => {
+        if (item.word.trim()) {
+          const lowerWord = item.word.toLowerCase().trim();
+          keywords.push(lowerWord);
+          glossary[lowerWord] = item.definition.trim();
+        }
+      });
+    }
+    
+    customGlossaryRef.current = { keywords, glossary };
     
     if (user?.id) {
       const { error } = await supabase.from('active_sessions').insert({
@@ -464,6 +631,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       interimTranscript: '',
       errorMessage: null,
       startTime: Date.now(),
+      participants: [],
+      customKeywords: keywords,
+      customGlossary: glossary,
     });
 
     await startRecording(language);
@@ -474,14 +644,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     if (session.isActive && accumulatedTranscriptRef.current.length > 0 && role === 'teacher') {
       const duration = Math.floor((Date.now() - (session.startTime || Date.now())) / 1000);
-      const text = session.language === 'mad'
-        ? translateToMadurese(accumulatedTranscriptRef.current)
-        : accumulatedTranscriptRef.current;
+      const text = translateText(accumulatedTranscriptRef.current, session.language);
       const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
 
       // End session in active_sessions
       if (session.roomCode) {
         await supabase.from('active_sessions').update({ is_active: false }).eq('class_code', session.roomCode);
+      }
+
+      // Serialize glossary metadata if there is a custom glossary
+      let finalTranscriptText = text;
+      if (session.customGlossary && Object.keys(session.customGlossary).length > 0) {
+        finalTranscriptText = text + "\n\n---GLOSSARY---\n" + JSON.stringify(session.customGlossary);
       }
 
       // Save to sessions table in Supabase
@@ -496,7 +670,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           word_count: wordCount,
           language: session.language,
           excerpt: text.substring(0, 120) + (text.length > 120 ? '...' : ''),
-          transcript_full: text,
+          transcript_full: finalTranscriptText,
         });
       }
 
@@ -510,7 +684,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           wordCount,
           language: session.language,
           excerpt: text.substring(0, 120) + (text.length > 120 ? '...' : ''),
-          transcriptFull: text,
+          transcriptFull: finalTranscriptText,
         });
       } catch (e) {
         console.error('[DB] Failed to save session:', e);
@@ -518,6 +692,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     accumulatedTranscriptRef.current = '';
+    customGlossaryRef.current = { keywords: [], glossary: {} };
     setSession(defaultSession);
     setIsRecording(false);
   };
@@ -541,11 +716,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Native event hooks (only used when running natively) ─────────────────────
   // We can't call hooks conditionally, so we always register but they only fire natively
   const NativeEventBridge = () => {
-    if (Platform.OS === 'web' || !nativeSTT.current?.useEvent) return null;
+    const { useSpeechRecognitionEvent } = nativeSTT.current!;
 
-    const { useSpeechRecognitionEvent } = nativeSTT.current;
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useSpeechRecognitionEvent('result', (event: any) => {
       let finalStr = '';
       let interimStr = '';
@@ -566,13 +738,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSession(prev => {
-        const isMad = prev.language === 'mad';
-        const finalTranscript = isMad 
-          ? translateToMadurese(accumulatedTranscriptRef.current) 
-          : accumulatedTranscriptRef.current;
-        const finalInterim = isMad 
-          ? translateToMadurese(interimStr.trim()) 
-          : interimStr.trim();
+        const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language);
+        const finalInterim = translateText(interimStr.trim(), prev.language);
 
         return {
           ...prev,
@@ -585,7 +752,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       resetAutoPauseTimer();
     });
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useSpeechRecognitionEvent('error', (event: any) => {
       if (event.error === 'no-speech') return;
       setSession(prev => ({
@@ -609,6 +775,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       toggleRecording,
     }}>
       {children}
+      {Platform.OS !== 'web' && isSttReady && <NativeEventBridge />}
     </SessionContext.Provider>
   );
 }

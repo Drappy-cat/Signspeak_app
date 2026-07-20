@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_sessions: {
+        Row: {
+          class_code: string
+          created_at: string
+          interim_transcript: string | null
+          is_active: boolean
+          started_at: string
+          subject: string
+          teacher_id: string
+          transcript: string | null
+        }
+        Insert: {
+          class_code: string
+          created_at?: string
+          interim_transcript?: string | null
+          is_active?: boolean
+          started_at?: string
+          subject: string
+          teacher_id: string
+          transcript?: string | null
+        }
+        Update: {
+          class_code?: string
+          created_at?: string
+          interim_transcript?: string | null
+          is_active?: boolean
+          started_at?: string
+          subject?: string
+          teacher_id?: string
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "active_sessions_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       profiles: {
         Row: {
           class_name: string | null

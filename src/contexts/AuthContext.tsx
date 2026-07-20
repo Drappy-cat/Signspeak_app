@@ -27,6 +27,10 @@ export interface User {
   // Student-specific
   className?: string;
   joinedRoomCode?: string;
+  // Teacher-specific
+  subject?: string;
+  teacherId?: string;
+  isVerified?: boolean;
 }
 
 interface AuthContextType {
@@ -34,12 +38,15 @@ interface AuthContextType {
   role: Role;
   isReady: boolean;
   hasOnboarded: boolean;
+  needsProfileCompletion: boolean;
   login: (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string) => Promise<void>;
   logout: () => Promise<void>;
   setRole: (role: Role) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   register: (name: string, email: string, password?: string, school?: string, className?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  completeProfile: (profileData: ProfileData) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -281,8 +288,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const completeProfile = async (profileData: ProfileData) => {
+    try {
+      const session = await getSession();
+      if (!session?.user) throw new Error('No active session found.');
+      
+      await upsertProfile(session.user.id, session.user.email || '', profileData);
+      
+      const updatedUser: User = {
+        id: session.user.id,
+        email: session.user.email || '',
+        name: profileData.name,
+        role: profileData.role,
+        photoUri: profileData.photoUri,
+        school: profileData.school,
+        className: profileData.className,
+        subject: profileData.subject,
+        teacherId: profileData.teacherId,
+        isVerified: profileData.isVerified || false,
+      };
+
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setRoleState(profileData.role);
+      setNeedsProfileCompletion(false);
+    } catch (error) {
+      console.error('completeProfile error:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, logout, setRole, completeOnboarding, register, resetPassword }}>
+    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, needsProfileCompletion, login, logout, setRole, completeOnboarding, register, resetPassword, loginWithGoogle, completeProfile }}>
       {children}
     </AuthContext.Provider>
   );

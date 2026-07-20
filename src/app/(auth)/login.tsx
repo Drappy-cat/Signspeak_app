@@ -160,6 +160,19 @@ export default function LoginScreen() {
       }
     }
   };
+  
+  const handleGoogleLogin = async () => {
+    setErrorMsg('');
+    setLoading(true);
+    try {
+      await loginWithGoogle();
+      setLoading(false);
+      router.replace('/(tabs)/home');
+    } catch (e: any) {
+      setLoading(false);
+      setErrorMsg(e.message || (appLang === 'en' ? 'Google login failed' : 'Masuk Google gagal'));
+    }
+  };
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
 

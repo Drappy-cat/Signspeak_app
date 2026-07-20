@@ -232,8 +232,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             roomCode: data.class_code,
             subject: data.subject,
             language: 'id',
-            transcript: data.transcript,
-            interimTranscript: data.interim_transcript,
+            transcript: data.transcript || '',
+            interimTranscript: data.interim_transcript || '',
             errorMessage: null,
             startTime: new Date(data.started_at).getTime(),
           });
@@ -271,11 +271,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Supabase Teacher Sync ───────────────────────────────────────────────────
   useEffect(() => {
     if (role === 'teacher' && session.isActive && session.roomCode) {
+      const roomCode = session.roomCode;
       const timer = setTimeout(() => {
         supabase.from('active_sessions').update({
           transcript: session.transcript,
           interim_transcript: session.interimTranscript,
-        }).eq('class_code', session.roomCode).then(({ error }) => {
+        }).eq('class_code', roomCode).then(({ error }) => {
           if (error) console.warn('[Supabase] Sync Error:', error);
         });
       }, 500); // Debounce interval
@@ -503,7 +504,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       try {
         await saveSession({
           subject: session.subject || 'Sesi Tanpa Judul',
-          className: session.classCode || 'Kelas Umum',
+          className: session.roomCode || 'Kelas Umum',
           teacherName: user?.name || 'Guru',
           date: `Hari ini, ${getTime()}`,
           duration,
@@ -609,6 +610,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       toggleRecording,
     }}>
       {children}
+      <NativeEventBridge />
     </SessionContext.Provider>
   );
 }

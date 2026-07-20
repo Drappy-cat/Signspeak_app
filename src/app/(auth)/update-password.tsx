@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Headphones, ArrowLeft, KeyRound } from 'lucide-react-native';
+import { Headphones, ArrowLeft, KeyRound, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
@@ -10,7 +10,9 @@ import { supabase } from '../../services/supabase';
 
 export default function UpdatePasswordScreen() {
   const [password, setPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -148,34 +150,58 @@ export default function UpdatePasswordScreen() {
               <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>
                 {appLang === 'en' ? 'New Password' : 'Sandi Baru'}
               </Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor={mutedColor}
-                secureTextEntry
-                style={[{
-                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
-                  fontSize: 14, fontWeight: '500',
-                }, inputStyle]}
-              />
+              <View style={[{
+                flexDirection: 'row', alignItems: 'center',
+                borderRadius: 12, paddingRight: 16,
+              }, inputStyle]}>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor={mutedColor}
+                  secureTextEntry={!showPass}
+                  style={{
+                    flex: 1, paddingHorizontal: 16, paddingVertical: 12,
+                    fontSize: 14, fontWeight: '500', color: textColor,
+                  }}
+                />
+                <TouchableOpacity activeOpacity={0.7} onPress={() => setShowPass(!showPass)}>
+                  {showPass ? (
+                    <EyeOff size={20} color={mutedColor} />
+                  ) : (
+                    <Eye size={20} color={mutedColor} />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
             
             <View style={{ gap: 4 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>
                 {appLang === 'en' ? 'Confirm Password' : 'Konfirmasi Sandi'}
               </Text>
-              <TextInput
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="••••••••"
-                placeholderTextColor={mutedColor}
-                secureTextEntry
-                style={[{
-                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
-                  fontSize: 14, fontWeight: '500',
-                }, inputStyle]}
-              />
+              <View style={[{
+                flexDirection: 'row', alignItems: 'center',
+                borderRadius: 12, paddingRight: 16,
+              }, inputStyle]}>
+                <TextInput
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor={mutedColor}
+                  secureTextEntry={!showConfirmPass}
+                  style={{
+                    flex: 1, paddingHorizontal: 16, paddingVertical: 12,
+                    fontSize: 14, fontWeight: '500', color: textColor,
+                  }}
+                />
+                <TouchableOpacity activeOpacity={0.7} onPress={() => setShowConfirmPass(!showConfirmPass)}>
+                  {showConfirmPass ? (
+                    <EyeOff size={20} color={mutedColor} />
+                  ) : (
+                    <Eye size={20} color={mutedColor} />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
             <TouchableOpacity 

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Headphones, ChevronDown } from 'lucide-react-native';
+import { Headphones, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
 import { supabase } from '../../services/supabase';
 import { DICT } from '../../constants/i18n';
+import { GOOGLE_LOGO_BASE64 } from '../../constants/assets';
 import { getCardShadow } from '../../utils/formatters';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -16,6 +17,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
+  const [showPass, setShowPass] = useState(false);
   const [classCode, setClassCode] = useState('');
   const [studentName, setStudentName] = useState('');
   const [studentClass, setStudentClass] = useState('');
@@ -169,6 +171,23 @@ export default function LoginScreen() {
       setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
       setModalMsg(e.message || (appLang === 'en' ? 'Google login failed' : 'Masuk Google gagal'));
       setShowModal(true);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      if (loginWithGoogle) {
+        await loginWithGoogle();
+      } else {
+        throw new Error(appLang === 'en' ? 'Google Sign-In is not configured' : 'Masuk dengan Google belum dikonfigurasi');
+      }
+    } catch (e: any) {
+      setModalTitle(appLang === 'en' ? 'Error' : 'Kesalahan');
+      setModalMsg(e.message || (appLang === 'en' ? 'Google Sign-In failed' : 'Gagal masuk dengan Google'));
+      setShowModal(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -371,17 +390,29 @@ export default function LoginScreen() {
                 {/* Password */}
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.loginPass}</Text>
-                  <TextInput
-                    value={pass}
-                    onChangeText={setPass}
-                    placeholder="••••••••"
-                    placeholderTextColor={mutedColor}
-                    secureTextEntry
-                    style={[{
-                      borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
-                      fontSize: 14, fontWeight: '500',
-                    }, inputStyle]}
-                  />
+                  <View style={[{
+                    flexDirection: 'row', alignItems: 'center',
+                    borderRadius: 12, paddingRight: 16,
+                  }, inputStyle]}>
+                    <TextInput
+                      value={pass}
+                      onChangeText={setPass}
+                      placeholder="••••••••"
+                      placeholderTextColor={mutedColor}
+                      secureTextEntry={!showPass}
+                      style={{
+                        flex: 1, paddingHorizontal: 16, paddingVertical: 12,
+                        fontSize: 14, fontWeight: '500', color: textColor,
+                      }}
+                    />
+                    <TouchableOpacity activeOpacity={0.7} onPress={() => setShowPass(!showPass)}>
+                      {showPass ? (
+                        <EyeOff size={20} color={mutedColor} />
+                      ) : (
+                        <Eye size={20} color={mutedColor} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
                   <View style={{ alignItems: 'flex-end', marginTop: 2 }}>
                     <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/(auth)/forgot-password')}>
                       <Text style={{ color: '#3b82f6', fontSize: 13, fontWeight: '700' }}>
@@ -432,7 +463,10 @@ export default function LoginScreen() {
                 flexDirection: 'row', gap: 10,
               }}
             >
-              <Text style={{ fontSize: 18 }}>G</Text>
+              <Image 
+                source={{ uri: GOOGLE_LOGO_BASE64 }} 
+                style={{ width: 24, height: 24 }} 
+              />
               <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.loginWithGoogle}</Text>
             </TouchableOpacity>
           </View>

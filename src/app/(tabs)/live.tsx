@@ -240,7 +240,7 @@ export default function LiveScreen() {
               {session.isActive ? 'Bu Sari Dewi' : (appLang === 'en' ? 'No Active Teacher' : 'Belum Ada Guru')}
             </Text>
             <Text style={{ fontSize: 12, color: mutedColor }}>
-              {session.isActive ? `${session.subject} — ${session.classCode}` : (appLang === 'en' ? 'Waiting Room' : 'Ruang Tunggu')}
+              {session.isActive ? `${session.subject} — ${session.roomCode}` : (appLang === 'en' ? 'Waiting Room' : 'Ruang Tunggu')}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -431,7 +431,13 @@ export default function LiveScreen() {
       {/* Header */}
       <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
         <Text style={{ fontSize: 20, fontWeight: '900', color: textColor }}>{d.manageSession}</Text>
-        <Text style={{ fontSize: 14, color: mutedColor, marginTop: 2 }}>{session.subject} — {session.classCode}</Text>
+        <Text style={{ fontSize: 14, color: mutedColor, marginTop: 2 }}>{session.subject}</Text>
+        {session.isActive && session.roomCode && (
+          <View style={{ marginTop: 12, padding: 16, backgroundColor: hc ? '#1e3a8a' : '#eff6ff', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...getCardShadow(hc, 'sm') }}>
+             <Text style={{ fontSize: 13, color: hc ? '#93c5fd' : '#1e40af', fontWeight: '800' }}>Kode Ruangan</Text>
+             <Text style={{ fontSize: 24, fontWeight: '900', color: hc ? '#ffffff' : '#1e3a8a', letterSpacing: 4 }}>{session.roomCode}</Text>
+          </View>
+        )}
       </View>
 
       {/* Error / Demo mode banner */}

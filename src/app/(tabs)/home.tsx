@@ -91,6 +91,7 @@ export default function HomeScreen() {
         </View>
         <TouchableOpacity
           activeOpacity={0.7}
+          onPress={() => router.push('/notifications')}
           style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: bellBg,
@@ -198,6 +199,7 @@ export default function HomeScreen() {
         </View>
         <TouchableOpacity
           activeOpacity={0.7}
+          onPress={() => router.push('/notifications')}
           style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: bellBg,

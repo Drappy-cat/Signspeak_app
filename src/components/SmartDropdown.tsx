@@ -6,9 +6,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  Modal, Animated, Dimensions, Platform, KeyboardAvoidingView,
+  Modal, Animated, Dimensions, Platform, KeyboardAvoidingView, ScrollView,
+  ActivityIndicator,
 } from 'react-native';
-import { Search, X, ChevronDown, Check, Plus } from 'lucide-react-native';
+import { Search, X, ChevronDown, Check, Plus, ArrowUpDown } from 'lucide-react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -16,6 +17,11 @@ export interface DropdownItem {
   id: string;
   label: string;
   sublabel?: string;
+}
+
+export interface SortOption {
+  id: string;
+  label: string;
 }
 
 interface SmartDropdownProps {
@@ -39,6 +45,10 @@ interface SmartDropdownProps {
   // Loading
   loading?: boolean;
   onSearchChange?: (text: string) => void;
+  // Sort options inside modal
+  sortOptions?: SortOption[];
+  activeSortId?: string;
+  onSortChange?: (sortId: string) => void;
 }
 
 export function SmartDropdown({
@@ -58,6 +68,9 @@ export function SmartDropdown({
   onMultiSelect,
   loading = false,
   onSearchChange,
+  sortOptions,
+  activeSortId,
+  onSortChange,
 }: SmartDropdownProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -143,44 +156,56 @@ export function SmartDropdown({
           opacity: disabled ? 0.5 : 1,
         }}
       >
-        <Text
-          numberOfLines={1}
-          style={{
-            flex: 1, fontSize: 14,
-            color: (selectedItem || selectedLabels.length > 0) ? textColor : mutedColor,
-            fontWeight: (selectedItem || selectedLabels.length > 0) ? '600' : '400',
-          }}
-        >
-          {loading ? 'Memuat...' : displayText}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
+          {loading && <ActivityIndicator size="small" color="#1e3a8a" />}
+          <Text
+            numberOfLines={1}
+            style={{
+              flex: 1, fontSize: 14,
+              color: (selectedItem || selectedLabels.length > 0) ? textColor : mutedColor,
+              fontWeight: (selectedItem || selectedLabels.length > 0) ? '600' : '400',
+            }}
+          >
+            {loading ? 'Memuat data...' : displayText}
+          </Text>
+        </View>
         <ChevronDown size={18} color={mutedColor} />
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="none" onRequestClose={closeModal}>
         <Animated.View
           style={{
-            flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'flex-end', opacity: fadeAnim,
+            flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+            justifyContent: 'center', alignItems: 'center',
+            paddingHorizontal: 20, paddingVertical: 40,
+            opacity: fadeAnim,
           }}
         >
           <TouchableOpacity
-            style={{ flex: 1 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
             activeOpacity={1}
             onPress={closeModal}
           />
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%', maxWidth: 440 }}
           >
             <Animated.View
               style={{
                 backgroundColor: bgColor,
-                borderTopLeftRadius: 20, borderTopRightRadius: 20,
-                maxHeight: SCREEN_HEIGHT * 0.65,
-                paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+                borderRadius: 20,
+                maxHeight: SCREEN_HEIGHT * 0.7,
+                overflow: 'hidden',
+                // Shadow
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.25,
+                shadowRadius: 24,
+                elevation: 16,
                 transform: [{
-                  translateY: fadeAnim.interpolate({
+                  scale: fadeAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [300, 0],
+                    outputRange: [0.92, 1],
                   }),
                 }],
               }}
@@ -188,9 +213,10 @@ export function SmartDropdown({
               {/* Header */}
               <View style={{
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                padding: 16, borderBottomWidth: 1, borderBottomColor: borderColor,
+                paddingHorizontal: 20, paddingVertical: 16,
+                borderBottomWidth: 1, borderBottomColor: borderColor,
               }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: textColor }}>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: textColor }}>
                   {label}
                 </Text>
                 {multiSelect && (
@@ -207,19 +233,26 @@ export function SmartDropdown({
                   </TouchableOpacity>
                 )}
                 {!multiSelect && (
-                  <TouchableOpacity onPress={closeModal}>
-                    <X size={22} color={mutedColor} />
+                  <TouchableOpacity
+                    onPress={closeModal}
+                    style={{
+                      width: 32, height: 32, borderRadius: 16,
+                      backgroundColor: hc ? '#334155' : '#f1f5f9',
+                      alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <X size={18} color={mutedColor} />
                   </TouchableOpacity>
                 )}
               </View>
 
               {/* Search */}
               {searchable && (
-                <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+                <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4 }}>
                   <View style={{
                     flexDirection: 'row', alignItems: 'center',
-                    backgroundColor: inputBg, borderRadius: 10,
-                    paddingHorizontal: 12, borderWidth: 1, borderColor,
+                    backgroundColor: inputBg, borderRadius: 12,
+                    paddingHorizontal: 12, borderWidth: 1.5, borderColor,
                   }}>
                     <Search size={16} color={mutedColor} />
                     <TextInput
@@ -230,29 +263,73 @@ export function SmartDropdown({
                           if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
                           searchTimeoutRef.current = setTimeout(() => {
                             onSearchChange(t);
-                          }, 500);
+                          }, 600);
                         }
                       }}
                       placeholder="Cari..."
                       placeholderTextColor={mutedColor}
                       style={{
-                        flex: 1, paddingVertical: 10, paddingHorizontal: 8,
+                        flex: 1, paddingVertical: 11, paddingHorizontal: 8,
                         fontSize: 14, color: textColor,
                       }}
                       autoFocus
                     />
-                    {search.length > 0 && (
-                      <TouchableOpacity onPress={() => setSearch('')}>
+                    {loading ? (
+                      <ActivityIndicator size="small" color="#1e3a8a" style={{ marginLeft: 6 }} />
+                    ) : search.length > 0 ? (
+                      <TouchableOpacity onPress={() => {
+                        setSearch('');
+                        if (onSearchChange) onSearchChange('');
+                      }}>
                         <X size={16} color={mutedColor} />
                       </TouchableOpacity>
-                    )}
+                    ) : null}
+                  </View>
+                </View>
+              )}
+
+              {/* Sort By Options */}
+              {sortOptions && sortOptions.length > 0 && (
+                <View style={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ArrowUpDown size={13} color={mutedColor} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: mutedColor, marginRight: 2 }}>
+                      Urutkan:
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                      {sortOptions.map(opt => {
+                        const isActive = activeSortId === opt.id;
+                        return (
+                          <TouchableOpacity
+                            key={opt.id}
+                            onPress={() => onSortChange?.(opt.id)}
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              backgroundColor: isActive ? accentColor : (hc ? '#334155' : '#f1f5f9'),
+                              borderWidth: 1,
+                              borderColor: isActive ? accentColor : (hc ? '#475569' : '#e2e8f0'),
+                            }}
+                          >
+                            <Text style={{
+                              fontSize: 11,
+                              fontWeight: '700',
+                              color: isActive ? '#ffffff' : textColor,
+                            }}>
+                              {opt.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
                   </View>
                 </View>
               )}
 
               {/* Custom Input */}
               {allowCustom && (
-                <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
+                <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
                   <View style={{
                     flexDirection: 'row', alignItems: 'center', gap: 8,
                   }}>
@@ -283,17 +360,42 @@ export function SmartDropdown({
                 </View>
               )}
 
+              {/* Loading indicator */}
+              {loading && (
+                <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+                  <View style={{
+                    height: 3, borderRadius: 2, backgroundColor: hc ? '#334155' : '#e2e8f0',
+                    overflow: 'hidden',
+                  }}>
+                    <Animated.View style={{
+                      width: '40%', height: '100%', borderRadius: 2,
+                      backgroundColor: accentColor,
+                    }} />
+                  </View>
+                </View>
+              )}
+
               {/* Items List */}
               <FlatList
                 data={filteredItems}
                 keyExtractor={item => item.id}
                 style={{ paddingHorizontal: 16, marginTop: 8 }}
+                contentContainerStyle={{ paddingBottom: 16 }}
                 keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={
-                  <View style={{ padding: 24, alignItems: 'center' }}>
-                    <Text style={{ color: mutedColor, fontSize: 14 }}>
-                      {search ? 'Tidak ditemukan' : 'Belum ada data'}
-                    </Text>
+                  <View style={{ padding: 32, alignItems: 'center', gap: 10 }}>
+                    {loading ? (
+                      <>
+                        <ActivityIndicator size="small" color="#1e3a8a" />
+                        <Text style={{ color: mutedColor, fontSize: 13, fontWeight: '500' }}>
+                          Memuat data sekolah...
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={{ color: mutedColor, fontSize: 14 }}>
+                        {search ? 'Tidak ditemukan' : 'Belum ada data'}
+                      </Text>
+                    )}
                   </View>
                 }
                 renderItem={({ item }) => {
@@ -308,7 +410,7 @@ export function SmartDropdown({
                       style={{
                         flexDirection: 'row', alignItems: 'center',
                         paddingVertical: 12, paddingHorizontal: 12,
-                        borderRadius: 10, marginBottom: 4,
+                        borderRadius: 12, marginBottom: 4,
                         backgroundColor: isSelected ? accentBg : 'transparent',
                       }}
                     >
@@ -331,7 +433,7 @@ export function SmartDropdown({
                           {item.label}
                         </Text>
                         {item.sublabel && (
-                          <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
+                          <Text numberOfLines={2} style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
                             {item.sublabel}
                           </Text>
                         )}

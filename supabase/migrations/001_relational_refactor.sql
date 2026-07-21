@@ -294,9 +294,8 @@ ALTER TABLE public.session_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "schools_select_all" ON public.schools
   FOR SELECT USING (true);
 
-CREATE POLICY "schools_insert_authenticated" ON public.schools
-  FOR INSERT TO authenticated
-  WITH CHECK (true);
+CREATE POLICY "schools_insert_all" ON public.schools
+  FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "schools_update_authenticated" ON public.schools
   FOR UPDATE TO authenticated
@@ -316,9 +315,8 @@ CREATE POLICY "classes_select_anon" ON public.classes
   FOR SELECT TO anon
   USING (true);
 
-CREATE POLICY "classes_insert_authenticated" ON public.classes
-  FOR INSERT TO authenticated
-  WITH CHECK (true);
+CREATE POLICY "classes_insert_all" ON public.classes
+  FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "classes_update_creator" ON public.classes
   FOR UPDATE TO authenticated

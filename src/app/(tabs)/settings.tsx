@@ -5,10 +5,11 @@ import { FontSizeLabels, FontSizeKey, FontSizes } from '../../constants/theme';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
 import { DICT } from '../../constants/i18n';
 import { getCardShadow } from '../../utils/formatters';
-import { Type, Moon, Globe, Zap, User, Info, ChevronRight } from 'lucide-react-native';
+import { Type, Moon, Globe, Zap, User, Info, ChevronRight, Shield } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { Animated, Easing } from 'react-native';
+import { checkIsAdmin } from '../../services/adminService';
 
 function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => void; hc: boolean }) {
   const anim = React.useMemo(() => new Animated.Value(val ? 22 : 2), []);
@@ -51,6 +52,13 @@ export default function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
   const { user, logout, role } = useAuth();
   const router = useRouter();
+  const [isAdmin, setIsAdmin] = React.useState(false);
+
+  React.useEffect(() => {
+    if (user?.id) {
+      checkIsAdmin(user.id).then(setIsAdmin).catch(() => setIsAdmin(false));
+    }
+  }, [user?.id]);
 
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';
@@ -249,6 +257,42 @@ export default function SettingsScreen() {
           </View>
           <ChevronRight size={18} color={mutedColor} />
         </TouchableOpacity>
+
+        {/* Admin Dashboard Button */}
+        {isAdmin && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/admin')}
+            style={[
+              {
+                padding: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              },
+              cardStyle,
+              { borderWidth: 1, borderColor: hc ? '#fbbf24' : '#fef3c7' },
+            ]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+              <Shield size={15} color="#d97706" />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>
+                    Admin Dashboard
+                  </Text>
+                  <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#d97706' }}>ADMIN</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
+                  Kelola pengguna, kelas, dan pantau aktivitas
+                </Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color={mutedColor} />
+          </TouchableOpacity>
+        )}
 
         {/* Profile */}
         <View style={[{ padding: 16 }, cardStyle]}>

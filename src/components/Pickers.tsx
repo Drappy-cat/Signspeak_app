@@ -3,12 +3,13 @@
 // Domain-specific wrappers around SmartDropdown
 // ============================================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { SmartDropdown, DropdownItem } from './SmartDropdown';
 import { Plus } from 'lucide-react-native';
-import { searchSchools, createSchool, getGradesBySchoolType, getClassesBySchoolAndGrade, createClass } from '../services/schoolService';
+import { searchSchools, createSchool, getGradesBySchoolType, getClassesBySchoolAndGrade, createClass, SchoolSortBy, INDONESIAN_PROVINCES, getDistrictsByCity } from '../services/schoolService';
 import { getAllSubjects, createCustomSubject } from '../services/teacherService';
+import { INDONESIA_REGIONS } from '../data/indonesiaRegions';
 import type { School, Grade, Class, Subject, SchoolType } from '../types/database';
 
 // ── SchoolPicker ─────────────────────────────────────────────────────────────
@@ -35,30 +36,73 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
   const borderColor = hc ? '#475569' : '#e2e8f0';
 
   const [filterType, setFilterType] = useState<SchoolType | null>(null);
+  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SchoolSortBy>('name');
   const [lastQuery, setLastQuery] = useState('');
 
-  const loadSchools = useCallback(async (query?: string) => {
+  const loadSchools = useCallback(async (
+    query?: string,
+    overrideSort?: SchoolSortBy,
+    overrideProv?: string | null,
+    overrideCity?: string | null,
+    overrideDist?: string | null
+  ) => {
     const activeQuery = query !== undefined ? query : lastQuery;
     if (query !== undefined) setLastQuery(query);
+    const activeSort = overrideSort || sortBy;
+    const activeProv = overrideProv !== undefined ? overrideProv : selectedProvince;
+    const activeCity = overrideCity !== undefined ? overrideCity : selectedCity;
+    const activeDist = overrideDist !== undefined ? overrideDist : selectedDistrict;
 
     setLoading(true);
     try {
-      const result = await searchSchools(activeQuery, filterType, 50);
+      const result = await searchSchools(activeQuery, filterType, 50, activeSort, activeProv, activeCity, activeDist);
       setSchools(result);
     } catch (e) {
       console.error('Failed to load schools:', e);
     } finally {
       setLoading(false);
     }
-  }, [filterType, lastQuery]);
+  }, [filterType, lastQuery, sortBy, selectedProvince, selectedCity, selectedDistrict]);
 
   useEffect(() => { loadSchools(); }, [loadSchools]);
+
+  useEffect(() => {
+    getDistrictsByCity(selectedCity, selectedProvince).then(res => setDistricts(res));
+  }, [selectedCity, selectedProvince]);
 
   const items: DropdownItem[] = schools.map(s => ({
     id: s.id,
     label: s.school_name,
     sublabel: `${s.school_type}${s.address ? ` · ${s.address}` : ''}`,
   }));
+
+  const provinceItems: DropdownItem[] = [
+    { id: '', label: appLang === 'en' ? 'All Provinces' : 'Semua Provinsi (Indonesia)' },
+    ...INDONESIAN_PROVINCES.map(p => ({ id: p, label: `Prov. ${p}` }))
+  ];
+
+  // Derive cities from comprehensive INDONESIA_REGIONS dataset
+  const availableCities = useMemo(() => {
+    if (!selectedProvince) {
+      return INDONESIA_REGIONS.flatMap(r => r.cities).sort((a, b) => a.localeCompare(b));
+    }
+    const region = INDONESIA_REGIONS.find(r => r.province.toLowerCase() === selectedProvince.toLowerCase() || selectedProvince.toLowerCase().includes(r.province.toLowerCase()));
+    return region ? region.cities : [];
+  }, [selectedProvince]);
+
+  const cityItems: DropdownItem[] = [
+    { id: '', label: appLang === 'en' ? 'All Regencies/Cities' : 'Semua Kab/Kota' },
+    ...availableCities.map(c => ({ id: c, label: c }))
+  ];
+
+  const districtItems: DropdownItem[] = [
+    { id: '', label: appLang === 'en' ? 'All Districts' : 'Semua Kecamatan' },
+    ...districts.map(d => ({ id: d, label: `Kec. ${d}` }))
+  ];
 
   const schoolTypes: SchoolType[] = ['SD', 'SMP', 'SMA', 'SMK', 'SLB'];
 
@@ -86,40 +130,102 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
 
 
   return (
-    <View style={{ gap: 8 }}>
-      <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
-        <TouchableOpacity
-          onPress={() => setFilterType(null)}
-          style={{
-            paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-            backgroundColor: filterType === null ? '#1e3a8a' : inputBg,
-            borderWidth: 1, borderColor: filterType === null ? '#1e3a8a' : borderColor,
-          }}
-        >
-          <Text style={{ fontSize: 12, color: filterType === null ? '#fff' : mutedColor, fontWeight: '600' }}>
-            Semua
-          </Text>
-        </TouchableOpacity>
-        {schoolTypes.map(type => (
-          <TouchableOpacity
-            key={type}
-            onPress={() => setFilterType(type)}
-            style={{
-              paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-              backgroundColor: filterType === type ? '#1e3a8a' : inputBg,
-              borderWidth: 1, borderColor: filterType === type ? '#1e3a8a' : borderColor,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: filterType === type ? '#fff' : mutedColor, fontWeight: '600' }}>
-              {type}
-            </Text>
-          </TouchableOpacity>
-        ))}
+    <View style={{ gap: 10 }}>
+      {/* Filter row: label + chips in a single horizontal bar */}
+      <View style={{ gap: 6 }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: mutedColor }}>
+          {appLang === 'en' ? 'Filter by type' : 'Filter jenis sekolah'}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'nowrap' }}>
+          {[null, ...schoolTypes].map((type, idx) => {
+            const isActive = filterType === type;
+            const chipLabel = type === null ? (appLang === 'en' ? 'All' : 'Semua') : type;
+            return (
+              <TouchableOpacity
+                key={idx}
+                onPress={() => setFilterType(type)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  backgroundColor: isActive ? '#1e3a8a' : (hc ? '#1e293b' : '#f1f5f9'),
+                  borderWidth: 1.5,
+                  borderColor: isActive ? '#1e3a8a' : (hc ? '#334155' : '#e2e8f0'),
+                }}
+              >
+                <Text style={{
+                  fontSize: 12, fontWeight: '700',
+                  color: isActive ? '#fff' : mutedColor,
+                  letterSpacing: 0.3,
+                }}>
+                  {chipLabel}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
+      {/* Location Filters Row */}
+      <View style={{ gap: 8 }}>
+        <SmartDropdown
+          label={appLang === 'en' ? '1. Province' : '1. Pilih Provinsi'}
+          placeholder={appLang === 'en' ? 'All Provinces' : 'Semua Provinsi'}
+          items={provinceItems}
+          selectedId={selectedProvince || ''}
+          onSelect={(item) => {
+            const prov = item.id || null;
+            setSelectedProvince(prov);
+            setSelectedCity(null);
+            setSelectedDistrict(null);
+            loadSchools(undefined, undefined, prov, null, null);
+          }}
+          hc={hc}
+        />
+
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <SmartDropdown
+              label={appLang === 'en' ? '2. City / Regency' : '2. Kab / Kota'}
+              placeholder={appLang === 'en' ? 'All Cities' : 'Semua Kab/Kota'}
+              items={cityItems}
+              selectedId={selectedCity || ''}
+              onSelect={(item) => {
+                const city = item.id || null;
+                setSelectedCity(city);
+                setSelectedDistrict(null);
+                loadSchools(undefined, undefined, undefined, city, null);
+              }}
+              hc={hc}
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <SmartDropdown
+              label={appLang === 'en' ? '3. District' : '3. Kecamatan'}
+              placeholder={appLang === 'en' ? 'All Districts' : 'Semua Kecamatan'}
+              items={districtItems}
+              selectedId={selectedDistrict || ''}
+              onSelect={(item) => {
+                const dist = item.id || null;
+                setSelectedDistrict(dist);
+                loadSchools(undefined, undefined, undefined, undefined, dist);
+              }}
+              hc={hc}
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* School dropdown */}
       <SmartDropdown
-        label={appLang === 'en' ? 'School' : 'Sekolah'}
-        placeholder={appLang === 'en' ? 'Search or select school...' : 'Cari atau pilih sekolah...'}
+        label={appLang === 'en' ? '4. School Name' : '4. Pilih Sekolah'}
+        placeholder={
+          filterType
+            ? (appLang === 'en' ? `Search ${filterType} schools...` : `Cari sekolah ${filterType}...`)
+            : (appLang === 'en' ? 'Search or select school...' : 'Cari atau pilih sekolah...')
+        }
         items={items}
         selectedId={selectedSchool?.id || null}
         onSelect={(item) => {
@@ -134,7 +240,11 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
       {!showCreate ? (
         <TouchableOpacity
           onPress={() => setShowCreate(true)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 }}
+          style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+            gap: 6, paddingVertical: 10, borderRadius: 10,
+            borderWidth: 1.5, borderColor: '#1e3a8a', borderStyle: 'dashed',
+          }}
         >
           <Plus size={14} color="#1e3a8a" />
           <Text style={{ fontSize: 13, color: '#1e3a8a', fontWeight: '600' }}>

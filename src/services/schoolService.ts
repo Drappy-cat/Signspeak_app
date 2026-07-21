@@ -12,12 +12,75 @@ import type {
 
 // ── Schools ──────────────────────────────────────────────────────────────────
 
-/** Search schools by name (fuzzy search) */
-export async function searchSchools(query: string, typeFilter?: SchoolType | null, limit = 50): Promise<School[]> {
+export type SchoolSortBy = 'name' | 'prov' | 'kab' | 'kec';
+
+export const INDONESIAN_PROVINCES = [
+  'Aceh',
+  'Bali',
+  'Banten',
+  'Bengkulu',
+  'D.I. Yogyakarta',
+  'D.K.I. Jakarta',
+  'Gorontalo',
+  'Jambi',
+  'Jawa Barat',
+  'Jawa Tengah',
+  'Jawa Timur',
+  'Kalimantan Barat',
+  'Kalimantan Selatan',
+  'Kalimantan Tengah',
+  'Kalimantan Timur',
+  'Kalimantan Utara',
+  'Kepulauan Bangka Belitung',
+  'Kepulauan Riau',
+  'Lampung',
+  'Maluku',
+  'Maluku Utara',
+  'Nusa Tenggara Barat',
+  'Nusa Tenggara Timur',
+  'Papua',
+  'Papua Barat',
+  'Papua Barat Daya',
+  'Papua Pegunungan',
+  'Papua Selatan',
+  'Papua Tengah',
+  'Riau',
+  'Sulawesi Barat',
+  'Sulawesi Selatan',
+  'Sulawesi Tengah',
+  'Sulawesi Tenggara',
+  'Sulawesi Utara',
+  'Sumatera Barat',
+  'Sumatera Selatan',
+  'Sumatera Utara',
+];
+
+/** Search schools by name/address with filtering and sorting */
+export async function searchSchools(
+  query: string,
+  typeFilter?: SchoolType | null,
+  limit = 50,
+  sortBy: SchoolSortBy = 'name',
+  provinceFilter?: string | null,
+  cityFilter?: string | null,
+  districtFilter?: string | null
+): Promise<School[]> {
   let q = db.from('schools').select('*');
 
   if (typeFilter) {
     q = q.eq('school_type', typeFilter);
+  }
+
+  if (provinceFilter && provinceFilter.trim()) {
+    q = q.ilike('address', `%${provinceFilter.trim()}%`);
+  }
+
+  if (cityFilter && cityFilter.trim()) {
+    q = q.ilike('address', `%${cityFilter.trim()}%`);
+  }
+
+  if (districtFilter && districtFilter.trim()) {
+    q = q.ilike('address', `%${districtFilter.trim()}%`);
   }
 
   if (query.trim()) {
@@ -28,12 +91,91 @@ export async function searchSchools(query: string, typeFilter?: SchoolType | nul
     });
   }
 
-  const { data, error } = await q
-    .order('school_name')
-    .limit(limit);
+  if (sortBy === 'name') {
+    q = q.order('school_name', { ascending: true });
+  } else {
+    q = q.order('address', { ascending: true, nullsFirst: false }).order('school_name', { ascending: true });
+  }
+
+  const { data, error } = await q.limit(limit);
 
   if (error) throw error;
-  return (data ?? []) as School[];
+  const result = (data ?? []) as School[];
+
+  if (sortBy !== 'name' && result.length > 0) {
+    result.sort((a, b) => {
+      const addrA = a.address || '';
+      const addrB = b.address || '';
+
+      let keyA = addrA;
+      let keyB = addrB;
+
+      if (sortBy === 'prov') {
+        const partsA = addrA.split(/Prov\./i);
+        const partsB = addrB.split(/Prov\./i);
+        if (partsA[1]) keyA = partsA[1].trim();
+        if (partsB[1]) keyB = partsB[1].trim();
+      } else if (sortBy === 'kab') {
+        const partsA = addrA.split(/Kab\.|Kota/i);
+        const partsB = addrB.split(/Kab\.|Kota/i);
+        if (partsA[1]) keyA = partsA[1].trim();
+        if (partsB[1]) keyB = partsB[1].trim();
+      } else if (sortBy === 'kec') {
+        const partsA = addrA.split(/Kec\./i);
+        const partsB = addrB.split(/Kec\./i);
+        if (partsA[1]) keyA = partsA[1].trim();
+        if (partsB[1]) keyB = partsB[1].trim();
+      }
+
+      return keyA.localeCompare(keyB);
+    });
+  }
+
+  return result;
+}
+
+/** Get distinct cities/regencies (Kabupaten/Kota) for a province */
+export async function getCitiesByProvince(province?: string | null): Promise<string[]> {
+  let q = db.from('schools').select('address');
+  if (province && province.trim()) {
+    q = q.ilike('address', `%${province.trim()}%`);
+  }
+  const { data, error } = await q.limit(1000);
+  if (error || !data) return [];
+
+  const citiesSet = new Set<string>();
+  data.forEach(row => {
+    if (!row.address) return;
+    const match = row.address.match(/(?:Kab\.|Kota)\s+([^,]+)/i);
+    if (match && match[1]) {
+      citiesSet.add(match[1].trim());
+    }
+  });
+
+  return Array.from(citiesSet).sort((a, b) => a.localeCompare(b));
+}
+
+/** Get distinct districts (Kecamatan) for a city/province */
+export async function getDistrictsByCity(city?: string | null, province?: string | null): Promise<string[]> {
+  let q = db.from('schools').select('address');
+  if (city && city.trim()) {
+    q = q.ilike('address', `%${city.trim()}%`);
+  } else if (province && province.trim()) {
+    q = q.ilike('address', `%${province.trim()}%`);
+  }
+  const { data, error } = await q.limit(1000);
+  if (error || !data) return [];
+
+  const districtSet = new Set<string>();
+  data.forEach(row => {
+    if (!row.address) return;
+    const match = row.address.match(/Kec\.\s+([^,]+)/i);
+    if (match && match[1]) {
+      districtSet.add(match[1].trim());
+    }
+  });
+
+  return Array.from(districtSet).sort((a, b) => a.localeCompare(b));
 }
 
 /** Get all schools (for browsing) */

@@ -124,11 +124,18 @@ export default function LoginScreen() {
         // Add them as a participant
         await addSessionParticipant(activeSession.id, student.id);
 
+        // Format class and school identity
+        const gradeStr = activeSession.class?.grade?.grade_name ? `Kelas ${activeSession.class.grade.grade_name}` : '';
+        const classStr = activeSession.class?.class_name || '';
+        const fullClassName = `${gradeStr} ${classStr}`.trim() || 'Kelas Umum';
+        const schoolName = activeSession.class?.school?.school_name || '';
+        const identityStr = schoolName ? `${fullClassName} • ${schoolName}` : fullClassName;
+
         // Store into AuthContext (local storage mock for student)
-        await login('', undefined, roomCodeUpper, 'student', student.name, 'Kelas', student.absen.toString());
+        await login('', undefined, roomCodeUpper, 'student', student.name, identityStr, student.absen.toString());
 
         setLoading(false);
-        router.replace('/(tabs)/home');
+        router.replace('/(tabs)/live'); // Langsung masuk ke sesi live
         return; // Students are done here
       } catch (err: any) {
         setLoading(false);

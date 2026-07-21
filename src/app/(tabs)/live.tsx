@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -126,9 +126,9 @@ function HighlightText({
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveScreen() {
-  const { role } = useAuth();
+  const { role, logout } = useAuth();
   const { session, endSession, isRecording, toggleRecording, updateLanguage } = useSession();
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const router = useRouter();
   const appLang = settings.appLang || 'id';
 
@@ -257,6 +257,18 @@ export default function LiveScreen() {
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
   }, [session.transcript, session.interimTranscript]);
 
+  // Auto-logout student when teacher ends session
+  useEffect(() => {
+    if (role === 'student' && !session.isActive && session.errorMessage === 'Sesi telah diakhiri oleh guru.') {
+      // Small delay to let them read the end message
+      const timer = setTimeout(async () => {
+        await logout();
+        router.replace('/');
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [role, session.isActive, session.errorMessage]);
+
   const defaultKeywords = KEYWORDS[session.language] || KEYWORDS['id'];
   const currentKeywords = [...defaultKeywords, ...(session.customKeywords || [])];
   const hc = settings.highContrast;
@@ -299,17 +311,51 @@ export default function LiveScreen() {
         <View style={[{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, headerStyle]}>
           <View>
             <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>
-              {session.isActive ? 'Bu Sari Dewi' : (appLang === 'en' ? 'No Active Teacher' : 'Belum Ada Guru')}
+              {session.isActive ? (session.teacherName || 'Guru') : (appLang === 'en' ? 'No Active Teacher' : 'Belum Ada Guru')}
             </Text>
             <Text style={{ fontSize: 12, color: mutedColor }}>
               {session.isActive ? `${session.subject} — ${session.roomCode}` : (appLang === 'en' ? 'Waiting Room' : 'Ruang Tunggu')}
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <PulseDot color={session.isActive ? "bg-red-500" : "bg-amber-500"} />
-            <Text style={{ color: session.isActive ? '#ef4444' : '#f59e0b', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }}>
-              {session.isActive ? 'LIVE' : (appLang === 'en' ? 'WAITING' : 'MENUNGGU')}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <PulseDot color={session.isActive ? "bg-red-500" : "bg-amber-500"} />
+              <Text style={{ color: session.isActive ? '#ef4444' : '#f59e0b', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }}>
+                {session.isActive ? 'LIVE' : (appLang === 'en' ? 'WAITING' : 'MENUNGGU')}
+              </Text>
+            </View>
+
+            {/* Accessibility Buttons */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Size Button */}
+              <TouchableOpacity
+                onPress={() => {
+                  const nextSize = settings.fontSize === 'normal' ? 'large' : settings.fontSize === 'large' ? 'xlarge' : 'normal';
+                  updateSettings({ fontSize: nextSize });
+                }}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontWeight: '900', color: textColor, fontSize: 14 }}>A<Text style={{ fontSize: 10 }}>A</Text></Text>
+              </TouchableOpacity>
+              
+              {/* Theme Button */}
+              <TouchableOpacity
+                onPress={() => updateSettings({ highContrast: !settings.highContrast })}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {settings.highContrast ? <Sun size={16} color="#f8fafc" /> : <Moon size={16} color="#0f172a" />}
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={async () => {
+                await logout();
+                router.replace('/');
+              }}
+              style={{ backgroundColor: hc ? '#ef4444' : '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+            >
+              <Text style={{ color: hc ? '#ffffff' : '#ef4444', fontSize: 11, fontWeight: '800' }}>{appLang === 'en' ? 'Logout' : 'Keluar'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -335,7 +381,7 @@ export default function LiveScreen() {
                     : (appLang === 'en' ? 'Waiting for teacher...' : 'Menunggu guru berbicara...')}
             </Text>
             <Text style={{ fontSize: 10, color: mutedColor }}>
-              {session.isActive ? 'Bu Sari Dewi' : (appLang === 'en' ? 'LENTERA System' : 'Sistem LENTERA')} • {appLang === 'en' ? 'Teacher' : 'Guru'}
+              {session.isActive ? (session.teacherName || 'Guru') : (appLang === 'en' ? 'LENTERA System' : 'Sistem LENTERA')} • {appLang === 'en' ? 'Teacher' : 'Guru'}
             </Text>
           </View>
         </View>
@@ -411,27 +457,7 @@ export default function LiveScreen() {
           ) : null}
         </ScrollView>
 
-        {/* Controls bar */}
-        <View style={[{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, ctrlStyle]}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>
-            {appLang === 'en' ? 'Size: ' : 'Ukuran: '}<Text style={{ color: textColor }}>{settings.fontSize === 'normal' ? (appLang === 'en' ? 'Normal' : 'Normal') : settings.fontSize === 'large' ? (appLang === 'en' ? 'Large' : 'Besar') : (appLang === 'en' ? 'X. Large' : 'X. Besar')}</Text>
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPaused(!paused)}
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12,
-              backgroundColor: paused ? '#1e3a8a' : hc ? '#334155' : '#f1f5f9',
-            }}
-          >
-            {paused
-              ? <Play size={13} color="white" fill="white" />
-              : <Square size={13} color={hc ? "#e2e8f0" : "#334155"} fill={hc ? "#e2e8f0" : "#334155"} />
-            }
-            <Text style={{ fontSize: 13, fontWeight: '800', color: paused ? 'white' : hc ? '#e2e8f0' : '#334155' }}>
-              {paused ? (appLang === 'en' ? 'Resume' : 'Lanjut') : (appLang === 'en' ? 'Pause' : 'Jeda')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+
 
         {/* Fitur Tanya Balik (Text-to-Speech) */}
         <View style={{ 

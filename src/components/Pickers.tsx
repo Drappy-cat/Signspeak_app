@@ -503,7 +503,25 @@ export function SubjectPicker({
   }));
 
   const handleCreateCustomSubject = async (name: string) => {
-    if (!authUserId) return;
+    if (!authUserId) {
+      // Create a temporary subject object during registration (when authUserId is not yet available)
+      const tempSubject: Subject = {
+        id: `temp-${Date.now()}`,
+        subject_name: name.trim(),
+        is_custom: true,
+        created_by: null,
+      };
+      
+      setSubjects(prev => {
+        if (prev.find(s => s.subject_name.toLowerCase() === name.trim().toLowerCase())) return prev;
+        return [...prev, tempSubject];
+      });
+      
+      const allSelected = [...subjects.filter(s => selectedSubjectIds.includes(s.id)), tempSubject];
+      onSelectSubjects(allSelected);
+      return;
+    }
+    
     try {
       const newSubject = await createCustomSubject(name, authUserId);
       setSubjects(prev => {

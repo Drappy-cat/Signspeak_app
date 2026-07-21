@@ -34,6 +34,7 @@ export interface ActiveSession {
   isActive: boolean;
   roomCode: string | null;
   subject: string | null;
+  teacherName: string | null;
   subjectId: string | null;
   classId: string | null;
   language: string;
@@ -61,6 +62,7 @@ const defaultSession: ActiveSession = {
   isActive: false,
   roomCode: null,
   subject: null,
+  teacherName: null,
   subjectId: null,
   classId: null,
   language: 'id',
@@ -127,7 +129,7 @@ class WebSpeechEngine {
     this.recognition = new SpeechRecognition();
     this.recognition.lang = this.lang;
     this.recognition.interimResults = true;
-    this.recognition.continuous = false; // Will be restarted on end for continuous effect
+    this.recognition.continuous = true; // Use true for less delay between sentences
     this.recognition.maxAlternatives = 1;
 
     this.recognition.onresult = (event: any) => {
@@ -171,7 +173,7 @@ class WebSpeechEngine {
           if (this.active) {
             this._createAndStart();
           }
-        }, 300);
+        }, 10);
       }
     };
 
@@ -197,6 +199,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const autoPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accumulatedTranscriptRef = useRef<string>('');
   const customGlossaryRef = useRef<{ keywords: string[]; glossary: Record<string, string> }>({ keywords: [], glossary: {} });
+  const teacherChannelRef = useRef<any>(null);
 
   // Initialize Web Speech Engine once
   useEffect(() => {
@@ -248,12 +251,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const roomCode = user.joinedRoomCode;
       
       const fetchInitial = async () => {
-        const { data } = await db.from('live_sessions').select('*').eq('room_code', roomCode).eq('is_active', true).maybeSingle();
+        const { data } = await db.from('live_sessions').select('*, teacher:teachers(full_name), subject_rel:subjects(subject_name)').eq('room_code', roomCode).eq('is_active', true).maybeSingle();
         if (data) {
           setSession({
             isActive: true,
             roomCode: data.room_code,
-            subject: 'Sesi', // Temporary since we don't have subject name here without join
+            subject: data.subject_rel?.subject_name || 'Sesi', 
+            teacherName: data.teacher?.full_name || 'Guru',
             subjectId: data.subject_id,
             classId: data.class_id,
             language: data.language || 'id',
@@ -278,13 +282,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             const updated = payload.new;
             if (!updated.is_active) {
               setSession(prev => ({ ...prev, isActive: false, errorMessage: 'Sesi telah diakhiri oleh guru.' }));
-            } else {
-              setSession(prev => ({
-                ...prev,
-                transcript: updated.transcript,
-                interimTranscript: updated.interim_transcript,
-              }));
             }
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'sync_transcript' },
+          (payload) => {
+            const data = payload.payload;
+            setSession(prev => ({
+              ...prev,
+              transcript: data.transcript,
+              interimTranscript: data.interimTranscript,
+            }));
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'end_session' },
+          () => {
+            setSession(prev => ({ ...prev, isActive: false, errorMessage: 'Sesi telah diakhiri oleh guru.' }));
           }
         )
         .on(
@@ -340,6 +357,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Supabase Teacher Sync ───────────────────────────────────────────────────
   useEffect(() => {
     if (role === 'teacher' && session.isActive && session.roomCode) {
+      // 1. Broadcast instantly to all students
+      if (teacherChannelRef.current) {
+        teacherChannelRef.current.send({
+          type: 'broadcast',
+          event: 'sync_transcript',
+          payload: {
+            transcript: session.transcript,
+            interimTranscript: session.interimTranscript,
+          }
+        });
+      }
+
+      // 2. Debounce DB save
       const timer = setTimeout(() => {
         db.from('live_sessions').update({
           transcript: session.transcript,
@@ -405,6 +435,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           }
         )
         .subscribe();
+        
+      teacherChannelRef.current = channel;
         
       // Periodically mark students as offline
       const timer = setInterval(() => {
@@ -635,6 +667,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       isActive: true,
       roomCode,
       subject,
+      teacherName: user?.name || null,
       classId,
       subjectId,
       language,
@@ -661,6 +694,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       // End session in live_sessions
       if (session.roomCode) {
         await db.from('live_sessions').update({ is_active: false }).eq('room_code', session.roomCode);
+        
+        if (teacherChannelRef.current) {
+          teacherChannelRef.current.send({
+            type: 'broadcast',
+            event: 'end_session',
+            payload: {}
+          });
+        }
       }
 
       // Serialize glossary metadata if there is a custom glossary

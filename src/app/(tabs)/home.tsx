@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { getTeacherClasses, getTeacherSubjects } from '../../services/teacherService';
+import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory } from '../../services/teacherService';
 import type { ClassWithDetails, Subject } from '../../types/database';
 import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -84,6 +85,8 @@ export default function HomeScreen() {
   const [selectedClassId, setSelectedClassId] = React.useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = React.useState<string | null>(null);
   const [customGlossaryList, setCustomGlossaryList] = React.useState<Array<{ word: string; definition: string }>>([]);
+  const [isGlossaryLoaded, setIsGlossaryLoaded] = React.useState(false);
+  const [recentSessions, setRecentSessions] = React.useState<any[]>([]);
   const [newWord, setNewWord] = React.useState('');
   const [newDefinition, setNewDefinition] = React.useState('');
 
@@ -98,8 +101,34 @@ export default function HomeScreen() {
         setTeacherSubjects(subjects);
         if (subjects.length > 0) setSelectedSubjectId(subjects[0].id);
       }).catch(console.error);
+
+      getTeacherSessionHistory(user.teacher_id, 3).then(data => {
+        setRecentSessions(data);
+      }).catch(console.error);
     }
   }, [role, user?.teacher_id]);
+
+  // Load saved custom glossary from database
+  React.useEffect(() => {
+    if (user?.teacher_id) {
+      getTeacherGlossary(user.teacher_id).then(data => {
+        if (data && data.length > 0) {
+          setCustomGlossaryList(data);
+        }
+      }).catch(console.error).finally(() => {
+        setIsGlossaryLoaded(true);
+      });
+    }
+  }, [user?.teacher_id]);
+
+  // Save custom glossary to database when it changes
+  React.useEffect(() => {
+    if (!isGlossaryLoaded) return;
+    
+    if (user?.teacher_id) {
+      saveTeacherGlossary(user.teacher_id, customGlossaryList).catch(console.error);
+    }
+  }, [customGlossaryList, user?.teacher_id, isGlossaryLoaded]);
 
   const renderStudentHome = () => (
     <View className="pb-10">
@@ -169,12 +198,12 @@ export default function HomeScreen() {
       <View style={{ paddingHorizontal: 20, paddingTop: 16, flexDirection: 'row', gap: 12 }}>
         <View style={[{ flex: 1, padding: 14 }, cardStyle]}>
           <Text className={`text-xs font-bold ${muted}`}>{appLang === 'en' ? 'Total Sessions' : 'Total Sesi'}</Text>
-          <Text style={{ fontSize: 24, fontWeight: '900', marginTop: 4, color: hc ? '#f8fafc' : '#0f172a' }}>24</Text>
+          <Text style={{ fontSize: 24, fontWeight: '900', marginTop: 4, color: hc ? '#f8fafc' : '#0f172a' }}>0</Text>
           <Text className={`text-xs ${muted} mt-0.5`}>{appLang === 'en' ? 'this month' : 'bulan ini'}</Text>
         </View>
         <View style={[{ flex: 1, padding: 14 }, cardStyle]}>
           <Text className={`text-xs font-bold ${muted}`}>{appLang === 'en' ? 'Words Transcribed' : 'Kata Ditranskripsi'}</Text>
-          <Text style={{ fontSize: 24, fontWeight: '900', marginTop: 4, color: hc ? '#f8fafc' : '#0f172a' }}>18.4K</Text>
+          <Text style={{ fontSize: 24, fontWeight: '900', marginTop: 4, color: hc ? '#f8fafc' : '#0f172a' }}>0</Text>
           <Text className={`text-xs ${muted} mt-0.5`}>{appLang === 'en' ? 'overall total' : 'total keseluruhan'}</Text>
         </View>
       </View>
@@ -307,12 +336,20 @@ export default function HomeScreen() {
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
         <Text style={{ fontWeight: '800', fontSize: 15, marginBottom: 12, color: hc ? '#f8fafc' : '#0f172a' }}>{d.myClasses}</Text>
         <View style={{ gap: 10 }}>
-          {[
-            { name: "XII IPA 3", subject: "Biologi", students: 28, active: true },
-            { name: "XI IPA 1", subject: "Biologi", students: 30, active: false },
-            { name: "X IPS 2", subject: "Biologi Dasar", students: 32, active: false },
-          ].map((cls, i) => (
-            <View key={i} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }, cardStyle]}>
+          {teacherClasses.length === 0 ? (
+            <Text style={{ color: mutedColorVal, fontStyle: 'italic', fontSize: 13, textAlign: 'center', padding: 20 }}>
+              {appLang === 'en' ? 'No classes registered yet.' : 'Belum ada kelas yang didaftarkan.'}
+            </Text>
+          ) : teacherClasses.map((cls, i) => (
+            <TouchableOpacity 
+              key={cls.id || i} 
+              activeOpacity={0.7}
+              onPress={() => {
+                setSelectedClassId(cls.id);
+                setStartModalVisible(true);
+              }}
+              style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }, cardStyle]}
+            >
               <View style={{
                 width: 40, height: 40, borderRadius: 10,
                 backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
@@ -321,17 +358,15 @@ export default function HomeScreen() {
                 <GraduationCap size={17} color={hc ? "#93c5fd" : "#1d4ed8"} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{cls.name} — {cls.subject}</Text>
-                <Text className={`text-xs ${muted} mt-0.5`}>{cls.students} {appLang === 'en' ? 'students registered' : 'siswa terdaftar'}</Text>
+                <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>
+                  {cls.grade?.grade_name ? `Kelas ${cls.grade.grade_name} ${cls.class_name}` : cls.class_name}
+                </Text>
+                <Text className={`text-xs ${muted} mt-0.5`}>
+                  {cls.school?.school_name || (appLang === 'en' ? 'No school info' : 'Tanpa info sekolah')}
+                </Text>
               </View>
-              {cls.active && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: 4 }}>
-                  <PulseDot />
-                  <Text style={{ color: '#f87171', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>LIVE</Text>
-                </View>
-              )}
               <ChevronRight size={16} color={hc ? "#64748b" : "#94a3b8"} />
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       </View>
@@ -340,20 +375,24 @@ export default function HomeScreen() {
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
         <Text style={{ fontWeight: '800', fontSize: 15, marginBottom: 12, color: hc ? '#f8fafc' : '#0f172a' }}>{d.recentSessions}</Text>
         <View style={{ gap: 8 }}>
-          {HISTORY_DATA.slice(0, 3).map(item => (
+          {recentSessions.length === 0 ? (
+            <Text style={{ color: mutedColorVal, fontStyle: 'italic', fontSize: 13, textAlign: 'center', padding: 10 }}>
+              {appLang === 'en' ? 'No recent sessions.' : 'Belum ada riwayat sesi.'}
+            </Text>
+          ) : recentSessions.map((item, i) => (
             <View key={item.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }, cardStyle]}>
               <View style={{
                 width: 36, height: 36, borderRadius: 10,
                 backgroundColor: hc ? '#334155' : '#f8fafc',
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>
-                <Text className={`text-xs font-black ${muted}`}>#{item.id}</Text>
+                <Text className={`text-xs font-black ${muted}`}>#{i + 1}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{item.subject}</Text>
-                <Text className={`text-xs ${muted} mt-0.5`}>{item.date}</Text>
+                <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{item.subject_display || 'Sesi'}</Text>
+                <Text className={`text-xs ${muted} mt-0.5`}>{new Date(item.created_at).toLocaleDateString()} · {Math.floor((item.duration || 0) / 60)}m</Text>
               </View>
-              <Text className={`text-xs font-bold ${linkColor}`}>{item.words.toLocaleString()} {appLang === 'en' ? 'words' : 'kata'}</Text>
+              <Text className={`text-xs font-bold ${linkColor}`}>{item.word_count?.toLocaleString() || 0} {appLang === 'en' ? 'words' : 'kata'}</Text>
             </View>
           ))}
         </View>

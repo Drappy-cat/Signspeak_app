@@ -104,6 +104,12 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'class' | 'teacher'; id: string; name: string } | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  
+  // Success/Error modal states
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   // ── Load Data ─────────────────────────────────────────────────────────────
@@ -117,6 +123,11 @@ export default function AdminDashboard() {
           setLoading(false);
           return;
         }
+      } else {
+        // If user is not logged in (e.g. just clicked Demo switcher without login)
+        setIsAdmin(false);
+        setLoading(false);
+        return;
       }
 
       const [metricsData, provincesData] = await Promise.all([
@@ -173,6 +184,11 @@ export default function AdminDashboard() {
       // Refresh metrics
       const m = await getAdminMetrics();
       setMetrics(m);
+
+      // Show success modal
+      setSuccessMessage(deleteTarget.type === 'class' ? 'Kelas berhasil dihapus' : 'Guru berhasil dihapus');
+      setSuccessModalVisible(true);
+      setTimeout(() => setSuccessModalVisible(false), 2000);
     } catch (e) {
       console.error('Delete failed:', e);
     }
@@ -180,6 +196,7 @@ export default function AdminDashboard() {
 
   const confirmDelete = (type: 'class' | 'teacher', id: string, name: string) => {
     setDeleteTarget({ type, id, name });
+    setDeleteConfirmationText('');
     setDeleteModalVisible(true);
   };
 
@@ -243,131 +260,6 @@ export default function AdminDashboard() {
     !searchQuery ||
     c.class_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.school as any)?.school_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════════════════════════
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0 }}>
-
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <LinearGradient
-        colors={hc ? ['#1e3a5f', '#0f172a'] : ['#1e3a8a', '#1e40af']}
-        style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{ padding: 4 }}>
-            <ArrowLeft size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: '#ffffff' }}>Admin Dashboard</Text>
-            <Text style={{ fontSize: 12, color: '#93c5fd', marginTop: 2 }}>Lentera Management System</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
-            <Crown size={14} color="#fbbf24" />
-            <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '700' }}>ADMIN</Text>
-          </View>
-        </View>
-
-        {/* Tab Bar */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          {TABS.map(tab => {
-            const isActive = activeTab === tab.key;
-            const Icon = tab.icon;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                onPress={() => { setSearchQuery(''); setActiveTab(tab.key); }}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 6,
-                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-                  backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)',
-                }}
-              >
-                <Icon size={16} color={isActive ? '#ffffff' : '#93c5fd'} />
-                <Text style={{ color: isActive ? '#ffffff' : '#93c5fd', fontSize: 13, fontWeight: isActive ? '700' : '500' }}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </LinearGradient>
-
-      {/* ── Search Bar (for users & classes tabs) ──────────────────────── */}
-      {(activeTab === 'users' || activeTab === 'classes') && (
-        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 8,
-            backgroundColor: cardBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
-            borderWidth: 1, borderColor,
-          }}>
-            <Search size={18} color={mutedColor} />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={activeTab === 'users' ? 'Cari guru...' : 'Cari kelas...'}
-              placeholderTextColor={mutedColor}
-              style={{ flex: 1, fontSize: 14, color: textColor, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={18} color={mutedColor} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
-      )}
-
-      {/* ── Content ────────────────────────────────────────────────────── */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentBlue} />}
-      >
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'users' && renderUsers()}
-        {activeTab === 'classes' && renderClasses()}
-        {activeTab === 'sessions' && renderSessions()}
-      </ScrollView>
-
-      {/* ── Delete Confirmation Modal ──────────────────────────────────── */}
-      <Modal visible={deleteModalVisible} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <View style={{ ...cardStyle, padding: 24, width: '100%', maxWidth: 380 }}>
-            <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#fef2f2', justifyContent: 'center', alignItems: 'center' }}>
-                <AlertTriangle size={28} color={dangerColor} />
-              </View>
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: textColor, textAlign: 'center' }}>
-              Konfirmasi Hapus
-            </Text>
-            <Text style={{ fontSize: 14, color: mutedColor, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
-              Apakah Anda yakin ingin menghapus {deleteTarget?.type === 'class' ? 'kelas' : 'guru'}{' '}
-              <Text style={{ fontWeight: '700', color: textColor }}>"{deleteTarget?.name}"</Text>?
-              {'\n'}Tindakan ini tidak dapat dibatalkan.
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
-              <TouchableOpacity
-                onPress={() => { setDeleteModalVisible(false); setDeleteTarget(null); }}
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: hc ? '#334155' : '#f1f5f9', alignItems: 'center' }}
-              >
-                <Text style={{ fontWeight: '700', color: mutedColor }}>Batal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleDelete}
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: dangerColor, alignItems: 'center' }}
-              >
-                <Text style={{ fontWeight: '700', color: '#ffffff' }}>Hapus</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
   );
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -473,14 +365,6 @@ export default function AdminDashboard() {
                 <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>{t.full_name}</Text>
                 <Text style={{ fontSize: 11, color: mutedColor }}>{(t.school as any)?.school_name || '-'}</Text>
               </View>
-              <View style={{
-                paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
-                backgroundColor: t.is_verified ? '#dcfce7' : '#fef3c7',
-              }}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: t.is_verified ? '#16a34a' : '#d97706' }}>
-                  {t.is_verified ? 'Verified' : 'Pending'}
-                </Text>
-              </View>
             </View>
           ))}
         </View>
@@ -529,16 +413,6 @@ export default function AdminDashboard() {
 
               {/* Actions */}
               <View style={{ flexDirection: 'row', gap: 6 }}>
-                <TouchableOpacity
-                  onPress={() => handleVerify(teacher.id, teacher.is_verified)}
-                  style={{
-                    width: 34, height: 34, borderRadius: 10,
-                    backgroundColor: teacher.is_verified ? '#dcfce7' : (hc ? '#334155' : '#f1f5f9'),
-                    justifyContent: 'center', alignItems: 'center',
-                  }}
-                >
-                  {teacher.is_verified ? <UserCheck size={16} color="#16a34a" /> : <UserX size={16} color={mutedColor} />}
-                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => confirmDelete('teacher', teacher.id, teacher.full_name)}
                   style={{
@@ -705,4 +579,196 @@ export default function AdminDashboard() {
       </View>
     );
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════════════════════
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0 }}>
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <LinearGradient
+        colors={hc ? ['#1e3a5f', '#0f172a'] : ['#1e3a8a', '#1e40af']}
+        style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{ padding: 4 }}>
+            <ArrowLeft size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 22, fontWeight: '900', color: '#ffffff' }}>Admin Dashboard</Text>
+            <Text style={{ fontSize: 12, color: '#93c5fd', marginTop: 2 }}>Lentera Management System</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
+            <Crown size={14} color="#fbbf24" />
+            <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '700' }}>ADMIN</Text>
+          </View>
+        </View>
+
+        {/* Tab Bar */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.key;
+            const Icon = tab.icon;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                onPress={() => { setSearchQuery(''); setActiveTab(tab.key); }}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+                  backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)',
+                }}
+              >
+                <Icon size={16} color={isActive ? '#ffffff' : '#93c5fd'} />
+                <Text style={{ color: isActive ? '#ffffff' : '#93c5fd', fontSize: 13, fontWeight: isActive ? '700' : '500' }}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </LinearGradient>
+
+      {/* ── Search Bar (for users & classes tabs) ──────────────────────── */}
+      {(activeTab === 'users' || activeTab === 'classes') && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            backgroundColor: cardBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+            borderWidth: 1, borderColor,
+          }}>
+            <Search size={18} color={mutedColor} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={activeTab === 'users' ? 'Cari guru...' : 'Cari kelas...'}
+              placeholderTextColor={mutedColor}
+              style={{ flex: 1, fontSize: 14, color: textColor, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X size={18} color={mutedColor} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      )}
+
+      {/* ── Content ────────────────────────────────────────────────────── */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentBlue} />}
+      >
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'users' && renderUsers()}
+        {activeTab === 'classes' && renderClasses()}
+        {activeTab === 'sessions' && renderSessions()}
+      </ScrollView>
+
+      {/* ── Delete Confirmation Modal ──────────────────────────────────── */}
+      <Modal visible={deleteModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+          <View style={{ ...cardStyle, padding: 24, width: '100%', maxWidth: 380 }}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#fef2f2', justifyContent: 'center', alignItems: 'center' }}>
+                <AlertTriangle size={28} color={dangerColor} />
+              </View>
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: textColor, textAlign: 'center' }}>
+              Konfirmasi Hapus
+            </Text>
+            <Text style={{ fontSize: 14, color: mutedColor, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
+              Apakah Anda yakin ingin menghapus {deleteTarget?.type === 'class' ? 'kelas' : 'guru'}{' '}
+              <Text style={{ fontWeight: '700', color: textColor }}>"{deleteTarget?.name}"</Text>?
+              {'\n'}Tindakan ini tidak dapat dibatalkan.
+            </Text>
+
+            <View style={{ marginTop: 20, width: '100%' }}>
+              <Text style={{ fontSize: 12, color: textColor, fontWeight: '700', marginBottom: 8 }}>
+                Ketik <Text style={{ color: dangerColor }}>HAPUS</Text> untuk mengonfirmasi:
+              </Text>
+              <TextInput
+                value={deleteConfirmationText}
+                onChangeText={setDeleteConfirmationText}
+                placeholder="HAPUS"
+                placeholderTextColor={mutedColor}
+                autoCapitalize="characters"
+                style={{
+                  backgroundColor: hc ? '#334155' : '#f8fafc',
+                  borderWidth: 1, 
+                  borderColor,
+                  borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+                  fontSize: 14, color: textColor,
+                  ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {})
+                }}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => { 
+                  setDeleteModalVisible(false); 
+                  setDeleteTarget(null); 
+                  setDeleteConfirmationText(''); 
+                }}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: hc ? '#334155' : '#f1f5f9', alignItems: 'center' }}
+              >
+                <Text style={{ fontWeight: '700', color: mutedColor }}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  if (deleteConfirmationText !== 'HAPUS') {
+                    setErrorModalVisible(true);
+                    setTimeout(() => setErrorModalVisible(false), 2000);
+                  } else {
+                    handleDelete();
+                  }
+                }}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: dangerColor, alignItems: 'center' }}
+              >
+                <Text style={{ fontWeight: '700', color: '#ffffff' }}>Hapus</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Success Modal ──────────────────────────────────────────────── */}
+      <Modal visible={successModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+          <View style={{ ...cardStyle, padding: 24, width: '100%', maxWidth: 300, alignItems: 'center' }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#dcfce7', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+              <Check size={32} color="#16a34a" />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: textColor, textAlign: 'center', marginBottom: 8 }}>
+              Berhasil
+            </Text>
+            <Text style={{ fontSize: 14, color: mutedColor, textAlign: 'center' }}>
+              {successMessage}
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Error Modal ────────────────────────────────────────────────── */}
+      <Modal visible={errorModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+          <View style={{ ...cardStyle, padding: 24, width: '100%', maxWidth: 300, alignItems: 'center' }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#fef2f2', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+              <X size={32} color={dangerColor} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: textColor, textAlign: 'center', marginBottom: 8 }}>
+              Gagal
+            </Text>
+            <Text style={{ fontSize: 14, color: mutedColor, textAlign: 'center' }}>
+              Kata yang Anda ketik tidak sesuai. Harap ketik "HAPUS".
+            </Text>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
 }

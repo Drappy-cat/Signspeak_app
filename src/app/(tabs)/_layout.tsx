@@ -26,7 +26,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         animation: 'shift',
-        tabBarStyle: {
+        tabBarStyle: role === 'student' ? { display: 'none' } : {
           backgroundColor: navBg,
           borderTopColor: border,
           borderTopWidth: 1,
@@ -54,6 +54,7 @@ export default function TabLayout() {
         options={{
           title: d.home,
           tabBarIcon: ({ color }) => <Home size={22} color={color} />,
+          href: isTeacher ? '/(tabs)/home' : null,
         }}
       />
       <Tabs.Screen
@@ -76,6 +77,7 @@ export default function TabLayout() {
         options={{
           title: isTeacher ? d.settingsTitle : d.settings,
           tabBarIcon: ({ color }) => <Settings size={22} color={color} />,
+          href: isTeacher ? '/(tabs)/settings' : null,
         }}
       />
     </Tabs>

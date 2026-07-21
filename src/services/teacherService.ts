@@ -300,3 +300,51 @@ export async function addSessionParticipant(sessionId: string, studentId: string
 
   if (error) throw error;
 }
+
+// ── Teacher Glossary ─────────────────────────────────────────────────────────
+
+/** Fetch the custom glossary for a specific teacher */
+export async function getTeacherGlossary(teacherId: string): Promise<Array<{ word: string; definition: string }>> {
+  const { data, error } = await db
+    .from('teachers')
+    .select('custom_glossary')
+    .eq('id', teacherId)
+    .single();
+
+  if (error) {
+    console.error('[DB] Failed to fetch glossary:', error);
+    return [];
+  }
+  return data?.custom_glossary || [];
+}
+
+/** Save the custom glossary to a specific teacher's profile */
+export async function saveTeacherGlossary(teacherId: string, glossary: Array<{ word: string; definition: string }>) {
+  const { error } = await db
+    .from('teachers')
+    .update({ custom_glossary: glossary })
+    .eq('id', teacherId);
+
+  if (error) {
+    console.error('[DB] Failed to save glossary:', error);
+    throw error;
+  }
+}
+
+// ── Teacher Session History ──────────────────────────────────────────────────
+
+/** Fetch the session history for a specific teacher */
+export async function getTeacherSessionHistory(teacherId: string, limit: number = 5): Promise<any[]> {
+  const { data, error } = await db
+    .from('session_history')
+    .select('*')
+    .eq('teacher_id', teacherId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('[DB] Failed to fetch session history:', error);
+    return [];
+  }
+  return data || [];
+}

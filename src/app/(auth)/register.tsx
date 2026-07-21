@@ -7,10 +7,10 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { DICT } from '../../constants/i18n';
 import { GOOGLE_LOGO_BASE64 } from '../../constants/assets';
 import { getCardShadow } from '../../utils/formatters';
+import PinModal from '../../components/PinModal';
 
-// Impor komponen relasional
 import { SchoolPicker, GradePicker, ClassPicker, SubjectPicker } from '../../components/Pickers';
-import { createTeacherProfile, assignTeacherToClasses, assignTeacherToSubjects } from '../../services/teacherService';
+import { createTeacherProfile, assignTeacherToClasses, assignTeacherToSubjects, createCustomSubject } from '../../services/teacherService';
 import type { School, Grade, Class, Subject, SchoolType } from '../../types/database';
 
 export default function RegisterScreen() {
@@ -32,6 +32,7 @@ export default function RegisterScreen() {
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showPinModal, setShowPinModal] = useState(false);
 
   const router = useRouter();
   const { register, loginWithGoogle, role, login, refreshUser } = useAuth();
@@ -61,6 +62,11 @@ export default function RegisterScreen() {
     if (!name.trim()) return setErrorMsg('Nama Lengkap wajib diisi');
     if (!email.trim() || !email.includes('@')) return setErrorMsg('Email valid wajib diisi');
     if (pass.length < 6) return setErrorMsg('Kata Sandi minimal 6 karakter');
+    
+    if (role === 'teacher') {
+      setShowPinModal(true);
+      return;
+    }
     
     // Siswa langsung daftar (hanya 1 step)
     if (role === 'student') {
@@ -120,8 +126,19 @@ export default function RegisterScreen() {
       // 3. Assign kelas (Mendukung guru multi-kelas)
       await assignTeacherToClasses(teacher.id, selectedClasses.map(c => c.id));
 
+      // 3.5. Simpan mapel kustom sementara ke database
+      const finalSubjectIds: string[] = [];
+      for (const s of selectedSubjects) {
+        if (s.id.startsWith('temp-')) {
+          const newSubj = await createCustomSubject(s.subject_name, authUserId);
+          finalSubjectIds.push(newSubj.id);
+        } else {
+          finalSubjectIds.push(s.id);
+        }
+      }
+
       // 4. Assign mapel (Mendukung guru multi-mapel)
-      await assignTeacherToSubjects(teacher.id, selectedSubjects.map(s => s.id));
+      await assignTeacherToSubjects(teacher.id, finalSubjectIds);
 
       // 5. Update AuthContext agar merefleksikan perubahan di UI (Akan mengarahkan otomatis kalau isReady)
       await login(email.trim(), pass, undefined, 'teacher');
@@ -463,6 +480,15 @@ export default function RegisterScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+
+      <PinModal 
+        visible={showPinModal} 
+        onClose={() => setShowPinModal(false)} 
+        onSuccess={() => {
+          setShowPinModal(false);
+          setStep(2);
+        }} 
+      />
     </KeyboardAvoidingView>
   );
 }

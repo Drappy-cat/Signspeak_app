@@ -34,19 +34,25 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
   const inputBg = hc ? '#334155' : '#f8fafc';
   const borderColor = hc ? '#475569' : '#e2e8f0';
 
+  const [filterType, setFilterType] = useState<SchoolType | null>(null);
+  const [lastQuery, setLastQuery] = useState('');
+
   const loadSchools = useCallback(async (query?: string) => {
+    const activeQuery = query !== undefined ? query : lastQuery;
+    if (query !== undefined) setLastQuery(query);
+
     setLoading(true);
     try {
-      const result = await searchSchools(query || '', 50);
+      const result = await searchSchools(activeQuery, filterType, 50);
       setSchools(result);
     } catch (e) {
       console.error('Failed to load schools:', e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterType, lastQuery]);
 
-  useEffect(() => { loadSchools(); }, []);
+  useEffect(() => { loadSchools(); }, [loadSchools]);
 
   const items: DropdownItem[] = schools.map(s => ({
     id: s.id,
@@ -81,6 +87,36 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
 
   return (
     <View style={{ gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+        <TouchableOpacity
+          onPress={() => setFilterType(null)}
+          style={{
+            paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+            backgroundColor: filterType === null ? '#1e3a8a' : inputBg,
+            borderWidth: 1, borderColor: filterType === null ? '#1e3a8a' : borderColor,
+          }}
+        >
+          <Text style={{ fontSize: 12, color: filterType === null ? '#fff' : mutedColor, fontWeight: '600' }}>
+            Semua
+          </Text>
+        </TouchableOpacity>
+        {schoolTypes.map(type => (
+          <TouchableOpacity
+            key={type}
+            onPress={() => setFilterType(type)}
+            style={{
+              paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+              backgroundColor: filterType === type ? '#1e3a8a' : inputBg,
+              borderWidth: 1, borderColor: filterType === type ? '#1e3a8a' : borderColor,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: filterType === type ? '#fff' : mutedColor, fontWeight: '600' }}>
+              {type}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <SmartDropdown
         label={appLang === 'en' ? 'School' : 'Sekolah'}
         placeholder={appLang === 'en' ? 'Search or select school...' : 'Cari atau pilih sekolah...'}
@@ -92,6 +128,7 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
         }}
         hc={hc}
         loading={loading}
+        onSearchChange={loadSchools}
       />
 
       {!showCreate ? (

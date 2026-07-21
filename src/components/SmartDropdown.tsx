@@ -38,6 +38,7 @@ interface SmartDropdownProps {
   onMultiSelect?: (items: DropdownItem[]) => void;
   // Loading
   loading?: boolean;
+  onSearchChange?: (text: string) => void;
 }
 
 export function SmartDropdown({
@@ -56,11 +57,13 @@ export function SmartDropdown({
   selectedIds = [],
   onMultiSelect,
   loading = false,
+  onSearchChange,
 }: SmartDropdownProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [customValue, setCustomValue] = useState('');
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
@@ -221,7 +224,15 @@ export function SmartDropdown({
                     <Search size={16} color={mutedColor} />
                     <TextInput
                       value={search}
-                      onChangeText={setSearch}
+                      onChangeText={(t) => {
+                        setSearch(t);
+                        if (onSearchChange) {
+                          if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                          searchTimeoutRef.current = setTimeout(() => {
+                            onSearchChange(t);
+                          }, 500);
+                        }
+                      }}
                       placeholder="Cari..."
                       placeholderTextColor={mutedColor}
                       style={{

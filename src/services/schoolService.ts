@@ -13,8 +13,12 @@ import type {
 // ── Schools ──────────────────────────────────────────────────────────────────
 
 /** Search schools by name (fuzzy search) */
-export async function searchSchools(query: string, limit = 50): Promise<School[]> {
+export async function searchSchools(query: string, typeFilter?: SchoolType | null, limit = 50): Promise<School[]> {
   let q = db.from('schools').select('*');
+
+  if (typeFilter) {
+    q = q.eq('school_type', typeFilter);
+  }
 
   if (query.trim()) {
     const words = query.trim().split(/\s+/);

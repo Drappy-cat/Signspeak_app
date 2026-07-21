@@ -13,17 +13,5 @@ export default function Index() {
     );
   }
 
-  if (!hasOnboarded) {
-    return <Redirect href="/onboarding" />;
-  }
-
-  if (!user) {
-    return <Redirect href="/(auth)/role-select" />;
-  }
-
-  if (needsProfileCompletion) {
-    return <Redirect href={"/(auth)/complete-profile" as any} />;
-  }
-
-  return <Redirect href="/(tabs)/home" />;
+  return <Redirect href="/splash" />;
 }

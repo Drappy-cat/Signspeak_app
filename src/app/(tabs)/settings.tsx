@@ -262,7 +262,7 @@ export default function SettingsScreen() {
         {isAdmin && (
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => router.push('/admin')}
+            onPress={() => router.push('/admin' as any)}
             style={[
               {
                 padding: 16,

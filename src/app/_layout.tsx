@@ -231,7 +231,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => {
-            router.replace('/admin');
+            router.replace('/admin' as any);
           }}
           style={{
             backgroundColor: 'rgba(255,255,255,0.06)',
@@ -245,7 +245,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => {
-            router.replace('/splash');
+            router.replace('/splash' as any);
           }}
           style={{
             backgroundColor: 'rgba(255,255,255,0.06)',

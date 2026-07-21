@@ -76,7 +76,7 @@ export function SmartDropdown({
   const [search, setSearch] = useState('');
   const [customValue, setCustomValue] = useState('');
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';

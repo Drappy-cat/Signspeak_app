@@ -67,21 +67,21 @@ export default function OnboardingScreen() {
 
   const slides = [
     {
-      colors: ['#13388e', '#13388e'] as const,
+      colors: ['#05216a', '#05216a'] as const,
       imageId: require('../assets/images/ob1.jpg'),
       imageEn: require('../assets/images/1.jpg'),
       title: d.obTitle1,
       sub: d.obSub1,
     },
     {
-      colors: ['#13388e', '#13388e'] as const,
+      colors: ['#05216a', '#05216a'] as const,
       imageId: require('../assets/images/ob2.jpg'),
       imageEn: require('../assets/images/2.jpg'),
       title: d.obTitle2,
       sub: d.obSub2,
     },
     {
-      colors: ['#13388e', '#13388e'] as const,
+      colors: ['#05216a', '#05216a'] as const,
       imageId: require('../assets/images/ob3.jpg'),
       imageEn: require('../assets/images/3.jpg'),
       title: d.obTitle3,
@@ -108,8 +108,8 @@ export default function OnboardingScreen() {
             source={s.imageEn}
             entering={FadeIn.duration(400)}
             exiting={FadeOut.duration(400)}
-            style={{ position: 'absolute', width: '100%', height: '100%' }}
-            resizeMode="stretch"
+            style={{ position: 'absolute', width: '100%', height: '100%', top: 0 }}
+            resizeMode="cover"
           />
         ) : (
           <View style={{ flex: 1, backgroundColor: s.colors[0], alignItems: 'center', justifyContent: 'center' }}>
@@ -122,12 +122,12 @@ export default function OnboardingScreen() {
           source={s.imageId}
           entering={FadeIn.duration(400)}
           exiting={FadeOut.duration(400)}
-          style={{ position: 'absolute', width: '100%', height: '100%' }}
-          resizeMode="stretch"
+          style={{ position: 'absolute', width: '100%', height: '100%', top: 0 }}
+          resizeMode="cover"
         />
       )}
 
-      <View style={{ position: 'absolute', bottom: 16, width: '100%', paddingHorizontal: 32, gap: 16 }}>
+      <View style={{ position: 'absolute', bottom: 24, width: '100%', paddingHorizontal: 32, gap: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
           {slides.map((_, i) => (
             <Animated.View
@@ -150,10 +150,10 @@ export default function OnboardingScreen() {
           }}
           activeOpacity={0.95}
         >
-          <Text style={{ color: '#13388e', fontWeight: '900', fontSize: 16 }}>
+          <Text style={{ color: '#05216a', fontWeight: '900', fontSize: 16 }}>
             {isLast ? d.obStart : d.obNext}
           </Text>
-          {!isLast && <ArrowRight size={18} color="#13388e" />}
+          {!isLast && <ArrowRight size={18} color="#05216a" />}
         </TouchableOpacity>
 
         {!isLast && (

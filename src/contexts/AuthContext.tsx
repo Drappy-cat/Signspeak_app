@@ -1,36 +1,37 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  signInWithEmail,
-  signUpWithEmail,
   signInWithGoogle,
   signOut as supabaseSignOut,
-  getProfile,
-  upsertProfile,
-  onAuthStateChange,
   getSession,
   pingSupabase,
-  type ProfileData,
 } from '../services/authService';
-import * as Linking from 'expo-linking';
 import { supabase } from '../services/supabase';
-import { getSession, getProfile, signInWithGoogle, signOut } from '../services/authService';
+import { getTeacherFullProfile, createTeacherProfile } from '../services/teacherService';
+import type { TeacherProfile } from '../types/database';
 
 export type Role = 'student' | 'teacher' | null;
 
 export interface User {
-  id?: string;
+  id?: string; // Auth User ID (for teachers) or local ID (for students)
+  teacher_id?: string; // Teacher Database ID
   name: string;
   email: string;
   role: Role;
   photoUri?: string;
+  
+  // School Info
   school?: string;
+  schoolId?: string;
+  
   // Student-specific
   className?: string;
+  classId?: string;
+  absen?: string;
   joinedRoomCode?: string;
+  
   // Teacher-specific
-  subject?: string;
-  teacherId?: string;
+  nip?: string;
   isVerified?: boolean;
 }
 
@@ -39,21 +40,23 @@ interface AuthContextType {
   role: Role;
   isReady: boolean;
   hasOnboarded: boolean;
-  login: (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string) => Promise<void>;
+  login: (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string, absen?: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   setRole: (role: Role) => Promise<void>;
   completeOnboarding: () => Promise<void>;
-  register: (name: string, email: string, password?: string, school?: string, className?: string) => Promise<void>;
+  register: (name: string, email: string, password?: string) => Promise<{ id: string; email: string }>;
   resetPassword: (email: string) => Promise<void>;
   needsProfileCompletion: boolean;
   completeProfile: (profile: Partial<User>) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const USER_STORAGE_KEY = '@lentera/user';
 const ONBOARDING_STORAGE_KEY = '@lentera/onboarded';
+const ROLE_STORAGE_KEY = '@lentera/role';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -64,7 +67,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Load cached auth state on mount ───────────────────────────────────────
   const loadAuthState = async () => {
-    // Keep Supabase active in the background
     pingSupabase();
 
     try {
@@ -77,41 +79,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoleState(parsedUser.role);
       }
 
+      const storedRole = await AsyncStorage.getItem(ROLE_STORAGE_KEY);
+      if (storedRole) {
+        setRoleState(storedRole as Role);
+      }
+
       if (onboarded === 'true') {
         setHasOnboarded(true);
       }
 
-      // Try to sync with Supabase session if available
-      try {
-        const session = await getSession();
-        if (session?.user) {
-          const profile = await getProfile(session.user.id);
-          if (profile && profile.name) {
-            const syncedUser: User = {
-              id: session.user.id,
-              email: session.user.email || '',
-              name: profile.name,
-              role: profile.role as Role,
-              photoUri: profile.photo_uri || profile.photoUri,
-              school: profile.school,
-              className: profile.class_name || profile.className,
-              subject: profile.subject,
-              teacherId: profile.teacher_id || profile.teacherId,
-              isVerified: profile.is_verified ?? profile.isVerified ?? false,
-            };
-            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(syncedUser));
-            setUser(syncedUser);
-            setRoleState(syncedUser.role);
-            setNeedsProfileCompletion(false);
-          } else if (!storedUser) {
-            // User is authenticated but has no profile yet
-            setNeedsProfileCompletion(true);
-          }
-        }
-      } catch {
-        // Supabase not reachable — use cached local data, which is fine
-        console.log('Supabase session sync skipped (offline or not configured)');
-      }
+      await refreshUser();
     } catch (e) {
       console.error('Failed to load auth state', e);
     } finally {
@@ -119,15 +96,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const session = await getSession();
+      if (session?.user) {
+        // Find teacher profile
+        const profile = await getTeacherFullProfile(session.user.id);
+        if (profile) {
+          const syncedUser: User = {
+            id: session.user.id,
+            teacher_id: profile.teacher.id,
+            email: session.user.email || '',
+            name: profile.teacher.full_name,
+            role: 'teacher',
+            school: profile.school?.school_name,
+            schoolId: profile.school?.id,
+            nip: profile.teacher.nip || undefined,
+            isVerified: profile.teacher.is_verified,
+          };
+          await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(syncedUser));
+          setUser(syncedUser);
+          setRoleState('teacher');
+          setNeedsProfileCompletion(false);
+        } else {
+          // User is authenticated but has no teacher profile yet
+          setNeedsProfileCompletion(true);
+          setRoleState('teacher');
+        }
+      }
+    } catch {
+      console.log('Supabase session sync skipped');
+    }
+  };
+
   useEffect(() => {
     loadAuthState();
     
-    // Listen to Supabase auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         await AsyncStorage.removeItem(USER_STORAGE_KEY);
         setUser(null);
         if (role === 'teacher') setRoleState(null);
+      } else if (event === 'SIGNED_IN') {
+        await refreshUser();
       }
     });
     
@@ -141,7 +152,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     if (activeRole === 'student') {
-      // Students don't need Supabase Auth, they just need local state to join sessions
       const mockUser: User = {
         email: '',
         name: name || 'Siswa Tanpa Nama',
@@ -155,7 +165,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    // Teacher: Use Supabase Auth
     if (!password) throw new Error('Password required for teacher login');
     
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -167,32 +176,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(authError.message);
     }
     
-    // Fetch profile
-    if (authData.user) {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
-        
-      if (profileError) {
-        console.warn('Failed to fetch profile:', profileError);
-      }
-      
-      const teacherUser: User = {
-        id: authData.user.id,
-        email: authData.user.email || email,
-        name: profile?.name || 'Guru LENTERA',
-        role: 'teacher',
-        school: profile?.school || '',
-      };
-      
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(teacherUser));
-      setUser(teacherUser);
-    }
+    await refreshUser();
   };
 
-  // ── Login with Google ─────────────────────────────────────────────────────
   const loginWithGoogle = async () => {
     try {
       await signInWithGoogle();
@@ -202,15 +188,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ── Logout ────────────────────────────────────────────────────────────────
   const logout = async () => {
     try {
       if (role === 'teacher') {
-        await signOut();
+        await supabaseSignOut();
       }
-      await AsyncStorage.removeItem(USER_STORAGE_KEY);
-      setUser(null);
-      setRoleState(null);
     } catch (e) {
       console.error('Failed to logout', e);
     }
@@ -220,9 +202,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setNeedsProfileCompletion(false);
   };
 
-  // ── Set Role ──────────────────────────────────────────────────────────────
   const setRole = async (newRole: Role) => {
     setRoleState(newRole);
+    if (newRole) {
+      await AsyncStorage.setItem(ROLE_STORAGE_KEY, newRole);
+    } else {
+      await AsyncStorage.removeItem(ROLE_STORAGE_KEY);
+    }
     if (user) {
       const updatedUser = { ...user, role: newRole };
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
@@ -230,84 +216,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ── Complete Onboarding ───────────────────────────────────────────────────
   const completeOnboarding = async () => {
     await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
     setHasOnboarded(true);
   };
 
-  // ── Register with Email ───────────────────────────────────────────────────
-  const register = async (name: string, email: string, password?: string, school?: string, className?: string) => {
-    const activeRole = role;
-    
-    if (activeRole === 'student') {
-      throw new Error('Student registration is not required.');
-    }
-    
+  // Register only creates the auth account. The multi-step form will create the profile.
+  const register = async (name: string, email: string, password?: string) => {
+    if (role === 'student') throw new Error('Student registration is not required.');
     if (!password) throw new Error('Password required');
 
-    // Register with Supabase
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          name,
-          role: activeRole,
-          school,
-        },
-      },
+      options: { data: { name } },
     });
-
-    if (authError) {
-      throw new Error(authError.message);
-    }
     
-    // NOTE: We assume the public.handle_new_user() trigger from supabase_setup_guide.md 
-    // will automatically create the profile in public.profiles table.
+    if (authError) throw new Error(authError.message);
+    if (!authData.user) throw new Error('No user returned from signup');
+    
+    setNeedsProfileCompletion(true);
+    return { id: authData.user.id, email };
+  };
 
-    const newUser: User = {
-      id: authData.user?.id,
-      email,
-      name,
-      role: activeRole,
-      school,
-    };
-
-    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
-    setUser(newUser);
+  const completeProfile = async (updates: Partial<User>) => {
+    // This will be called at the end of the multi-step form if needed,
+    // though the multi-step form uses teacherService directly for relations.
+    await refreshUser();
   };
 
   const resetPassword = async (email: string) => {
-    const redirectUrl = Linking.createURL('/update-password');
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    });
-    if (error) {
-      throw new Error(error.message);
-    }
-  };
-
-  const completeProfile = async (profileUpdate: Partial<User>) => {
-    if (!user) return;
-    const updatedUser = { ...user, ...profileUpdate };
-    
-    if (updatedUser.id) {
-       await supabase.from('profiles').update({
-         school: updatedUser.school,
-         class_name: updatedUser.className,
-         subject: updatedUser.subject,
-         teacher_id: updatedUser.teacherId,
-       }).eq('id', updatedUser.id);
-    }
-    
-    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
-    setUser(updatedUser);
-    setNeedsProfileCompletion(false);
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw new Error(error.message);
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, isReady, hasOnboarded, login, loginWithGoogle, logout, setRole, completeOnboarding, register, resetPassword, needsProfileCompletion, completeProfile }}>
+    <AuthContext.Provider
+      value={{
+        user, role, isReady, hasOnboarded, needsProfileCompletion,
+        login, loginWithGoogle, logout, setRole, completeOnboarding,
+        register, resetPassword, completeProfile, refreshUser
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

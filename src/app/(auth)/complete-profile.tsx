@@ -86,8 +86,7 @@ export default function CompleteProfileScreen() {
         photoUri: finalPhotoUri,
         school: school.trim(),
         className: role === 'student' ? className.trim() : undefined,
-        subject: role === 'teacher' ? subject.trim() || undefined : undefined,
-        teacherId: role === 'teacher' ? teacherNip.trim() || undefined : undefined,
+        nip: role === 'teacher' ? teacherNip.trim() || undefined : undefined,
         isVerified: false,
       });
 

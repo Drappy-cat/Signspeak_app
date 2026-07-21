@@ -228,6 +228,34 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             ↩ Onboarding
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            router.replace('/admin');
+          }}
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.06)',
+            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+          }}
+        >
+          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '800' }}>
+            👑 Admin
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            router.replace('/splash');
+          }}
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.06)',
+            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+          }}
+        >
+          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '800' }}>
+            ✨ Splashscreen
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Legend (Web Only) */}
@@ -288,6 +316,8 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding" />
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="admin" />
+              <Stack.Screen name="splash" />
               <Stack.Screen name="about" />
               <Stack.Screen name="notifications" />
             </Stack>

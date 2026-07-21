@@ -97,7 +97,7 @@ export default function ForgotPasswordScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 16, paddingBottom: 8 }}>
             <TouchableOpacity 
               activeOpacity={0.7} 
-              onPress={() => router.back()}
+              onPress={() => router.canGoBack() ? router.back() : router.replace('/(auth)/login')}
               style={{
                 width: 40, height: 40, borderRadius: 12,
                 backgroundColor: hc ? '#1e293b' : '#ffffff',

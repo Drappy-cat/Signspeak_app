@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { getTeacherClasses, getTeacherSubjects } from '../../services/teacherService';
+import type { ClassWithDetails, Subject } from '../../types/database';
 import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
@@ -77,14 +79,27 @@ export default function HomeScreen() {
 
   const [selectedLang, setSelectedLang] = React.useState(settings.language || 'id');
   const [startModalVisible, setStartModalVisible] = React.useState(false);
-  const [selectedSubject, setSelectedSubject] = React.useState('Biologi');
-  const [selectedClass, setSelectedClass] = React.useState('XII IPA 3');
+  const [teacherClasses, setTeacherClasses] = React.useState<ClassWithDetails[]>([]);
+  const [teacherSubjects, setTeacherSubjects] = React.useState<Subject[]>([]);
+  const [selectedClassId, setSelectedClassId] = React.useState<string | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = React.useState<string | null>(null);
   const [customGlossaryList, setCustomGlossaryList] = React.useState<Array<{ word: string; definition: string }>>([]);
   const [newWord, setNewWord] = React.useState('');
   const [newDefinition, setNewDefinition] = React.useState('');
 
-  const SUBJECTS = ['Biologi', 'Fisika', 'Kimia', 'Matematika', 'Bahasa Indonesia', 'Bahasa Inggris'];
-  const CLASSES = ['X IPA 1', 'XI IPA 2', 'XII IPA 3', 'X IPS 1', 'XI IPS 2', 'XII IPS 3'];
+  React.useEffect(() => {
+    if (role === 'teacher' && user?.teacher_id) {
+      getTeacherClasses(user.teacher_id).then(classes => {
+        setTeacherClasses(classes);
+        if (classes.length > 0) setSelectedClassId(classes[0].id);
+      }).catch(console.error);
+      
+      getTeacherSubjects(user.teacher_id).then(subjects => {
+        setTeacherSubjects(subjects);
+        if (subjects.length > 0) setSelectedSubjectId(subjects[0].id);
+      }).catch(console.error);
+    }
+  }, [role, user?.teacher_id]);
 
   const renderStudentHome = () => (
     <View className="pb-10">
@@ -436,30 +451,28 @@ export default function HomeScreen() {
                 {appLang === 'en' ? 'Select Subject' : 'Pilih Mata Pelajaran'}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-                {SUBJECTS.map((subj) => {
-                  const isSelected = selectedSubject === subj;
+                {teacherSubjects.map((subj) => {
+                  const isSelected = selectedSubjectId === subj.id;
                   return (
                     <TouchableOpacity
-                      key={subj}
+                      key={subj.id}
                       activeOpacity={0.8}
-                      onPress={() => setSelectedSubject(subj)}
+                      onPress={() => setSelectedSubjectId(subj.id)}
                       style={{
                         paddingVertical: 10,
                         paddingHorizontal: 16,
                         borderRadius: 12,
                         backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
+                        borderWidth: 1,
+                        borderColor: isSelected ? '#1e3a8a' : hc ? '#475569' : '#e2e8f0',
                       }}
                     >
-                      {isSelected && <Check size={12} color="#ffffff" />}
                       <Text style={{
-                        fontSize: 12,
-                        fontWeight: '800',
-                        color: isSelected ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+                        fontSize: 14,
+                        fontWeight: isSelected ? '800' : '600',
+                        color: isSelected ? '#ffffff' : hc ? '#e2e8f0' : '#475569',
                       }}>
-                        {subj}
+                        {subj.subject_name}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -471,30 +484,28 @@ export default function HomeScreen() {
                 {appLang === 'en' ? 'Select Class' : 'Pilih Kelas'}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-                {CLASSES.map((cls) => {
-                  const isSelected = selectedClass === cls;
+                {teacherClasses.map((cls) => {
+                  const isSelected = selectedClassId === cls.id;
                   return (
                     <TouchableOpacity
-                      key={cls}
+                      key={cls.id}
                       activeOpacity={0.8}
-                      onPress={() => setSelectedClass(cls)}
+                      onPress={() => setSelectedClassId(cls.id)}
                       style={{
                         paddingVertical: 10,
                         paddingHorizontal: 16,
                         borderRadius: 12,
                         backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
+                        borderWidth: 1,
+                        borderColor: isSelected ? '#1e3a8a' : hc ? '#475569' : '#e2e8f0',
                       }}
                     >
-                      {isSelected && <Check size={12} color="#ffffff" />}
                       <Text style={{
-                        fontSize: 12,
-                        fontWeight: '800',
-                        color: isSelected ? '#ffffff' : hc ? '#cbd5e1' : '#475569',
+                        fontSize: 14,
+                        fontWeight: isSelected ? '800' : '600',
+                        color: isSelected ? '#ffffff' : hc ? '#e2e8f0' : '#475569',
                       }}>
-                        {cls}
+                        {cls.class_name}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -585,8 +596,12 @@ export default function HomeScreen() {
               onPress={() => {
                 setStartModalVisible(false);
                 const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                const sessionSubject = `${selectedSubject} (${selectedClass})`;
-                startSession(roomCode, sessionSubject, selectedLang, customGlossaryList);
+                
+                const selectedSubjObj = teacherSubjects.find(s => s.id === selectedSubjectId);
+                const selectedClassObj = teacherClasses.find(c => c.id === selectedClassId);
+                const sessionSubject = `${selectedSubjObj?.subject_name} (${selectedClassObj?.class_name})`;
+                
+                startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);
                 router.push('/(tabs)/live');
               }}
             >

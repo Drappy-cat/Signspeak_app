@@ -397,8 +397,8 @@ export default function SplashScreen() {
 
         {/* Footer info */}
         <Animated.View style={{ opacity: textOpacity, alignItems: 'center', marginBottom: 20 }}>
-          <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '500', letterSpacing: 0.5 }}>
-            Versi 1.0.0 • Aksesibilitas Pembelajaran
+          <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '500', letterSpacing: 0.5, textAlign: 'center' }}>
+            Versi 1.0.0 • Team Peneliti PUI Disabilitas Universitas Negeri Surabaya
           </Text>
         </Animated.View>
       </SafeAreaView>

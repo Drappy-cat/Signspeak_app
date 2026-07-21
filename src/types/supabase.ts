@@ -64,6 +64,10 @@ export type Database = {
           name: string
           role: string
           school: string | null
+          photo_uri: string | null
+          subject: string | null
+          teacher_id: string | null
+          is_verified: boolean | null
         }
         Insert: {
           class_name?: string | null
@@ -73,6 +77,10 @@ export type Database = {
           name: string
           role: string
           school?: string | null
+          photo_uri?: string | null
+          subject?: string | null
+          teacher_id?: string | null
+          is_verified?: boolean | null
         }
         Update: {
           class_name?: string | null
@@ -82,6 +90,10 @@ export type Database = {
           name?: string
           role?: string
           school?: string | null
+          photo_uri?: string | null
+          subject?: string | null
+          teacher_id?: string | null
+          is_verified?: boolean | null
         }
         Relationships: []
       }

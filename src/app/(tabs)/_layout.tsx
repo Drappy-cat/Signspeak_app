@@ -25,6 +25,7 @@ export default function TabLayout() {
       sceneContainerStyle={{ backgroundColor: hc ? '#0f172a' : '#F0F7FF' }}
       screenOptions={{
         headerShown: false,
+        animation: 'shift',
         tabBarStyle: {
           backgroundColor: navBg,
           borderTopColor: border,

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Headphones, Eye, EyeOff } from 'lucide-react-native';
+import { Headphones, Eye, EyeOff, ChevronDown } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
-import { supabase } from '../../services/supabase';
+import { supabase, db } from '../../services/supabase';
+import { getActiveSessionByRoomCode, upsertStudent, addSessionParticipant } from '../../services/teacherService';
 import { DICT } from '../../constants/i18n';
 import { GOOGLE_LOGO_BASE64 } from '../../constants/assets';
 import { getCardShadow } from '../../utils/formatters';
@@ -93,25 +94,46 @@ export default function LoginScreen() {
         setShowModal(true);
         return;
       }
-      if (!studentName.trim() || !studentClass.trim() || !studentAbsen.trim()) {
+      if (!studentName.trim() || !studentAbsen.trim()) {
         setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
-        setModalMsg(appLang === 'en' ? 'Name, Class and Attendance Number are required' : 'Nama, Kelas dan Nomor Absen wajib diisi');
+        setModalMsg(appLang === 'en' ? 'Name and Attendance Number are required' : 'Nama dan Nomor Absen wajib diisi');
         setShowModal(true);
         return;
       }
       
       setLoading(true);
-      const { data, error } = await supabase
-        .from('active_sessions')
-        .select('class_code')
-        .eq('class_code', classCode.trim().toUpperCase())
-        .eq('is_active', true)
-        .maybeSingle();
-      setLoading(false);
-      
-      if (error || !data) {
-        setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
-        setModalMsg(appLang === 'en' ? 'Room Code not found or session ended' : 'Kode Ruangan tidak ditemukan atau sesi telah berakhir');
+      try {
+        const roomCodeUpper = classCode.trim().toUpperCase();
+        const activeSession = await getActiveSessionByRoomCode(roomCodeUpper);
+        
+        if (!activeSession) {
+          setLoading(false);
+          setModalTitle(appLang === 'en' ? 'Warning' : 'Peringatan');
+          setModalMsg(appLang === 'en' ? 'Room Code not found or session ended' : 'Kode Ruangan tidak ditemukan atau sesi telah berakhir');
+          setShowModal(true);
+          return;
+        }
+
+        // Upsert the student (creates them in DB if not exist, or updates)
+        const student = await upsertStudent({
+          class_id: activeSession.class_id,
+          name: studentName.trim(),
+          absen: studentAbsen.trim(),
+        });
+
+        // Add them as a participant
+        await addSessionParticipant(activeSession.id, student.id);
+
+        // Store into AuthContext (local storage mock for student)
+        await login('', undefined, roomCodeUpper, 'student', student.name, 'Kelas', student.absen.toString());
+
+        setLoading(false);
+        router.replace('/(tabs)/home');
+        return; // Students are done here
+      } catch (err: any) {
+        setLoading(false);
+        setModalTitle(appLang === 'en' ? 'Error' : 'Kesalahan');
+        setModalMsg(err.message || 'Gagal masuk ke ruangan');
         setShowModal(true);
         return;
       }
@@ -135,11 +157,8 @@ export default function LoginScreen() {
         return;
       }
     }
-    setLoading(true);
     try {
-      if (role === 'student') {
-        await login('', undefined, classCode.trim(), 'student', studentName.trim(), studentClass.trim(), studentAbsen.trim());
-      } else {
+      if (role === 'teacher') {
         await login(email.trim(), pass, undefined, 'teacher');
       }
       setLoading(false);
@@ -163,27 +182,14 @@ export default function LoginScreen() {
     setErrorMsg('');
     setLoading(true);
     try {
-      await loginWithGoogle();
-      setLoading(false);
-      router.replace('/(tabs)/home');
-    } catch (e: any) {
-      setLoading(false);
-      setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
-      setModalMsg(e.message || (appLang === 'en' ? 'Google login failed' : 'Masuk Google gagal'));
-      setShowModal(true);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    try {
       if (loginWithGoogle) {
         await loginWithGoogle();
+        router.replace('/(tabs)/home');
       } else {
         throw new Error(appLang === 'en' ? 'Google Sign-In is not configured' : 'Masuk dengan Google belum dikonfigurasi');
       }
     } catch (e: any) {
-      setModalTitle(appLang === 'en' ? 'Error' : 'Kesalahan');
+      setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
       setModalMsg(e.message || (appLang === 'en' ? 'Google Sign-In failed' : 'Gagal masuk dengan Google'));
       setShowModal(true);
     } finally {
@@ -230,15 +236,11 @@ export default function LoginScreen() {
         <View style={{ flex: 1, paddingHorizontal: 24 }}>
           {/* Logo area */}
           <View style={{ alignItems: 'center', paddingTop: 40, paddingBottom: 20, gap: 12 }}>
-            <View style={{
-              width: 64, height: 64, borderRadius: 16,
-              backgroundColor: '#1e3a8a',
-              alignItems: 'center', justifyContent: 'center',
-              shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
-            }}>
-              <Headphones size={32} color="#ffffff" />
-            </View>
+            <Image 
+              source={require('../../../assets/images/app-icon.png')} 
+              style={{ width: 80, height: 80 }}
+              resizeMode="contain"
+            />
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 22, fontWeight: '900', color: '#1e3a8a', letterSpacing: 1 }}>LENTERA</Text>
               <Text style={{ fontSize: 9, fontWeight: '800', color: mutedColor, textTransform: 'uppercase', letterSpacing: 1.5, textAlign: 'center', marginTop: 2 }}>
@@ -273,6 +275,19 @@ export default function LoginScreen() {
                       fontSize: 14, fontWeight: '700', letterSpacing: 2, textAlign: 'center',
                     }, inputStyle]}
                   />
+                  <View style={{ 
+                    marginTop: 8, padding: 12, borderRadius: 8, 
+                    backgroundColor: hc ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
+                    borderWidth: 1, borderColor: hc ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe',
+                    flexDirection: 'row', alignItems: 'center', gap: 10
+                  }}>
+                    <Text style={{ fontSize: 16 }}>ℹ️</Text>
+                    <Text style={{ flex: 1, fontSize: 12, color: hc ? '#93c5fd' : '#1e40af', lineHeight: 18 }}>
+                      {appLang === 'en' 
+                        ? 'You can get this class code directly from your teacher. Please ask your teacher to provide the code to join their session.' 
+                        : 'Kode kelas ini bisa Anda dapatkan dari guru Anda. Silakan minta kode tersebut kepada guru agar Anda bisa bergabung ke dalam sesi.'}
+                    </Text>
+                  </View>
                 </View>
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerName}</Text>
@@ -287,71 +302,7 @@ export default function LoginScreen() {
                     }, inputStyle]}
                   />
                 </View>
-                <View style={{ gap: 6, zIndex: 10 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerClass}</Text>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => setShowClassDropdown(!showClassDropdown)}
-                    style={[{
-                      borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
-                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                      borderWidth: 1, borderColor: hc ? '#334155' : '#cbd5e1',
-                    }, inputStyle]}
-                  >
-                    <Text style={{ fontSize: 14, fontWeight: '500', color: studentClass ? textColor : mutedColor }}>
-                      {studentClass || (appLang === 'en' ? 'Select Class' : 'Pilih Kelas')}
-                    </Text>
-                    <ChevronDown size={16} color={mutedColor} />
-                  </TouchableOpacity>
 
-                  {showClassDropdown && (
-                    <View style={{
-                      backgroundColor: hc ? '#1e293b' : '#ffffff',
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: hc ? '#334155' : '#cbd5e1',
-                      marginTop: 4,
-                      maxHeight: 180,
-                      overflow: 'hidden',
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 8,
-                      elevation: 4,
-                    }}>
-                      <ScrollView nestedScrollEnabled={true}>
-                        {[
-                          'X IPA 1', 'X IPA 2', 'X IPA 3', 'X IPS 1', 'X IPS 2', 'X IPS 3',
-                          'XI IPA 1', 'XI IPA 2', 'XI IPA 3', 'XI IPS 1', 'XI IPS 2', 'XI IPS 3',
-                          'XII IPA 1', 'XII IPA 2', 'XII IPA 3', 'XII IPS 1', 'XII IPS 2', 'XII IPS 3'
-                        ].map((cls) => (
-                          <TouchableOpacity
-                            key={cls}
-                            onPress={() => {
-                              setStudentClass(cls);
-                              setShowClassDropdown(false);
-                            }}
-                            style={{
-                              paddingHorizontal: 16,
-                              paddingVertical: 12,
-                              borderBottomWidth: 1,
-                              borderBottomColor: hc ? '#334155' : '#f1f5f9',
-                              backgroundColor: studentClass === cls ? (hc ? '#1e3b8a' : '#eff6ff') : 'transparent',
-                            }}
-                          >
-                            <Text style={{
-                              fontSize: 14,
-                              fontWeight: studentClass === cls ? '700' : '500',
-                              color: studentClass === cls ? (hc ? '#ffffff' : '#1e3a8a') : textColor,
-                            }}>
-                              {cls}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  )}
-                </View>
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>
                     {appLang === 'en' ? "Attendance Number" : "Nomor Absen"}
@@ -443,32 +394,36 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Divider — atau / or */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-              <Text style={{ marginHorizontal: 12, fontSize: 12, fontWeight: '600', color: mutedColor }}>{d.orDivider}</Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-            </View>
+            {/* Google Sign-In button - Teacher Only */}
+            {role !== 'student' && (
+              <>
+                {/* Divider — atau / or */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
+                  <Text style={{ marginHorizontal: 12, fontSize: 12, fontWeight: '600', color: mutedColor }}>{d.orDivider}</Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
+                </View>
 
-            {/* Google Sign-In button */}
-            <TouchableOpacity
-              onPress={handleGoogleLogin}
-              disabled={loading}
-              activeOpacity={0.9}
-              style={{
-                width: '100%', paddingVertical: 14, borderRadius: 12,
-                alignItems: 'center', justifyContent: 'center',
-                backgroundColor: hc ? '#334155' : '#ffffff',
-                borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
-                flexDirection: 'row', gap: 10,
-              }}
-            >
-              <Image 
-                source={{ uri: GOOGLE_LOGO_BASE64 }} 
-                style={{ width: 24, height: 24 }} 
-              />
-              <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.loginWithGoogle}</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleGoogleLogin}
+                  disabled={loading}
+                  activeOpacity={0.9}
+                  style={{
+                    width: '100%', paddingVertical: 14, borderRadius: 12,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: hc ? '#334155' : '#ffffff',
+                    borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
+                    flexDirection: 'row', gap: 10,
+                  }}
+                >
+                  <Image 
+                    source={{ uri: GOOGLE_LOGO_BASE64 }} 
+                    style={{ width: 24, height: 24 }} 
+                  />
+                  <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.loginWithGoogle}</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
           {/* Register link - Teacher Only */}

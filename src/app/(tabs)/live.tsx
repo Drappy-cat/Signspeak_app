@@ -19,8 +19,8 @@ function PulseDot({ color = 'bg-red-500' }: { color?: string }) {
   React.useEffect(() => {
     RNAnimated.loop(
       RNAnimated.sequence([
-        RNAnimated.timing(anim, { toValue: 1, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-        RNAnimated.timing(anim, { toValue: 0.4, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: false })
+        RNAnimated.timing(anim, { toValue: 1, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        RNAnimated.timing(anim, { toValue: 0.4, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
       ])
     ).start();
   }, []);

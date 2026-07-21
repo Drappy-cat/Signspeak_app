@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, SafeAreaView, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, SafeAreaView, StatusBar as RNStatusBar, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Headphones, ArrowLeft, Mail } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -97,7 +97,7 @@ export default function ForgotPasswordScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 16, paddingBottom: 8 }}>
             <TouchableOpacity 
               activeOpacity={0.7} 
-              onPress={() => router.back()}
+              onPress={() => router.canGoBack() ? router.back() : router.replace('/(auth)/login')}
               style={{
                 width: 40, height: 40, borderRadius: 12,
                 backgroundColor: hc ? '#1e293b' : '#ffffff',
@@ -111,15 +111,11 @@ export default function ForgotPasswordScreen() {
 
           {/* Logo area */}
           <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 16, gap: 8 }}>
-            <View style={{
-              width: 52, height: 52, borderRadius: 14,
-              backgroundColor: '#1e3a8a',
-              alignItems: 'center', justifyContent: 'center',
-              shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
-            }}>
-              <Headphones size={26} color="#ffffff" />
-            </View>
+            <Image 
+              source={require('../../../assets/images/app-icon.png')} 
+              style={{ width: 64, height: 64 }}
+              resizeMode="contain"
+            />
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 20, fontWeight: '900', color: '#1e3a8a', letterSpacing: 0.5 }}>LENTERA</Text>
               <Text style={{ fontSize: 12, color: mutedColor, marginTop: 4, fontWeight: '600' }}>

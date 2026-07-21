@@ -2,30 +2,7 @@ import { supabase } from './supabase';
 import type { Role } from '../contexts/AuthContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface ProfileData {
-  name: string;
-  role: Role;
-  photoUri?: string;
-  school?: string;
-  // Student-specific
-  className?: string;
-  // Teacher-specific
-  subject?: string;
-  teacherId?: string;   // NIP / ID Guru (opsional, tanpa validasi API)
-  isVerified?: boolean;  // Pondasi untuk verifikasi guru di masa depan
-}
-
-export interface SupabaseProfile extends ProfileData {
-  id: string;
-  email: string;
-  created_at?: string;
-  // Snake-case aliases from Supabase DB columns
-  photo_uri?: string;
-  class_name?: string;
-  teacher_id?: string;
-  is_verified?: boolean;
-}
+// Profile logic is now handled by teacherService.ts
 
 // ── Auth Functions ────────────────────────────────────────────────────────────
 
@@ -68,44 +45,7 @@ export async function getSession() {
   return session;
 }
 
-// ── Profile Functions ─────────────────────────────────────────────────────────
-
-/** Fetch user profile from the `profiles` table */
-export async function getProfile(userId: string): Promise<SupabaseProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
-  if (error && error.code !== 'PGRST116') {
-    // PGRST116 = "no rows found" — this is expected for new users
-    throw error;
-  }
-
-  return data as SupabaseProfile | null;
-}
-
-/** Create or update a user's profile in the `profiles` table */
-export async function upsertProfile(userId: string, email: string, profileData: ProfileData) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .upsert({
-      id: userId,
-      email,
-      name: profileData.name,
-      role: profileData.role || 'student',
-      photo_uri: profileData.photoUri || null,
-      school: profileData.school || null,
-      class_name: profileData.className || null,
-      subject: profileData.subject || null,
-      teacher_id: profileData.teacherId || null,
-      is_verified: profileData.isVerified ?? false,
-    } as any, { onConflict: 'id' });
-
-  if (error) throw error;
-  return data;
-}
+// ── Listeners ─────────────────────────────────────────────────────────────────
 
 /** Listen to auth state changes (login, logout, token refresh) */
 export function onAuthStateChange(callback: (event: string, session: any) => void) {
@@ -116,8 +56,8 @@ export function onAuthStateChange(callback: (event: string, session: any) => voi
 /** Silent ping to keep the free-tier Supabase database awake and prevent it from pausing */
 export async function pingSupabase() {
   try {
-    // Perform a minimal read on profiles table
-    await supabase.from('profiles').select('id').limit(1);
+    // Perform a minimal read on teachers table
+    await supabase.from('teachers' as any).select('id').limit(1);
     console.log('[Supabase] Silent ping successful. Database project active.');
   } catch (err) {
     console.warn('[Supabase] Silent ping failed:', err);

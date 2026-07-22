@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory } from '../../services/teacherService';
+import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory, generateUniqueRoomCode } from '../../services/teacherService';
 import type { ClassWithDetails, Subject } from '../../types/database';
 import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -678,15 +678,15 @@ export default function HomeScreen() {
             {/* Action - Confirm Start */}
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() => {
+              onPress={async () => {
                 setStartModalVisible(false);
-                const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const roomCode = await generateUniqueRoomCode();
                 
                 const selectedSubjObj = teacherSubjects.find(s => s.id === selectedSubjectId);
                 const selectedClassObj = teacherClasses.find(c => c.id === selectedClassId);
                 const sessionSubject = `${selectedSubjObj?.subject_name} (${selectedClassObj?.class_name})`;
                 
-                startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);
+                await startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);
                 router.push('/(tabs)/live');
               }}
             >

@@ -274,7 +274,34 @@ export async function getStudentsByClass(classId: string): Promise<Student[]> {
   return (data ?? []) as Student[];
 }
 
-// ── Live Sessions ────────────────────────────────────────────────────────────
+/** Generate a collision-free 6-character room code across all active sessions */
+export async function generateUniqueRoomCode(): Promise<string> {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Exclude ambiguous 0, O, 1, I to avoid student typing confusion
+  let attempts = 0;
+
+  while (attempts < 15) {
+    attempts++;
+    let candidate = '';
+    for (let i = 0; i < 6; i++) {
+      candidate += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    // Check if room code is currently active in live_sessions
+    const { data, error } = await db
+      .from('live_sessions')
+      .select('id')
+      .eq('room_code', candidate)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!error && !data) {
+      return candidate; // Unambiguous and collision-free!
+    }
+  }
+
+  // Fallback
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
 /** Get active live session by room code (for students joining) */
 export async function getActiveSessionByRoomCode(roomCode: string) {

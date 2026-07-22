@@ -35,6 +35,8 @@ export interface ActiveSession {
   roomCode: string | null;
   subject: string | null;
   teacherName: string | null;
+  teacherSchool?: string | null;
+  teacherNip?: string | null;
   subjectId: string | null;
   classId: string | null;
   language: string;
@@ -63,6 +65,8 @@ const defaultSession: ActiveSession = {
   roomCode: null,
   subject: null,
   teacherName: null,
+  teacherSchool: null,
+  teacherNip: null,
   subjectId: null,
   classId: null,
   language: 'id',
@@ -251,13 +255,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const roomCode = user.joinedRoomCode;
       
       const fetchInitial = async () => {
-        const { data } = await db.from('live_sessions').select('*, teacher:teachers(full_name), subject_rel:subjects(subject_name)').eq('room_code', roomCode).eq('is_active', true).maybeSingle();
+        const { data } = await db.from('live_sessions')
+          .select('*, teacher:teachers(full_name, nip, school:schools(school_name)), subject_rel:subjects(subject_name)')
+          .eq('room_code', roomCode)
+          .eq('is_active', true)
+          .maybeSingle();
         if (data) {
+          const teacherObj: any = data.teacher;
           setSession({
             isActive: true,
             roomCode: data.room_code,
-            subject: data.subject_rel?.subject_name || 'Sesi', 
-            teacherName: data.teacher?.full_name || 'Guru',
+            subject: data.subject_rel?.subject_name || 'Sesi Pembelajaran', 
+            teacherName: teacherObj?.full_name || 'Guru Pengampu',
+            teacherNip: teacherObj?.nip || null,
+            teacherSchool: teacherObj?.school?.school_name || null,
             subjectId: data.subject_id,
             classId: data.class_id,
             language: data.language || 'id',
@@ -667,7 +678,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       isActive: true,
       roomCode,
       subject,
-      teacherName: user?.name || null,
+      teacherName: user?.name || 'Guru',
+      teacherSchool: user?.school || null,
       classId,
       subjectId,
       language,

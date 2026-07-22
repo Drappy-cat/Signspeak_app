@@ -386,6 +386,59 @@ export default function LiveScreen() {
           </View>
         </View>
 
+        {/* Teacher Identity Badge Bar */}
+        <View style={{
+          marginHorizontal: 16,
+          marginTop: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          borderRadius: 12,
+          backgroundColor: hc ? '#1e293b' : '#ffffff',
+          borderWidth: 1,
+          borderColor: hc ? '#334155' : '#e2e8f0',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          ...getCardShadow(hc, 'sm'),
+        }}>
+          <View style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Users size={18} color={hc ? '#93c5fd' : '#1d4ed8'} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: mutedColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Guru Pengampu Sesi
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: textColor, marginTop: 1 }} numberOfLines={1}>
+              {session.teacherName || 'Guru Pengampu'}
+            </Text>
+            {(session.teacherSchool || session.teacherNip) && (
+              <Text style={{ fontSize: 11, color: mutedColor, marginTop: 1 }} numberOfLines={1}>
+                {[session.teacherSchool, session.teacherNip ? `NIP. ${session.teacherNip}` : null].filter(Boolean).join(' • ')}
+              </Text>
+            )}
+          </View>
+          {session.roomCode && (
+            <View style={{
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 6,
+              backgroundColor: hc ? '#334155' : '#f1f5f9',
+            }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: hc ? '#38bdf8' : '#0284c7' }}>
+                {session.roomCode}
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Transcript Area */}
         <ScrollView
           ref={scrollViewRef}
@@ -394,7 +447,7 @@ export default function LiveScreen() {
           showsVerticalScrollIndicator={false}
         >
           {!session.isActive ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 }}>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 }}>
               <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: hc ? '#1e293b' : '#eff6ff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                 <Mic size={24} color={hc ? '#60a5fa' : '#1d4ed8'} />
               </View>
@@ -404,8 +457,28 @@ export default function LiveScreen() {
               <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', marginTop: 8, lineHeight: 22, paddingHorizontal: 20 }}>
                 {appLang === 'en' 
                   ? "You will automatically receive the transcription once the teacher starts the live class." 
-                  : "Anda akan otomatis menerima transkripsi teks setelah guru memulai sesi kelas secara langsung."}
+                  : "Anda telah terhubung ke ruang kelas. Transkripsi teks akan otomatis muncul saat guru berbicara."}
               </Text>
+
+              {session.teacherName && (
+                <View style={{
+                  marginTop: 20,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  backgroundColor: hc ? '#1e293b' : '#ffffff',
+                  borderWidth: 1,
+                  borderColor: hc ? '#334155' : '#e2e8f0',
+                  alignItems: 'center',
+                  gap: 4,
+                }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: mutedColor }}>Guru Pengampu Kode Ini:</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: textColor }}>{session.teacherName}</Text>
+                  <Text style={{ fontSize: 12, color: hc ? '#60a5fa' : '#1e40af', fontWeight: '600' }}>
+                    {[session.subject, `Kode: ${session.roomCode}`].filter(Boolean).join(' • ')}
+                  </Text>
+                </View>
+              )}
             </View>
           ) : !hasContent && !session.errorMessage ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 }}>

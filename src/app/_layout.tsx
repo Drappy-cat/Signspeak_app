@@ -16,7 +16,7 @@ import { DICT } from '../constants/i18n';
 // Automatically TRUE during local development (__DEV__), and FALSE in production APK build.
 const SHOW_DEV_MENU = __DEV__;
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.hideAsync().catch(() => {});
 
 function FloatingDevMenu() {
   const [open, setOpen] = useState(false);

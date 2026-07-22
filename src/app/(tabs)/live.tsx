@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -127,7 +127,7 @@ function HighlightText({
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveScreen() {
   const { role, logout } = useAuth();
-  const { session, endSession, isRecording, toggleRecording, updateLanguage } = useSession();
+  const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
   const appLang = settings.appLang || 'id';
@@ -137,6 +137,10 @@ export default function LiveScreen() {
   const [selectedWord, setSelectedWord] = useState('');
   const [glossaryDef, setGlossaryDef] = useState<string | null>(null);
   const [originalIndoWord, setOriginalIndoWord] = useState<string | null>(null);
+
+  // Teacher Live Transcript Corrector states
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editText, setEditText] = useState('');
 
   const handleWordLongPress = async (word: string) => {
     if (!word) return;
@@ -350,7 +354,7 @@ export default function LiveScreen() {
               activeOpacity={0.7}
               onPress={async () => {
                 await logout();
-                router.replace('/');
+                router.replace('/(auth)/role-select');
               }}
               style={{ backgroundColor: hc ? '#ef4444' : '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
             >
@@ -591,7 +595,9 @@ export default function LiveScreen() {
       {/* Header */}
       <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
         <Text style={{ fontSize: 20, fontWeight: '900', color: textColor }}>{d.manageSession}</Text>
-        <Text style={{ fontSize: 14, color: mutedColor, marginTop: 2 }}>{session.subject}</Text>
+        <Text style={{ fontSize: 14, color: mutedColor, marginTop: 2 }}>
+          {session.subject || (appLang === 'en' ? 'General Class Session' : 'Sesi Kelas Umum')}
+        </Text>
         {session.isActive && session.roomCode && (
           <View style={{ marginTop: 12, padding: 16, backgroundColor: hc ? '#1e3a8a' : '#eff6ff', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...getCardShadow(hc, 'sm') }}>
              <Text style={{ fontSize: 13, color: hc ? '#93c5fd' : '#1e40af', fontWeight: '800' }}>Kode Ruangan</Text>
@@ -656,6 +662,62 @@ export default function LiveScreen() {
         )}
       </View>
 
+      {/* Teacher Live Real-time Transcript & Corrector Card */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+        <View style={[{ padding: 16 }, cardStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Volume2 size={16} color={hc ? '#60a5fa' : '#1e3a8a'} />
+              <Text style={{ fontSize: 14, fontWeight: '800', color: textColor }}>
+                {appLang === 'en' ? 'Live Real-Time Transcript' : 'Transkrip Teks Real-Time'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setEditText(session.transcript || '');
+                setEditModalVisible(true);
+              }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+                paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+              }}
+            >
+              <Edit3 size={13} color={hc ? '#93c5fd' : '#1d4ed8'} />
+              <Text style={{ fontSize: 12, fontWeight: '800', color: hc ? '#93c5fd' : '#1d4ed8' }}>
+                {appLang === 'en' ? 'Edit / Correct' : 'Edit / Koreksi'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{
+            backgroundColor: hc ? '#0f172a' : '#f8fafc',
+            borderRadius: 12, borderWidth: 1, borderColor: hc ? '#334155' : '#e2e8f0',
+            padding: 14, minHeight: 100, maxHeight: 180,
+          }}>
+            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+              {(session.transcript || session.interimTranscript) ? (
+                <Text style={{ fontSize: 15, lineHeight: 22, color: textColor }}>
+                  {session.transcript}
+                  {session.interimTranscript ? (
+                    <Text style={{ color: hc ? '#f59e0b' : '#d97706', fontStyle: 'italic' }}>
+                      {' '}{session.interimTranscript}
+                    </Text>
+                  ) : null}
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 13, color: mutedColor, fontStyle: 'italic', textAlign: 'center', marginTop: 24 }}>
+                  {appLang === 'en' 
+                    ? 'Spoken text will appear here in real-time.' 
+                    : 'Teks hasil rekaman suara akan muncul di sini secara real-time.'}
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </View>
+
       {/* Language Switcher */}
       <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
         <View style={[{ padding: 14 }, cardStyle]}>
@@ -691,11 +753,11 @@ export default function LiveScreen() {
             })}
           </View>
           <Text style={{ fontSize: 11, color: mutedColor, marginTop: 8, textAlign: 'center' }}>
-            {session.language === 'mad' || session.language === 'jv'
+            {session.language === 'mad'
               ? (appLang === 'en' 
-                ? `⚠️ ${LANGUAGE_LABELS[session.language]} uses Indonesian engine` 
-                : `⚠️ Bahasa ${LANGUAGE_LABELS[session.language]} menggunakan engine Indonesia`) 
-              : `${appLang === 'en' ? 'Using engine' : 'Menggunakan engine'} ${LANGUAGE_LABELS[session.language]}`}
+                ? `⚠️ Madurese uses Indonesian engine` 
+                : `⚠️ Bahasa Madura menggunakan engine Indonesia`) 
+              : `${appLang === 'en' ? 'Engine:' : 'Engine:'} Bahasa ${LANGUAGE_LABELS[session.language || 'id']}`}
           </Text>
         </View>
       </View>
@@ -957,6 +1019,75 @@ export default function LiveScreen() {
                 {appLang === 'en' ? 'Close' : 'Tutup'}
               </Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Teacher Live Transcript Corrector Modal */}
+      <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{
+            width: '100%', maxWidth: 440, backgroundColor: hc ? '#1e293b' : '#ffffff',
+            borderRadius: 20, padding: 20, ...getCardShadow(hc, 'lg'),
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Edit3 size={18} color={hc ? '#60a5fa' : '#1e3a8a'} />
+                <Text style={{ fontSize: 16, fontWeight: '900', color: textColor }}>
+                  {appLang === 'en' ? 'Edit & Correct Transcript' : 'Edit & Koreksi Transkrip'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <X size={20} color={mutedColor} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 12, lineHeight: 18 }}>
+              {appLang === 'en'
+                ? 'Correct misrecognized words or edit the transcript text below. Changes will be synced instantly to all connected student screens.'
+                : 'Perbaiki kata yang salah ucap atau perbarui teks transkrip di bawah. Perubahan akan langsung disinkronkan ke layar semua siswa.'}
+            </Text>
+
+            <TextInput
+              multiline
+              numberOfLines={6}
+              value={editText}
+              onChangeText={setEditText}
+              placeholder={appLang === 'en' ? 'Type or edit transcript text...' : 'Ketik atau edit teks transkrip...'}
+              placeholderTextColor={mutedColor}
+              style={{
+                backgroundColor: hc ? '#0f172a' : '#f8fafc',
+                color: textColor, borderRadius: 12, borderWidth: 1,
+                borderColor: hc ? '#334155' : '#cbd5e1', padding: 12,
+                fontSize: 14, lineHeight: 20, height: 140, textAlignVertical: 'top',
+              }}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center' }}
+              >
+                <Text style={{ fontWeight: '800', color: textColor, fontSize: 14 }}>
+                  {appLang === 'en' ? 'Cancel' : 'Batal'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  await updateTranscript(editText);
+                  setEditModalVisible(false);
+                  Alert.alert(
+                    appLang === 'en' ? 'Success' : 'Berhasil',
+                    appLang === 'en' ? 'Transcript updated and synced to all students.' : 'Transkrip telah diperbarui dan disinkronkan ke semua siswa.'
+                  );
+                }}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#1e3a8a', alignItems: 'center' }}
+              >
+                <Text style={{ fontWeight: '800', color: '#ffffff', fontSize: 14 }}>
+                  {appLang === 'en' ? 'Save & Sync' : 'Simpan & Sinkron'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

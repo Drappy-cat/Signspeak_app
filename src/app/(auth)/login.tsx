@@ -165,9 +165,7 @@ export default function LoginScreen() {
       }
     }
     try {
-      if (role === 'teacher') {
-        await login(email.trim(), pass, undefined, 'teacher');
-      }
+      await login(email.trim(), pass, undefined, 'teacher');
       setLoading(false);
       router.replace('/(tabs)/home');
     } catch (e: any) {

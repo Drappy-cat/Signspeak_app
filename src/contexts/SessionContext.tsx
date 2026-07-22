@@ -55,6 +55,7 @@ interface SessionContextType {
   startSession: (roomCode: string, subject: string, language: string, classId: string, subjectId: string, customGlossaryList?: Array<{ word: string; definition: string }>) => Promise<void>;
   endSession: () => Promise<void>;
   updateLanguage: (language: string) => void;
+  updateTranscript: (newTranscript: string) => Promise<void>;
   pauseRecording: () => Promise<void>;
   resumeRecording: () => Promise<void>;
   isRecording: boolean;
@@ -818,6 +819,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setSession(prev => ({ ...prev, language }));
   };
 
+  const updateTranscript = async (newTranscript: string) => {
+    accumulatedTranscriptRef.current = newTranscript;
+    setSession(prev => ({
+      ...prev,
+      transcript: newTranscript,
+      interimTranscript: '',
+    }));
+
+    if (session.isActive && session.roomCode && supabase) {
+      try {
+        await supabase
+          .from('active_sessions')
+          .update({ transcript: newTranscript } as any)
+          .eq('class_code', session.roomCode);
+      } catch (err) {
+        console.error('[Supabase] Failed to update transcript correction:', err);
+      }
+    }
+  };
+
   const resumeRecording = async () => {
     await startRecording(session.language);
   };
@@ -887,6 +908,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       startSession,
       endSession,
       updateLanguage,
+      updateTranscript,
       pauseRecording,
       resumeRecording,
       isRecording,

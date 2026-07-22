@@ -1245,6 +1245,7 @@ export default function HomeScreen() {
                 onPress={async () => {
                   setProfileDropdownVisible(false);
                   await logout();
+                  router.replace('/(auth)/role-select');
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8, marginTop: 2, borderTopWidth: 1, borderTopColor: hc ? '#334155' : '#f1f5f9' }}
               >

@@ -117,6 +117,31 @@ export async function assignTeacherToClass(teacherId: string, classId: string): 
   if (error && error.code !== '23505') throw error; // Ignore duplicate
 }
 
+/** Create a new class for a school and assign it to the teacher */
+export async function createAndAssignClassForTeacher(data: {
+  school_id: string;
+  grade_id: string;
+  class_name: string;
+  teacher_id: string;
+}): Promise<ClassWithDetails> {
+  const room_code = await generateUniqueRoomCode();
+  const { data: newClass, error } = await db
+    .from('classes')
+    .insert({
+      school_id: data.school_id,
+      grade_id: data.grade_id,
+      class_name: data.class_name,
+      room_code: room_code,
+    } as any)
+    .select('*, grade:grades(*), school:schools(*)')
+    .single();
+
+  if (error) throw error;
+
+  await assignTeacherToClass(data.teacher_id, newClass.id);
+  return newClass as ClassWithDetails;
+}
+
 /** Assign teacher to multiple classes */
 export async function assignTeacherToClasses(teacherId: string, classIds: string[]): Promise<void> {
   if (classIds.length === 0) return;

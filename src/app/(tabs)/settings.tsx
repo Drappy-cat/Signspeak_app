@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar, Image } from 'react-native';
 import { useSettings } from '../../contexts/SettingsContext';
 import { FontSizeLabels, FontSizeKey, FontSizes } from '../../constants/theme';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -301,13 +301,20 @@ export default function SettingsScreen() {
               width: 48, height: 48, borderRadius: 24,
               backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
               alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              overflow: 'hidden',
             }}>
-              <User size={22} color={iconColor} />
+              {user?.photoUri ? (
+                <Image source={{ uri: user.photoUri }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+              ) : (
+                <User size={22} color={iconColor} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '800', fontSize: 15, color: textColor }}>{user?.name || 'Budi Santoso'}</Text>
+              <Text style={{ fontWeight: '800', fontSize: 15, color: textColor }}>{user?.name || (role === 'teacher' ? 'Guru' : 'Siswa')}</Text>
               <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
-                {role === 'student' ? (appLang === 'en' ? 'Student · XII IPA 3' : 'Siswa · XII IPA 3') : (appLang === 'en' ? 'Teacher' : 'Guru')} · SMAN 1 Surabaya
+                {role === 'student'
+                  ? `${appLang === 'en' ? 'Student' : 'Siswa'} · ${user?.className || (appLang === 'en' ? 'General Class' : 'Kelas Umum')}`
+                  : `${appLang === 'en' ? 'Teacher' : 'Guru'} · ${user?.school || (appLang === 'en' ? 'No School Info' : 'Tanpa Info Sekolah')}`}
               </Text>
             </View>
           </View>

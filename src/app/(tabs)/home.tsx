@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,7 +7,7 @@ import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory } from '../../services/teacherService';
 import type { ClassWithDetails, Subject } from '../../types/database';
-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2 } from 'lucide-react-native';
+import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -20,6 +20,35 @@ const HISTORY_DATA = [
   { id: 2, subject: "Matematika", kelas: "XII IPA 3", teacher: "Pak Budi Santoso", date: "Kemarin, 10:00", duration: "50 mnt", words: 980, excerpt: "...turunan fungsi trigonometri dan aplikasi integral..." },
   { id: 3, subject: "Fisika", kelas: "XII IPA 3", teacher: "Pak Ahmad Rizki", date: "Senin, 11:00", duration: "45 mnt", words: 1100, excerpt: "...hukum Newton tentang gerak, gaya, dan percepatan..." },
 ];
+
+export function formatSessionDateTime(dateString: string): string {
+  if (!dateString) return '';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return dateString;
+
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const timeStr = `${hours}:${minutes} WIB`;
+
+  if (isToday) {
+    return `Hari ini, ${timeStr}`;
+  } else if (isYesterday) {
+    return `Kemarin, ${timeStr}`;
+  } else {
+    const day = d.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}, ${timeStr}`;
+  }
+}
 
 const getGreeting = (lang: string) => {
   const hour = new Date().getHours();
@@ -87,6 +116,7 @@ export default function HomeScreen() {
   const [customGlossaryList, setCustomGlossaryList] = React.useState<Array<{ word: string; definition: string }>>([]);
   const [isGlossaryLoaded, setIsGlossaryLoaded] = React.useState(false);
   const [recentSessions, setRecentSessions] = React.useState<any[]>([]);
+  const [selectedSessionHistory, setSelectedSessionHistory] = React.useState<any | null>(null);
   const [newWord, setNewWord] = React.useState('');
   const [newDefinition, setNewDefinition] = React.useState('');
 
@@ -373,27 +403,43 @@ export default function HomeScreen() {
 
       {/* Recent */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        <Text style={{ fontWeight: '800', fontSize: 15, marginBottom: 12, color: hc ? '#f8fafc' : '#0f172a' }}>{d.recentSessions}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <Text style={{ fontWeight: '800', fontSize: 15, color: hc ? '#f8fafc' : '#0f172a' }}>{d.recentSessions}</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/history')} activeOpacity={0.7}>
+            <Text className={`text-sm font-bold ${linkColor}`}>{d.seeAll}</Text>
+          </TouchableOpacity>
+        </View>
         <View style={{ gap: 8 }}>
           {recentSessions.length === 0 ? (
             <Text style={{ color: mutedColorVal, fontStyle: 'italic', fontSize: 13, textAlign: 'center', padding: 10 }}>
               {appLang === 'en' ? 'No recent sessions.' : 'Belum ada riwayat sesi.'}
             </Text>
           ) : recentSessions.map((item, i) => (
-            <View key={item.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }, cardStyle]}>
+            <TouchableOpacity 
+              key={item.id || i}
+              activeOpacity={0.8}
+              onPress={() => setSelectedSessionHistory(item)}
+              style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }, cardStyle]}
+            >
               <View style={{
                 width: 36, height: 36, borderRadius: 10,
-                backgroundColor: hc ? '#334155' : '#f8fafc',
+                backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>
-                <Text className={`text-xs font-black ${muted}`}>#{i + 1}</Text>
+                <BookOpen size={16} color={hc ? "#93c5fd" : "#1d4ed8"} />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{item.subject_display || 'Sesi'}</Text>
-                <Text className={`text-xs ${muted} mt-0.5`}>{new Date(item.created_at).toLocaleDateString()} · {Math.floor((item.duration || 0) / 60)}m</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <Clock size={11} color={mutedColorVal} />
+                  <Text className={`text-xs ${muted}`}>
+                    {formatSessionDateTime(item.created_at || item.session_date)} · {Math.floor((item.duration || 0) / 60)}m
+                  </Text>
+                </View>
               </View>
               <Text className={`text-xs font-bold ${linkColor}`}>{item.word_count?.toLocaleString() || 0} {appLang === 'en' ? 'words' : 'kata'}</Text>
-            </View>
+              <ChevronRight size={15} color={hc ? "#64748b" : "#94a3b8"} />
+            </TouchableOpacity>
           ))}
         </View>
       </View>
@@ -661,6 +707,132 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      )}
+      {/* Session History Detail Modal */}
+      {selectedSessionHistory && (
+        <Modal
+          visible={true}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setSelectedSessionHistory(null)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' }}>
+            <View style={{
+              height: '82%',
+              backgroundColor: hc ? '#0f172a' : '#f0f7ff',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingTop: 16,
+              paddingHorizontal: 20,
+              ...getCardShadow(hc, 'lg')
+            }}>
+              {/* Drag Handle */}
+              <View style={{ alignItems: 'center', marginBottom: 12 }}>
+                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: hc ? '#475569' : '#cbd5e1' }} />
+              </View>
+
+              {/* Modal Header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: hc ? '#f8fafc' : '#0f172a' }}>
+                    {selectedSessionHistory.subject_display || 'Detail Sesi'}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: hc ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                    {selectedSessionHistory.teacher_name || user?.name || 'Guru'} • {selectedSessionHistory.class_display || 'Kelas'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedSessionHistory(null)}
+                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: hc ? '#1e293b' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={16} color={hc ? '#94a3b8' : '#64748b'} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Time & Info Bar */}
+              <View style={{
+                flexDirection: 'row', alignItems: 'center', gap: 6,
+                padding: 10, borderRadius: 10, backgroundColor: hc ? '#1e293b' : '#ffffff',
+                borderWidth: 1, borderColor: hc ? '#334155' : '#e2e8f0', marginBottom: 12
+              }}>
+                <Clock size={14} color={hc ? '#60a5fa' : '#1e40af'} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#f8fafc' : '#0f172a' }}>
+                  {formatSessionDateTime(selectedSessionHistory.created_at || selectedSessionHistory.session_date)}
+                </Text>
+              </View>
+
+              {/* Stats Grid */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                <View style={{ flex: 1, padding: 10, borderRadius: 10, backgroundColor: hc ? '#1e293b' : '#ffffff', borderWidth: 1, borderColor: hc ? '#334155' : '#e2e8f0' }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b', textTransform: 'uppercase' }}>Durasi</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#f8fafc' : '#0f172a', marginTop: 2 }}>
+                    {Math.floor((selectedSessionHistory.duration || 0) / 60)}m {(selectedSessionHistory.duration || 0) % 60}s
+                  </Text>
+                </View>
+                <View style={{ flex: 1, padding: 10, borderRadius: 10, backgroundColor: hc ? '#1e293b' : '#ffffff', borderWidth: 1, borderColor: hc ? '#334155' : '#e2e8f0' }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b', textTransform: 'uppercase' }}>Kata</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#f8fafc' : '#0f172a', marginTop: 2 }}>
+                    {selectedSessionHistory.word_count || 0}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, padding: 10, borderRadius: 10, backgroundColor: hc ? '#1e293b' : '#ffffff', borderWidth: 1, borderColor: hc ? '#334155' : '#e2e8f0' }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b', textTransform: 'uppercase' }}>Bahasa</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#f8fafc' : '#0f172a', marginTop: 2 }}>
+                    {selectedSessionHistory.language === 'en' ? 'English' : selectedSessionHistory.language === 'jv' ? 'Jawa' : selectedSessionHistory.language === 'mad' ? 'Madura' : 'Indonesia'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Full Recorded Transcript */}
+              <Text style={{ fontSize: 11, fontWeight: '800', color: hc ? '#94a3b8' : '#64748b', textTransform: 'uppercase', marginBottom: 6 }}>
+                Transkrip Teks Terrekam
+              </Text>
+              <View style={{ flex: 1, borderRadius: 12, backgroundColor: hc ? '#1e293b' : '#ffffff', borderWidth: 1, borderColor: hc ? '#334155' : '#e2e8f0', padding: 16, marginBottom: 16 }}>
+                <ScrollView showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingBottom: 10 }}>
+                  <Text style={{ fontSize: 15, lineHeight: 24, fontWeight: '500', color: hc ? '#f8fafc' : '#0f172a' }}>
+                    {selectedSessionHistory.transcript_full || selectedSessionHistory.excerpt || 'Tidak ada teks transkrip terrekam.'}
+                  </Text>
+                </ScrollView>
+              </View>
+
+              {/* Share Action Button */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={async () => {
+                  try {
+                    const text = selectedSessionHistory.transcript_full || selectedSessionHistory.excerpt || '';
+                    const message = `📚 *RANGKUMAN KELAS LENTERA*\n\n` +
+                      `📖 *Mata Pelajaran:* ${selectedSessionHistory.subject_display || 'Sesi'}\n` +
+                      `🏫 *Kelas:* ${selectedSessionHistory.class_display || '-'}\n` +
+                      `👤 *Guru:* ${selectedSessionHistory.teacher_name || user?.name || 'Guru'}\n` +
+                      `⏱️ *Durasi:* ${Math.floor((selectedSessionHistory.duration || 0) / 60)} mnt\n` +
+                      `📅 *Waktu:* ${formatSessionDateTime(selectedSessionHistory.created_at || selectedSessionHistory.session_date)}\n\n` +
+                      `📝 *Transkrip:* \n"${text}"\n\n` +
+                      `--- Diposkan via LENTERA App ---`;
+                    await Share.share({ message });
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                style={{
+                  backgroundColor: '#1e3a8a',
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  marginBottom: 20,
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                <Share2 size={16} color="#ffffff" />
+                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+                  Bagikan Transkrip Sesi
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       )}
     </SafeAreaView>
   );

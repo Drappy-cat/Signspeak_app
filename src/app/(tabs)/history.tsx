@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView, Platform, StatusBar as RNStatusBar, Modal, Share } from 'react-native';
 import { Search, BookOpen, Clock, HelpCircle, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { DICT } from '../../constants/i18n';
 import { getCardShadow, parseHighlights } from '../../utils/formatters';
 import { useFocusEffect } from 'expo-router';
 import { getHistory, SessionRecord } from '../../services/db';
+import { getTeacherSessionHistory } from '../../services/teacherService';
+import { formatSessionDateTime } from './home';
 import { KEYWORDS, GLOSSARY, LANGUAGE_LABELS } from '../../constants/keywords';
 import { getOriginalIndonesianWord } from '../../utils/translator';
 import { FontSizes } from '../../constants/theme';
@@ -77,6 +80,7 @@ function HighlightText({
 }
 
 export default function HistoryScreen() {
+  const { user, role } = useAuth();
   const { settings } = useSettings();
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';
@@ -149,16 +153,48 @@ export default function HistoryScreen() {
   useFocusEffect(
     React.useCallback(() => {
       let isMounted = true;
-      getHistory().then(data => {
-        if (isMounted) {
-          setHistoryList(data);
-          setLoading(false);
+      setLoading(true);
+
+      const fetchHistoryData = async () => {
+        try {
+          if (role === 'teacher' && user?.teacher_id) {
+            const dbData = await getTeacherSessionHistory(user.teacher_id, 50);
+            if (isMounted) {
+              const formattedRecords: SessionRecord[] = dbData.map((item, idx) => ({
+                id: item.id || idx + 1,
+                subject: item.subject_display || 'Sesi',
+                className: item.class_display || 'Kelas',
+                teacherName: item.teacher_name || user.name || 'Guru',
+                date: formatSessionDateTime(item.created_at || item.session_date),
+                duration: item.duration || 0,
+                wordCount: item.word_count || 0,
+                language: item.language || 'id',
+                excerpt: item.excerpt || 'Tidak ada ringkasan',
+                transcriptFull: item.transcript_full || item.excerpt || '',
+              }));
+              setHistoryList(formattedRecords);
+              setLoading(false);
+              return;
+            }
+          }
+
+          const localData = await getHistory();
+          if (isMounted) {
+            setHistoryList(localData);
+            setLoading(false);
+          }
+        } catch (e) {
+          console.error('[History] Error loading history:', e);
+          if (isMounted) setLoading(false);
         }
-      });
+      };
+
+      fetchHistoryData();
+
       return () => {
         isMounted = false;
       };
-    }, [])
+    }, [user?.teacher_id, role])
   );
 
   const bgColor = hc ? "#0f172a" : "#F0F7FF";

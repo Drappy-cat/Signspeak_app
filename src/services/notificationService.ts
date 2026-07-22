@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { db } from './supabase';
 
 export interface AppNotification {
   id: string;
@@ -10,62 +11,90 @@ export interface AppNotification {
   read: boolean;
 }
 
-const STORAGE_KEY = '@lentera/notifications';
+const STORAGE_KEY = '@lentera/notifications_read_ids';
+const CLEARED_KEY = '@lentera/notifications_cleared_ids';
 
-// Default mock notifications to display initially so the screen is not empty
-const DEFAULT_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'notif-1',
-    title: 'Sesi Kelas Live Sedang Berlangsung',
-    body: 'Kelas Biologi Bu Sari Dewi sedang berlangsung untuk Room ID: BIO-4821. Bergabung sekarang!',
-    timestamp: Date.now() - 1000 * 60 * 15, // 15 mins ago
-    type: 'live_session',
-    actionData: { roomCode: 'BIO-4821' },
-    read: false
-  },
-  {
-    id: 'notif-2',
-    title: 'Riwayat Sesi Baru Tersedia',
-    body: 'Transkripsi sesi Biologi tanggal 19 Juli 2026 telah diarsipkan. Ketuk untuk meninjau.',
-    timestamp: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
-    type: 'history_ready',
-    actionData: { historyId: 2 },
-    read: false
-  },
-  {
-    id: 'notif-3',
-    title: 'Kehadiran Siswa',
-    body: 'Sesi Biologi Anda telah dimulai selama 5 menit tetapi belum ada siswa yang hadir.',
-    timestamp: Date.now() - 1000 * 60 * 60 * 24 * 3, // 3 days ago
-    type: 'no_students',
-    read: true
-  },
-  {
-    id: 'notif-4',
-    title: 'Pemberitahuan Lama',
-    body: 'Ini adalah contoh notifikasi lama yang sudah lewat dari 7 hari (otomatis dibersihkan).',
-    timestamp: Date.now() - 1000 * 60 * 60 * 24 * 9, // 9 days ago (should be auto-cleaned on fetch)
-    type: 'history_ready',
-    read: true
-  }
-];
-
-export async function getNotifications(): Promise<AppNotification[]> {
+export async function getNotifications(teacherId?: string): Promise<AppNotification[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    let list: AppNotification[] = raw ? JSON.parse(raw) : DEFAULT_NOTIFICATIONS;
+    const rawReadIds = await AsyncStorage.getItem(STORAGE_KEY);
+    const readIds: string[] = rawReadIds ? JSON.parse(rawReadIds) : [];
     
-    // Auto-clean: Remove notifications older than 7 days (1 week)
-    const oneWeekAgo = Date.now() - 1000 * 60 * 60 * 24 * 7;
-    const initialLength = list.length;
-    list = list.filter(n => n.timestamp >= oneWeekAgo);
-    
-    // Save back if changed or first load
-    if (list.length !== initialLength || !raw) {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    const rawClearedIds = await AsyncStorage.getItem(CLEARED_KEY);
+    const clearedIds: string[] = rawClearedIds ? JSON.parse(rawClearedIds) : [];
+
+    const notifications: AppNotification[] = [];
+
+    // 1. Fetch active live sessions from Supabase
+    try {
+      let liveQuery = db
+        .from('live_sessions')
+        .select('*, teacher:teachers(full_name)')
+        .eq('is_active', true);
+
+      if (teacherId) {
+        liveQuery = liveQuery.eq('teacher_id', teacherId);
+      }
+
+      const { data: liveData, error: liveError } = await liveQuery;
+      
+      if (!liveError && liveData && liveData.length > 0) {
+        for (const session of liveData) {
+          const notifId = `live-${session.id}`;
+          if (!clearedIds.includes(notifId)) {
+            notifications.push({
+              id: notifId,
+              title: 'Sesi Kelas Live Sedang Berlangsung',
+              body: `Sesi ${session.room_code} sedang aktif. Ketuk untuk masuk ke ruang kelas live.`,
+              timestamp: new Date(session.created_at || Date.now()).getTime(),
+              type: 'live_session',
+              actionData: { roomCode: session.room_code },
+              read: readIds.includes(notifId),
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch live_sessions for notifications:', err);
     }
-    
-    return list;
+
+    // 2. Fetch completed session history from Supabase
+    try {
+      let histQuery = db
+        .from('session_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (teacherId) {
+        histQuery = histQuery.eq('teacher_id', teacherId);
+      }
+
+      const { data: histData, error: histError } = await histQuery;
+
+      if (!histError && histData && histData.length > 0) {
+        for (const hist of histData) {
+          const notifId = `hist-${hist.id}`;
+          if (!clearedIds.includes(notifId)) {
+            notifications.push({
+              id: notifId,
+              title: 'Riwayat Sesi Baru Tersedia',
+              body: `Transkripsi sesi ${hist.subject_display || 'Kelas'} (${hist.class_display || '-'}) telah diarsipkan.`,
+              timestamp: new Date(hist.created_at || hist.session_date).getTime(),
+              type: 'history_ready',
+              actionData: { historyId: hist.id },
+              read: readIds.includes(notifId),
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch session_history for notifications:', err);
+    }
+
+    // Sort by timestamp descending
+    notifications.sort((a, b) => b.timestamp - a.timestamp);
+
+    return notifications;
   } catch (error) {
     console.error('getNotifications error:', error);
     return [];
@@ -74,15 +103,21 @@ export async function getNotifications(): Promise<AppNotification[]> {
 
 export async function saveNotifications(notifications: AppNotification[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+    const readIds = notifications.filter(n => n.read).map(n => n.id);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(readIds));
   } catch (error) {
     console.error('saveNotifications error:', error);
   }
 }
 
-export async function clearAllNotifications(): Promise<void> {
+export async function clearAllNotifications(notifIds?: string[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    if (notifIds && notifIds.length > 0) {
+      const rawClearedIds = await AsyncStorage.getItem(CLEARED_KEY);
+      const clearedIds: string[] = rawClearedIds ? JSON.parse(rawClearedIds) : [];
+      const updated = Array.from(new Set([...clearedIds, ...notifIds]));
+      await AsyncStorage.setItem(CLEARED_KEY, JSON.stringify(updated));
+    }
   } catch (error) {
     console.error('clearAllNotifications error:', error);
   }

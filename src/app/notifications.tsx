@@ -5,11 +5,13 @@ import { useSettings } from '../contexts/SettingsContext';
 import { DICT } from '../constants/i18n';
 import { getCardShadow } from '../utils/formatters';
 import { ArrowLeft, Bell, Trash2, Mic, Users, BookOpen, ChevronRight, Check } from 'lucide-react-native';
+import { useAuth } from '../contexts/AuthContext';
 import { getNotifications, saveNotifications, clearAllNotifications, AppNotification } from '../services/notificationService';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const { settings } = useSettings();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   const hc = settings.highContrast;
@@ -24,10 +26,10 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     loadNotifs();
-  }, []);
+  }, [user?.teacher_id]);
 
   const loadNotifs = async () => {
-    const list = await getNotifications();
+    const list = await getNotifications(user?.teacher_id);
     setNotifications(list);
   };
 

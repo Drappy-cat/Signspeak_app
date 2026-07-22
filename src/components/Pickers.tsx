@@ -62,7 +62,7 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
       const result = await searchSchools(activeQuery, filterType, 50, activeSort, activeProv, activeCity, activeDist);
       setSchools(result);
     } catch (e) {
-      console.error('Failed to load schools:', e);
+      console.warn('Using offline school data fallback:', e);
     } finally {
       setLoading(false);
     }

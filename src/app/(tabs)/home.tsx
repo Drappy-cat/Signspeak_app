@@ -5,7 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory, generateUniqueRoomCode } from '../../services/teacherService';
+import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory, generateUniqueRoomCode, assignTeacherToClass } from '../../services/teacherService';
+import { getClassesBySchool } from '../../services/schoolService';
 import type { ClassWithDetails, Subject } from '../../types/database';
 import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -119,6 +120,44 @@ export default function HomeScreen() {
   const [selectedSessionHistory, setSelectedSessionHistory] = React.useState<any | null>(null);
   const [newWord, setNewWord] = React.useState('');
   const [newDefinition, setNewDefinition] = React.useState('');
+
+  const [addClassModalVisible, setAddClassModalVisible] = React.useState(false);
+  const [availableClasses, setAvailableClasses] = React.useState<ClassWithDetails[]>([]);
+  const [selectedNewClassId, setSelectedNewClassId] = React.useState<string>('');
+  const [isAddingClass, setIsAddingClass] = React.useState(false);
+
+  const openAddClassModal = async () => {
+    if (!user?.schoolId) {
+      alert(appLang === 'en' ? 'School ID not found in profile.' : 'Data sekolah tidak ditemukan di profil Anda.');
+      return;
+    }
+    setAddClassModalVisible(true);
+    try {
+      const allClasses = await getClassesBySchool(user.schoolId);
+      const myClassIds = teacherClasses.map(c => c.id);
+      const filtered = allClasses.filter(c => !myClassIds.includes(c.id));
+      setAvailableClasses(filtered);
+      if (filtered.length > 0) setSelectedNewClassId(filtered[0].id);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddClass = async () => {
+    if (!user?.teacher_id || !selectedNewClassId) return;
+    setIsAddingClass(true);
+    try {
+      await assignTeacherToClass(user.teacher_id, selectedNewClassId);
+      const updated = await getTeacherClasses(user.teacher_id);
+      setTeacherClasses(updated);
+      setAddClassModalVisible(false);
+    } catch (e) {
+      console.error(e);
+      alert(appLang === 'en' ? 'Failed to add class.' : 'Gagal menambahkan kelas.');
+    } finally {
+      setIsAddingClass(false);
+    }
+  };
 
   React.useEffect(() => {
     if (role === 'teacher' && user?.teacher_id) {
@@ -364,7 +403,13 @@ export default function HomeScreen() {
 
       {/* Classes */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        <Text style={{ fontWeight: '800', fontSize: 15, marginBottom: 12, color: hc ? '#f8fafc' : '#0f172a' }}>{d.myClasses}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <Text style={{ fontWeight: '800', fontSize: 15, color: hc ? '#f8fafc' : '#0f172a' }}>{d.myClasses}</Text>
+          <TouchableOpacity activeOpacity={0.7} onPress={openAddClassModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: hc ? '#1e3a8a' : '#eff6ff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+            <Plus size={14} color={hc ? '#93c5fd' : '#1d4ed8'} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#93c5fd' : '#1d4ed8' }}>{appLang === 'en' ? 'Add' : 'Tambah'}</Text>
+          </TouchableOpacity>
+        </View>
         <View style={{ gap: 10 }}>
           {teacherClasses.length === 0 ? (
             <Text style={{ color: mutedColorVal, fontStyle: 'italic', fontSize: 13, textAlign: 'center', padding: 20 }}>
@@ -845,6 +890,104 @@ export default function HomeScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+        </View>
+      )}
+
+      {/* Add Class Modal */}
+      {addClassModalVisible && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={() => setAddClassModalVisible(false)} 
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} 
+          />
+          <View style={{
+            width: '100%',
+            maxWidth: 500,
+            backgroundColor: hc ? '#1e293b' : '#ffffff',
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            paddingHorizontal: 24,
+            paddingTop: 24,
+            paddingBottom: Platform.OS === 'ios' ? 44 : 32,
+            ...getCardShadow(hc, 'lg')
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: hc ? '#f8fafc' : '#0f172a' }}>
+                {appLang === 'en' ? 'Add Class' : 'Tambah Kelas'}
+              </Text>
+              <TouchableOpacity onPress={() => setAddClassModalVisible(false)}>
+                <X size={20} color={hc ? '#94a3b8' : '#64748b'} />
+              </TouchableOpacity>
+            </View>
+            
+            {availableClasses.length === 0 ? (
+              <Text style={{ color: hc ? '#94a3b8' : '#64748b', fontSize: 14, textAlign: 'center', marginVertical: 20 }}>
+                {appLang === 'en' ? 'No classes available to add in your school.' : 'Tidak ada kelas tersedia untuk ditambahkan di sekolah Anda.'}
+              </Text>
+            ) : (
+              <>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
+                  {appLang === 'en' ? 'Select Class' : 'Pilih Kelas'}
+                </Text>
+                <ScrollView style={{ maxHeight: 250, marginBottom: 20 }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {availableClasses.map((cls) => {
+                      const isSelected = selectedNewClassId === cls.id;
+                      return (
+                        <TouchableOpacity
+                          key={cls.id}
+                          activeOpacity={0.8}
+                          onPress={() => setSelectedNewClassId(cls.id)}
+                          style={{
+                            paddingVertical: 10,
+                            paddingHorizontal: 16,
+                            borderRadius: 12,
+                            backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
+                            borderWidth: 1,
+                            borderColor: isSelected ? '#1e3a8a' : hc ? '#475569' : '#e2e8f0',
+                          }}
+                        >
+                          <Text style={{
+                            color: isSelected ? '#ffffff' : hc ? '#e2e8f0' : '#475569',
+                            fontWeight: isSelected ? '700' : '600',
+                            fontSize: 13
+                          }}>
+                            {cls.grade?.grade_name ? `Kelas ${cls.grade.grade_name} ${cls.class_name}` : cls.class_name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleAddClass}
+                  disabled={isAddingClass}
+                  style={{
+                    backgroundColor: isAddingClass ? 'rgba(30,58,138,0.5)' : '#1e3a8a',
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+                    {appLang === 'en' ? 'Save Class' : 'Simpan Kelas'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
       )}
     </SafeAreaView>

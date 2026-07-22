@@ -1190,8 +1190,6 @@ export default function HomeScreen() {
               backgroundColor: hc ? '#1e293b' : '#ffffff',
               borderRadius: 16,
               padding: 12,
-              borderWidth: 1,
-              borderColor: hc ? '#334155' : '#e2e8f0',
               zIndex: 2001,
               ...getCardShadow(hc, 'lg'),
             }}

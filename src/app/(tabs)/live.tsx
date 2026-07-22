@@ -394,8 +394,6 @@ export default function LiveScreen() {
           paddingVertical: 10,
           borderRadius: 12,
           backgroundColor: hc ? '#1e293b' : '#ffffff',
-          borderWidth: 1,
-          borderColor: hc ? '#334155' : '#e2e8f0',
           flexDirection: 'row',
           alignItems: 'center',
           gap: 12,

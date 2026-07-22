@@ -833,9 +833,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Native event hooks (only used when running natively) ─────────────────────
   // We can't call hooks conditionally, so we always register but they only fire natively
   const NativeEventBridge = () => {
-    const { useSpeechRecognitionEvent } = nativeSTT.current!;
+    const hook = nativeSTT.current?.useEvent;
+    if (!hook) return null;
 
-    useSpeechRecognitionEvent('result', (event: any) => {
+    hook('result', (event: any) => {
       let finalStr = '';
       let interimStr = '';
 
@@ -869,7 +870,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       resetAutoPauseTimer();
     });
 
-    useSpeechRecognitionEvent('error', (event: any) => {
+    hook('error', (event: any) => {
       if (event.error === 'no-speech') return;
       setSession(prev => ({
         ...prev,

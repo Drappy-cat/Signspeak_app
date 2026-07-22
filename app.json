@@ -1,33 +1,37 @@
 {
   "expo": {
-    "name": "Signspeak_app",
-    "slug": "Signspeak_app",
+    "name": "LENTERA",
+    "slug": "lentera",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "signspeakapp",
+    "icon": "./assets/images/app-icon.png",
+    "scheme": "lentera",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/app-icon.png",
       "infoPlist": {
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone.",
-        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photo library to set your profile picture.",
-        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to take a photo for your profile picture."
+        "NSSpeechRecognitionUsageDescription": "Allow LENTERA to use speech recognition for live transcription.",
+        "NSMicrophoneUsageDescription": "Allow LENTERA to use the microphone for classroom speech recognition.",
+        "NSPhotoLibraryUsageDescription": "Allow LENTERA to access your photo library to set your profile picture.",
+        "NSCameraUsageDescription": "Allow LENTERA to take a photo for your profile picture."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#1e3a8a",
+        "foregroundImage": "./assets/images/app-icon.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
-      "package": "com.anonymous.Signspeak_app"
+      "package": "com.lentera.app"
     },
     "web": {
       "output": "single",
@@ -38,9 +42,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#1e3a8a",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 120
         }
       ],
       "expo-sqlite",

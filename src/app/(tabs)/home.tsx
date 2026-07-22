@@ -658,15 +658,18 @@ export default function HomeScreen() {
           bottom: 0,
           backgroundColor: 'rgba(15, 23, 42, 0.6)', // Glassmorphic translucent dark background
           justifyContent: 'flex-end',
+          alignItems: 'center',
           zIndex: 1000,
         }}>
           <TouchableOpacity 
             activeOpacity={1} 
             onPress={() => setStartModalVisible(false)} 
-            style={{ flex: 1 }} 
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} 
           />
           
           <View style={{
+            width: '100%',
+            maxWidth: 500,
             backgroundColor: hc ? '#1e293b' : '#ffffff',
             borderTopLeftRadius: 24,
             borderTopRightRadius: 24,
@@ -917,14 +920,25 @@ export default function HomeScreen() {
       )}
       {/* Session History Detail Modal */}
       {selectedSessionHistory && (
-        <Modal
-          visible={true}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setSelectedSessionHistory(null)}
-        >
-          <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' }}>
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={() => setSelectedSessionHistory(null)} 
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} 
+          />
             <View style={{
+              width: '100%',
+              maxWidth: 500,
               height: '82%',
               backgroundColor: hc ? '#0f172a' : '#f0f7ff',
               borderTopLeftRadius: 24,
@@ -1018,7 +1032,7 @@ export default function HomeScreen() {
                       `--- Diposkan via LENTERA App ---`;
                     await Share.share({ message });
                   } catch (e) {
-                    console.error(e);
+                    console.log('Share error or canceled:', e);
                   }
                 }}
                 style={{
@@ -1038,8 +1052,7 @@ export default function HomeScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </Modal>
+        </View>
       )}
       {/* Add Class Modal */}
       {addClassModalVisible && (

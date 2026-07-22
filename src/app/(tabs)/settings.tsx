@@ -305,9 +305,14 @@ export default function SettingsScreen() {
               <User size={22} color={iconColor} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '800', fontSize: 15, color: textColor }}>{user?.name || 'Budi Santoso'}</Text>
+              <Text style={{ fontWeight: '800', fontSize: 15, color: textColor }}>
+                {user?.name || (role === 'teacher' ? 'Guru LENTERA' : 'Siswa LENTERA')}
+              </Text>
               <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>
-                {role === 'student' ? (appLang === 'en' ? 'Student · XII IPA 3' : 'Siswa · XII IPA 3') : (appLang === 'en' ? 'Teacher' : 'Guru')} · SMAN 1 Surabaya
+                {role === 'student' 
+                  ? `${appLang === 'en' ? 'Student' : 'Siswa'}${user?.className ? ` · ${user.className}` : ''}`
+                  : (appLang === 'en' ? 'Teacher' : 'Guru')
+                }{user?.school ? ` · ${user.school}` : ''}
               </Text>
             </View>
           </View>

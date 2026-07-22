@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { saveSession } from '../services/db';
+import { addNotification } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
 import { Platform } from 'react-native';
@@ -262,13 +263,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
         if (data) {
           const teacherObj: any = data.teacher;
+          const resolvedTeacherName = teacherObj?.full_name || data.teacher_name || 'Guru Pengampu';
+          const resolvedSchool = teacherObj?.school?.school_name || data.teacher_school || null;
           setSession({
             isActive: true,
             roomCode: data.room_code,
             subject: data.subject_rel?.subject_name || 'Sesi Pembelajaran', 
-            teacherName: teacherObj?.full_name || 'Guru Pengampu',
+            teacherName: resolvedTeacherName,
             teacherNip: teacherObj?.nip || null,
-            teacherSchool: teacherObj?.school?.school_name || null,
+            teacherSchool: resolvedSchool,
             subjectId: data.subject_id,
             classId: data.class_id,
             language: data.language || 'id',
@@ -313,6 +316,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           { event: 'end_session' },
           () => {
             setSession(prev => ({ ...prev, isActive: false, errorMessage: 'Sesi telah diakhiri oleh guru.' }));
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'sync_teacher_info' },
+          (payload) => {
+            const data = payload.payload;
+            if (data?.teacherName) {
+              setSession(prev => ({
+                ...prev,
+                teacherName: data.teacherName,
+                teacherSchool: data.teacherSchool || prev.teacherSchool,
+              }));
+            }
           }
         )
         .on(
@@ -406,6 +423,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           { event: 'student_presence' },
           (payload) => {
             const student = payload.payload;
+            channel.send({
+              type: 'broadcast',
+              event: 'sync_teacher_info',
+              payload: {
+                teacherName: user?.name || 'Guru',
+                teacherSchool: user?.school || null,
+              }
+            });
+
             setSession(prev => {
               const currentParticipants = prev.participants || [];
               const idx = currentParticipants.findIndex(p => p.absen === student.absen && p.name === student.name);
@@ -659,16 +685,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     customGlossaryRef.current = { keywords, glossary };
     
     if (user?.teacher_id) {
-      const { error } = await db.from('live_sessions').insert({
+      let insertPayload: any = {
         room_code: roomCode,
         teacher_id: user.teacher_id,
+        teacher_name: user?.name || 'Guru',
+        teacher_school: user?.school || null,
         class_id: classId,
         subject_id: subjectId,
         language: language,
         is_active: true,
         transcript: '',
         interim_transcript: ''
-      });
+      };
+
+      let { error } = await db.from('live_sessions').insert(insertPayload);
+
+      // Graceful fallback if database schema cache doesn't have teacher_name column yet
+      if (error && error.code === 'PGRST204') {
+        delete insertPayload.teacher_name;
+        delete insertPayload.teacher_school;
+        const res = await db.from('live_sessions').insert(insertPayload);
+        error = res.error;
+      }
+
       if (error) {
         console.error('[Supabase] Failed to start session', error);
       }
@@ -690,6 +729,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       participants: [],
       customKeywords: keywords,
       customGlossary: glossary,
+    });
+
+    addNotification({
+      title: 'Sesi Kelas Live Dimulai',
+      body: `Sesi ${subject} dengan Kode: ${roomCode} telah aktif. Siswa dapat bergabung sekarang.`,
+      type: 'live_session',
+      actionData: { roomCode },
     });
 
     await startRecording(language);
@@ -736,6 +782,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           word_count: wordCount,
           excerpt: text.substring(0, 120) + (text.length > 120 ? '...' : ''),
           transcript_full: finalTranscriptText,
+        });
+
+        addNotification({
+          title: 'Transkrip Sesi Tersedia',
+          body: `Transkripsi sesi ${session.subject || 'Sesi'} (${wordCount} kata) telah tersimpan di Riwayat.`,
+          type: 'history_ready',
         });
       }
 

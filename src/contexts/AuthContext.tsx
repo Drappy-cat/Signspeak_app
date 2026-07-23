@@ -47,6 +47,8 @@ interface AuthContextType {
   completeOnboarding: () => Promise<void>;
   register: (name: string, email: string, password?: string) => Promise<{ id: string; email: string }>;
   resetPassword: (email: string) => Promise<void>;
+  verifyRecoveryOtp: (email: string, token: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   needsProfileCompletion: boolean;
   completeProfile: (profile: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -246,7 +248,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // 1. Cek apakah email terdaftar di database via fungsi RPC
+    const { data: isRegistered, error: rpcError } = await supabase.rpc('check_teacher_email', {
+      teacher_email: email.trim(),
+    });
+
+    if (rpcError) {
+      console.error('RPC Error:', rpcError);
+      throw new Error('Gagal memeriksa status email. Silakan coba lagi.');
+    }
+
+    if (!isRegistered) {
+      throw new Error('Email tidak terdaftar di sistem Lentera.');
+    }
+
+    // 2. Jika terdaftar, baru kirim OTP
+    const { error } = await supabase.auth.signInWithOtp({ 
+      email: email.trim(),
+      options: {
+        shouldCreateUser: false,
+      }
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  };
+
+  const verifyRecoveryOtp = async (email: string, token: string) => {
+    // Cek dengan type 'email' (untuk OTP signInWithOtp) terlebih dahulu, lalu 'recovery'
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: token.trim(), type: 'email' });
+    if (error) {
+      const fallback = await supabase.auth.verifyOtp({ email: email.trim(), token: token.trim(), type: 'recovery' });
+      if (fallback.error) throw new Error(error.message || fallback.error.message);
+    }
+  };
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
     if (error) throw new Error(error.message);
   };
 
@@ -255,7 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user, role, isReady, hasOnboarded, needsProfileCompletion,
         login, loginWithGoogle, logout, setRole, completeOnboarding,
-        register, resetPassword, completeProfile, refreshUser
+        register, resetPassword, verifyRecoveryOtp, updatePassword, completeProfile, refreshUser
       }}
     >
       {children}

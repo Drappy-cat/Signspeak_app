@@ -7,7 +7,7 @@ import { DICT } from '../../constants/i18n';
 import { getCardShadow } from '../../utils/formatters';
 import { Type, Moon, Globe, Zap, User, Info, ChevronRight, Shield } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Animated, Easing } from 'react-native';
 import { checkIsAdmin } from '../../services/adminService';
 
@@ -50,9 +50,15 @@ function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => voi
 
 export default function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
-  const { user, logout, role } = useAuth();
+  const { user, logout, role, refreshUser } = useAuth();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = React.useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshUser();
+    }, [])
+  );
 
   React.useEffect(() => {
     if (user?.id) {

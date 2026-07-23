@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Signspeak_app",
-    "slug": "Signspeak_app",
+    "slug": "fnovians",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -49,6 +49,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c294f3a0-339e-4d8f-9e62-5405ffe7157b"
+      }
+    },
+    "owner": "fnovians-team"
   }
 }

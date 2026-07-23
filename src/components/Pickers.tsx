@@ -105,6 +105,10 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
   ];
 
   const schoolTypes: SchoolType[] = ['SD', 'SMP', 'SMA', 'SMK', 'SLB'];
+  const schoolTypeItems: DropdownItem[] = [
+    { id: '', label: appLang === 'en' ? 'All Types' : 'Semua Jenis' },
+    ...schoolTypes.map(t => ({ id: t, label: t }))
+  ];
 
   const handleCreate = async () => {
     if (!newName.trim() || !newType) return;
@@ -131,41 +135,14 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
 
   return (
     <View style={{ gap: 10 }}>
-      {/* Filter row: label + chips in a single horizontal bar */}
-      <View style={{ gap: 6 }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: mutedColor }}>
-          {appLang === 'en' ? 'Filter by type' : 'Filter jenis sekolah'}
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'nowrap' }}>
-          {[null, ...schoolTypes].map((type, idx) => {
-            const isActive = filterType === type;
-            const chipLabel = type === null ? (appLang === 'en' ? 'All' : 'Semua') : type;
-            return (
-              <TouchableOpacity
-                key={idx}
-                onPress={() => setFilterType(type)}
-                style={{
-                  flex: 1,
-                  paddingVertical: 8,
-                  borderRadius: 10,
-                  alignItems: 'center',
-                  backgroundColor: isActive ? '#1e3a8a' : (hc ? '#1e293b' : '#f1f5f9'),
-                  borderWidth: 1.5,
-                  borderColor: isActive ? '#1e3a8a' : (hc ? '#334155' : '#e2e8f0'),
-                }}
-              >
-                <Text style={{
-                  fontSize: 12, fontWeight: '700',
-                  color: isActive ? '#fff' : mutedColor,
-                  letterSpacing: 0.3,
-                }}>
-                  {chipLabel}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+      <SmartDropdown
+        label={appLang === 'en' ? 'Filter by type' : 'Filter jenis sekolah'}
+        placeholder={appLang === 'en' ? 'All Types' : 'Semua Jenis'}
+        items={schoolTypeItems}
+        selectedId={filterType || ''}
+        onSelect={(item) => setFilterType((item.id || null) as SchoolType | null)}
+        hc={hc}
+      />
 
       {/* Location Filters Row */}
       <View style={{ gap: 8 }}>

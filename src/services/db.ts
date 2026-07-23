@@ -13,6 +13,7 @@ export interface SessionRecord {
   language: string;
   excerpt: string;
   transcriptFull?: string;
+  rawDate?: string;
 }
 
 // In-memory mock for Web since expo-sqlite requires native modules

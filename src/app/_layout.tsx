@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { SettingsProvider, useSettings } from '../contexts/SettingsContext';
 import { SessionProvider } from '../contexts/SessionContext';
 import { DICT } from '../constants/i18n';
+import { ThemeRippleOverlay } from '../components/ThemeRippleOverlay';
 
 // ── Developer Mode Switch ───────────────────────────────────────────────────
 // Automatically TRUE during local development (__DEV__), and FALSE in production APK build.
@@ -165,10 +166,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
 
   if (Platform.OS !== 'web') {
     return (
-      <View style={{ flex: 1 }}>
-        {children}
-        <FloatingDevMenu />
-      </View>
+      <ThemeRippleOverlay>
+        <View style={{ flex: 1 }}>
+          {children}
+          <FloatingDevMenu />
+        </View>
+      </ThemeRippleOverlay>
     );
   }
 
@@ -295,8 +298,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           boxShadow: '0 30px 80px rgba(0,0,0,0.8)',
         } as any}
       >
-        {children}
-        <FloatingDevMenu />
+        <ThemeRippleOverlay>
+          {children}
+          <FloatingDevMenu />
+        </ThemeRippleOverlay>
       </View>
 
       {/* Caption */}
@@ -304,6 +309,30 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         LENTERA (Learning Text and Real-time Accessibility) — Prototype UI/UX · Aksesibilitas untuk Siswa Tunarungu di Ruang Kelas Indonesia
       </Text>
     </View>
+  );
+}
+
+function RootNavigator() {
+  const { settings } = useSettings();
+  const hc = settings.highContrast;
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        contentStyle: { backgroundColor: hc ? '#0f172a' : '#F0F7FF' },
+      }}
+    >
+      <Stack.Screen name="index" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="admin" />
+      <Stack.Screen name="splash" />
+      <Stack.Screen name="about" />
+      <Stack.Screen name="notifications" />
+    </Stack>
   );
 }
 
@@ -318,16 +347,7 @@ export default function RootLayout() {
         <SessionProvider>
           <StatusBar style="auto" />
           <AppWrapper>
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="onboarding" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="admin" />
-              <Stack.Screen name="splash" />
-              <Stack.Screen name="about" />
-              <Stack.Screen name="notifications" />
-            </Stack>
+            <RootNavigator />
           </AppWrapper>
         </SessionProvider>
       </SettingsProvider>

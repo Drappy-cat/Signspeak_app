@@ -4,7 +4,6 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image';
 import { saveProfilePhotoLocally, uploadProfilePhoto } from '../../services/storageService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -145,22 +144,12 @@ export default function HomeScreen() {
   const [editSchool, setEditSchool] = React.useState('');
   const [editNip, setEditNip] = React.useState('');
   const [editClassName, setEditClassName] = React.useState('');
-  const [editPhotoUri, setEditPhotoUri] = React.useState('');
+  const [editPhotoUri, setEditPhotoUri] = React.useState<string | null>(null);
   const [savingProfile, setSavingProfile] = React.useState(false);
   const [allGradesList, setAllGradesList] = React.useState<Grade[]>([]);
   const [selectedGradeId, setSelectedGradeId] = React.useState<string>('');
   const [newClassNameInput, setNewClassNameInput] = React.useState<string>('');
   const [isAddingClass, setIsAddingClass] = React.useState(false);
-
-  // Profile Edit Modal States
-  const [profileDropdownVisible, setProfileDropdownVisible] = React.useState(false);
-  const [editProfileModalVisible, setEditProfileModalVisible] = React.useState(false);
-  const [editName, setEditName] = React.useState('');
-  const [editSchool, setEditSchool] = React.useState('');
-  const [editNip, setEditNip] = React.useState('');
-  const [editClassName, setEditClassName] = React.useState('');
-  const [editPhotoUri, setEditPhotoUri] = React.useState<string | null>(null);
-  const [savingProfile, setSavingProfile] = React.useState(false);
 
   const openAddClassModal = async () => {
     setAddClassModalVisible(true);

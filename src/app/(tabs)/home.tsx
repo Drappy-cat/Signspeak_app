@@ -1244,8 +1244,8 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
                 onPress={async () => {
                   setProfileDropdownVisible(false);
-                  await logout();
                   router.replace('/(auth)/role-select');
+                  await logout();
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8, marginTop: 2, borderTopWidth: 1, borderTopColor: hc ? '#334155' : '#f1f5f9' }}
               >
@@ -1418,6 +1418,66 @@ export default function HomeScreen() {
                     }}
                   />
                 </>
+              )}
+
+              {/* List of Currently Assigned Classes for Teacher */}
+              {role === 'teacher' && (
+                <View style={{ borderTopWidth: 1, borderTopColor: hc ? '#334155' : '#e2e8f0', paddingTop: 14, marginBottom: 16 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 10 }}>
+                    {appLang === 'en' ? 'Classes You Teach' : 'Kelas Yang Sudah Anda Ampu'}
+                  </Text>
+                  
+                  {teacherClasses.length === 0 ? (
+                    <Text style={{ color: hc ? '#64748b' : '#94a3b8', fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginVertical: 8 }}>
+                      {appLang === 'en' ? 'No classes assigned yet.' : 'Belum ada kelas yang diampu.'}
+                    </Text>
+                  ) : (
+                    <ScrollView style={{ maxHeight: 160 }}>
+                      <View style={{ gap: 8 }}>
+                        {teacherClasses.map((cls) => (
+                          <View
+                            key={cls.id}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              paddingVertical: 8,
+                              paddingHorizontal: 12,
+                              borderRadius: 10,
+                              backgroundColor: hc ? '#334155' : '#f8fafc',
+                              borderWidth: 1,
+                              borderColor: hc ? '#475569' : '#e2e8f0',
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <GraduationCap size={16} color={hc ? '#93c5fd' : '#1d4ed8'} />
+                              <Text style={{ fontWeight: '700', fontSize: 13, color: hc ? '#f8fafc' : '#0f172a' }}>
+                                {cls.grade?.grade_name ? `Kelas ${cls.grade.grade_name} ${cls.class_name}` : cls.class_name}
+                              </Text>
+                            </View>
+
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              onPress={async () => {
+                                if (!user?.teacher_id) return;
+                                try {
+                                  await removeTeacherFromClass(user.teacher_id, cls.id);
+                                  const updated = await getTeacherClasses(user.teacher_id);
+                                  setTeacherClasses(updated);
+                                } catch (e) {
+                                  console.error(e);
+                                }
+                              }}
+                              style={{ padding: 4 }}
+                            >
+                              <Trash2 size={15} color="#ef4444" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  )}
+                </View>
               )}
             </ScrollView>
 

@@ -143,7 +143,28 @@ export async function searchSchools(
       result.sort((a, b) => {
         const addrA = a.address || '';
         const addrB = b.address || '';
-        return addrA.localeCompare(addrB);
+
+        let keyA = addrA;
+        let keyB = addrB;
+
+        if (sortBy === 'prov') {
+          const partsA = addrA.split(/Prov\./i);
+          const partsB = addrB.split(/Prov\./i);
+          if (partsA[1]) keyA = partsA[1].trim();
+          if (partsB[1]) keyB = partsB[1].trim();
+        } else if (sortBy === 'kab') {
+          const partsA = addrA.split(/Kab\.|Kota/i);
+          const partsB = addrB.split(/Kab\.|Kota/i);
+          if (partsA[1]) keyA = partsA[1].trim();
+          if (partsB[1]) keyB = partsB[1].trim();
+        } else if (sortBy === 'kec') {
+          const partsA = addrA.split(/Kec\./i);
+          const partsB = addrB.split(/Kec\./i);
+          if (partsA[1]) keyA = partsA[1].trim();
+          if (partsB[1]) keyB = partsB[1].trim();
+        }
+
+        return keyA.localeCompare(keyB);
       });
     }
 

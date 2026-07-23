@@ -230,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to logout', e);
     }
     await AsyncStorage.removeItem(USER_STORAGE_KEY);
+    await AsyncStorage.removeItem(ROLE_STORAGE_KEY);
     setUser(null);
     setRoleState(null);
     setNeedsProfileCompletion(false);

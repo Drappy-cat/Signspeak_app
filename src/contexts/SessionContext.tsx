@@ -257,33 +257,53 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const roomCode = user.joinedRoomCode;
       
       const fetchInitial = async () => {
-        const { data } = await db.from('live_sessions')
-          .select('*, teacher:teachers(full_name, nip, school:schools(school_name)), subject_rel:subjects(subject_name)')
-          .eq('room_code', roomCode)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (data) {
-          const teacherObj: any = data.teacher;
-          const resolvedTeacherName = teacherObj?.full_name || data.teacher_name || 'Guru Pengampu';
-          const resolvedSchool = teacherObj?.school?.school_name || data.teacher_school || null;
-          setSession({
-            isActive: true,
-            roomCode: data.room_code,
-            subject: data.subject_rel?.subject_name || 'Sesi Pembelajaran', 
-            teacherName: resolvedTeacherName,
-            teacherNip: teacherObj?.nip || null,
-            teacherSchool: resolvedSchool,
-            subjectId: data.subject_id,
-            classId: data.class_id,
-            language: data.language || 'id',
-            transcript: data.transcript || '',
-            interimTranscript: data.interim_transcript || '',
-            errorMessage: null,
-            startTime: new Date(data.started_at).getTime(),
-            participants: [],
-            customKeywords: [],
-            customGlossary: {},
-          });
+        try {
+          const { data } = await db.from('live_sessions')
+            .select('*, teacher:teachers(full_name, nip, school:schools(school_name)), subject_rel:subjects(subject_name)')
+            .eq('room_code', roomCode)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (data) {
+            const teacherObj: any = data.teacher;
+            let resolvedTeacherName = teacherObj?.full_name || data.teacher_name;
+            let resolvedSchool = teacherObj?.school?.school_name || data.teacher_school;
+            let resolvedNip = teacherObj?.nip;
+
+            // Direct fallback lookup if relation returned null
+            if (!resolvedTeacherName && data.teacher_id) {
+              const { data: directTeacher } = await db.from('teachers')
+                .select('full_name, nip, school:schools(school_name)')
+                .eq('id', data.teacher_id)
+                .maybeSingle();
+              if (directTeacher) {
+                resolvedTeacherName = directTeacher.full_name;
+                resolvedNip = directTeacher.nip;
+                resolvedSchool = (directTeacher.school as any)?.school_name || resolvedSchool;
+              }
+            }
+
+            setSession({
+              isActive: true,
+              roomCode: data.room_code,
+              subject: data.subject_rel?.subject_name || 'Sesi Pembelajaran', 
+              teacherName: resolvedTeacherName || 'Guru Pengampu',
+              teacherNip: resolvedNip || null,
+              teacherSchool: resolvedSchool || null,
+              subjectId: data.subject_id,
+              classId: data.class_id,
+              language: data.language || 'id',
+              transcript: data.transcript || '',
+              interimTranscript: data.interim_transcript || '',
+              errorMessage: null,
+              startTime: new Date(data.started_at).getTime(),
+              participants: [],
+              customKeywords: [],
+              customGlossary: {},
+            });
+          }
+        } catch (err) {
+          console.warn('Failed fetchInitial for session:', err);
         }
       };
       fetchInitial();
@@ -309,6 +329,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               ...prev,
               transcript: data.transcript,
               interimTranscript: data.interimTranscript,
+              teacherName: data.teacherName || prev.teacherName,
+              teacherSchool: data.teacherSchool || prev.teacherSchool,
             }));
           }
         )
@@ -394,6 +416,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           payload: {
             transcript: session.transcript,
             interimTranscript: session.interimTranscript,
+            teacherName: user?.name || session.teacherName || 'Guru',
+            teacherSchool: user?.school || session.teacherSchool || null,
           }
         });
       }
@@ -409,7 +433,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }, 1000); // Debounce interval
       return () => clearTimeout(timer);
     }
-  }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript]);
+  }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript, user?.name, user?.school]);
 
   // ── Supabase Teacher Participants Receiver ──────────────────────────────────
   useEffect(() => {
@@ -472,7 +496,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }
           }
         )
-        .subscribe();
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            channel.send({
+              type: 'broadcast',
+              event: 'sync_teacher_info',
+              payload: {
+                teacherName: user?.name || 'Guru',
+                teacherSchool: user?.school || null,
+              }
+            });
+          }
+        });
         
       teacherChannelRef.current = channel;
         
@@ -505,7 +540,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         return prev;
       });
     }
-  }, [role, session.isActive, session.roomCode]);
+  }, [role, session.isActive, session.roomCode, user?.name, user?.school]);
 
   // ── Native STT via expo-speech-recognition ──────────────────────────────────
   // We import these conditionally to avoid crashes on web

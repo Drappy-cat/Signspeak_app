@@ -252,6 +252,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let channel: any = null;
     let heartbeatTimer: any = null;
+    let pollTimer: any = null;
 
     if (role === 'student' && user?.joinedRoomCode) {
       const roomCode = user.joinedRoomCode;
@@ -262,9 +263,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             .select('*, teacher:teachers(full_name, nip, school:schools(school_name)), subject_rel:subjects(subject_name)')
             .eq('room_code', roomCode)
             .eq('is_active', true)
+            .order('started_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
 
           if (data) {
+            if (pollTimer) {
+              clearInterval(pollTimer);
+              pollTimer = null;
+            }
+
             const teacherObj: any = data.teacher;
             let resolvedTeacherName = teacherObj?.full_name || data.teacher_name;
             let resolvedSchool = teacherObj?.school?.school_name || data.teacher_school;
@@ -301,6 +309,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               customKeywords: [],
               customGlossary: {},
             });
+          } else {
+            setSession(prev => ({
+              ...prev,
+              isActive: false,
+              roomCode: roomCode,
+              errorMessage: null,
+            }));
           }
         } catch (err) {
           console.warn('Failed fetchInitial for session:', err);
@@ -308,8 +323,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       };
       fetchInitial();
       
+      // Polling fallback every 3s to guarantee initial connection without needing page refresh
+      pollTimer = setInterval(() => {
+        fetchInitial();
+      }, 3000);
+
       channel = supabase
         .channel(`room_${roomCode}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'live_sessions', filter: `room_code=eq.${roomCode}` },
+          () => {
+            fetchInitial();
+          }
+        )
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'live_sessions', filter: `room_code=eq.${roomCode}` },
@@ -327,6 +354,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             const data = payload.payload;
             setSession(prev => ({
               ...prev,
+              isActive: true, // Automatically activate if transcript is received
               transcript: data.transcript,
               interimTranscript: data.interimTranscript,
               teacherName: data.teacherName || prev.teacherName,
@@ -349,10 +377,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             if (data?.teacherName) {
               setSession(prev => ({
                 ...prev,
+                isActive: true, // Activate if teacher info is received (meaning teacher is there)
                 teacherName: data.teacherName,
                 teacherSchool: data.teacherSchool || prev.teacherSchool,
               }));
             }
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'session_started' },
+          () => {
+            setSession(prev => ({ ...prev, isActive: true, errorMessage: null }));
           }
         )
         .on(
@@ -398,6 +434,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         });
     }
     return () => {
+      if (pollTimer) clearInterval(pollTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (channel) {
         supabase.removeChannel(channel);
@@ -720,14 +757,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     
     customGlossaryRef.current = { keywords, glossary };
     
-    if (user?.teacher_id) {
+    try {
       let insertPayload: any = {
         room_code: roomCode,
-        teacher_id: user.teacher_id,
+        teacher_id: user?.teacher_id || null,
         teacher_name: user?.name || 'Guru',
         teacher_school: user?.school || null,
-        class_id: classId,
-        subject_id: subjectId,
+        class_id: classId || null,
+        subject_id: subjectId || null,
         language: language,
         is_active: true,
         transcript: '',
@@ -747,6 +784,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error('[Supabase] Failed to start session', error);
       }
+    } catch (e) {
+      console.error('[Supabase] Exception starting session:', e);
     }
 
     setSession({
@@ -768,11 +807,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     });
 
     addNotification({
-      title: 'Sesi Kelas Live Dimulai',
-      body: `Sesi ${subject} dengan Kode: ${roomCode} telah aktif. Siswa dapat bergabung sekarang.`,
+      title: `Kelas ${subject} Dimulai!`,
+      body: 'Sesi live transcription sedang berlangsung sekarang.',
       type: 'live_session',
-      actionData: { roomCode },
     });
+
+    // Notify all students in the waiting room
+    if (teacherChannelRef.current) {
+      teacherChannelRef.current.send({
+        type: 'broadcast',
+        event: 'session_started',
+        payload: { startedAt: Date.now() }
+      });
+      // Also send teacher info just in case
+      teacherChannelRef.current.send({
+        type: 'broadcast',
+        event: 'sync_teacher_info',
+        payload: {
+          teacherName: user?.name || 'Guru',
+          teacherSchool: user?.school || null,
+        }
+      });
+    }
 
     await startRecording(language);
   };
@@ -878,9 +934,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (session.isActive && session.roomCode && supabase) {
       try {
         await (supabase as any)
-          .from('active_sessions')
+          .from('live_sessions')
           .update({ transcript: newTranscript })
-          .eq('class_code', session.roomCode);
+          .eq('room_code', session.roomCode);
       } catch (err) {
         console.error('[Supabase] Failed to update transcript correction:', err);
       }

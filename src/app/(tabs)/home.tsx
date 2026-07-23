@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { saveProfilePhotoLocally, uploadProfilePhoto } from '../../services/storageService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -136,6 +137,16 @@ export default function HomeScreen() {
   const [newDefinition, setNewDefinition] = React.useState('');
 
   const [addClassModalVisible, setAddClassModalVisible] = React.useState(false);
+  
+  // Profile Edit States
+  const [profileDropdownVisible, setProfileDropdownVisible] = React.useState(false);
+  const [editProfileModalVisible, setEditProfileModalVisible] = React.useState(false);
+  const [editName, setEditName] = React.useState('');
+  const [editSchool, setEditSchool] = React.useState('');
+  const [editNip, setEditNip] = React.useState('');
+  const [editClassName, setEditClassName] = React.useState('');
+  const [editPhotoUri, setEditPhotoUri] = React.useState('');
+  const [savingProfile, setSavingProfile] = React.useState(false);
   const [allGradesList, setAllGradesList] = React.useState<Grade[]>([]);
   const [selectedGradeId, setSelectedGradeId] = React.useState<string>('');
   const [newClassNameInput, setNewClassNameInput] = React.useState<string>('');
@@ -292,7 +303,7 @@ export default function HomeScreen() {
     setEditSchool(user?.school || '');
     setEditNip(user?.nip || '');
     setEditClassName(user?.className || '');
-    setEditPhotoUri(user?.photoUri || null);
+    setEditPhotoUri(user?.photoUri || '');
     setProfileDropdownVisible(false);
     setEditProfileModalVisible(true);
   };
@@ -970,10 +981,9 @@ export default function HomeScreen() {
               activeOpacity={0.9}
               onPress={async () => {
                 setStartModalVisible(false);
-                const roomCode = await generateUniqueRoomCode();
-                
                 const selectedSubjObj = teacherSubjects.find(s => s.id === selectedSubjectId);
                 const selectedClassObj = teacherClasses.find(c => c.id === selectedClassId);
+                const roomCode = selectedClassObj?.room_code || await generateUniqueRoomCode();
                 const sessionSubject = `${selectedSubjObj?.subject_name} (${selectedClassObj?.class_name})`;
                 
                 await startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);

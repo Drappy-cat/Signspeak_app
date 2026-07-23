@@ -154,6 +154,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     if (activeRole === 'student') {
+      if (!roomCode) {
+        throw new Error('Kode ruangan wajib diisi');
+      }
+
       const mockUser: User = {
         email: '',
         name: name || 'Siswa Tanpa Nama',

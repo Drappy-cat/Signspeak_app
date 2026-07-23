@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { View, Text, TouchableOpacity, Platform, Modal, SafeAreaView } from 'react-native';
@@ -158,10 +159,20 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const appLang = settings.appLang || 'id';
   const d = DICT[appLang];
 
+  const appTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: hc ? '#0f172a' : '#F0F7FF',
+    },
+  };
+
   if (Platform.OS !== 'web') {
     return (
       <View style={{ flex: 1 }}>
-        {children}
+        <ThemeProvider value={appTheme}>
+          {children}
+        </ThemeProvider>
         <FloatingDevMenu />
       </View>
     );
@@ -288,7 +299,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           boxShadow: '0 30px 80px rgba(0,0,0,0.8)',
         } as any}
       >
-        {children}
+        <ThemeProvider value={appTheme}>
+          {children}
+        </ThemeProvider>
         <FloatingDevMenu />
       </View>
 

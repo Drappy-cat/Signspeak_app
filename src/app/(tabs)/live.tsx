@@ -340,11 +340,44 @@ export default function LiveScreen() {
               {session.isActive ? `${session.subject} — ${session.roomCode}` : (appLang === 'en' ? 'Waiting Room' : 'Ruang Tunggu')}
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <PulseDot color={session.isActive ? "bg-red-500" : "bg-amber-500"} />
               <Text style={{ color: session.isActive ? '#ef4444' : '#f59e0b', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }}>
                 {session.isActive ? 'LIVE' : (appLang === 'en' ? 'WAITING' : 'MENUNGGU')}
+              </Text>
+            </View>
+
+            {/* Language Mode Badge (Top Right Indicator) */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              backgroundColor: session.language === 'jv'
+                ? (hc ? '#713f12' : '#fef9c3')
+                : session.language === 'mad'
+                ? (hc ? '#14532d' : '#dcfce7')
+                : (hc ? '#1e3a8a' : '#dbeafe'),
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: session.language === 'jv'
+                ? (hc ? '#a16207' : '#fde047')
+                : session.language === 'mad'
+                ? (hc ? '#15803d' : '#86efac')
+                : (hc ? '#1d4ed8' : '#bfdbfe'),
+            }}>
+              <Text style={{
+                fontSize: 10,
+                fontWeight: '900',
+                color: session.language === 'jv'
+                  ? (hc ? '#fef08a' : '#854d0e')
+                  : session.language === 'mad'
+                  ? (hc ? '#86efac' : '#14532d')
+                  : (hc ? '#93c5fd' : '#1e40af'),
+              }}>
+                🇮🇩 {session.language === 'jv' ? 'JAWA' : session.language === 'mad' ? 'MADURA' : 'INDO'}
               </Text>
             </View>
 
@@ -1116,6 +1149,78 @@ export default function LiveScreen() {
                   {appLang === 'en' ? 'Save & Sync' : 'Simpan & Sinkron'}
                 </Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 10-Second Language Switch Pause Pop-Up Modal */}
+      <Modal
+        transparent
+        visible={Boolean(session.isLangSwitching || (session.langPauseCountdown && session.langPauseCountdown > 0))}
+        animationType="fade"
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.78)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 340,
+            backgroundColor: hc ? '#1e293b' : '#ffffff',
+            borderRadius: 24,
+            padding: 24,
+            alignItems: 'center',
+            ...getCardShadow(hc, 'lg'),
+          }}>
+            <View style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+            }}>
+              <Globe size={32} color={hc ? '#60a5fa' : '#2563eb'} />
+            </View>
+
+            <Text style={{ fontSize: 18, fontWeight: '900', color: textColor, textAlign: 'center', marginBottom: 6 }}>
+              {appLang === 'en' ? 'Changing Transcript Language...' : 'Mengubah Bahasa Transkrip...'}
+            </Text>
+
+            {/* Language Transition Badge */}
+            <View style={{
+              backgroundColor: hc ? '#334155' : '#eff6ff',
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: hc ? '#475569' : '#bfdbfe',
+              marginVertical: 10,
+            }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#93c5fd' : '#1d4ed8' }}>
+                🔄 {session.langSwitchLabel || 'Indonesia ➔ Indonesia'}
+              </Text>
+            </View>
+
+            <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', lineHeight: 20, marginVertical: 8 }}>
+              {appLang === 'en'
+                ? 'Transcript paused for 10 seconds to adjust translation modules.'
+                : 'Transkrip di-pause sejenak selama 10 detik untuk menyesuaikan modul penerjemahan.'}
+            </Text>
+
+            {/* Live 10s Countdown Badge */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: '#ef4444',
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 20,
+              marginTop: 12,
+            }}>
+              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, letterSpacing: 0.5 }}>
+                ⏸ PAUSE ({session.langPauseCountdown || 10}s)
+              </Text>
             </View>
           </View>
         </View>

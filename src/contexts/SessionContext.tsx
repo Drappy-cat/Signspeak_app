@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { saveSession } from '../services/db';
 import { addNotification } from '../services/notificationService';
 import { useAuth } from './AuthContext';
@@ -48,6 +48,11 @@ export interface ActiveSession {
   participants: Participant[];
   customKeywords: string[];
   customGlossary: Record<string, string>;
+  isLangSwitching?: boolean;
+  langPauseCountdown?: number;
+  langSwitchFrom?: string;
+  langSwitchTo?: string;
+  langSwitchLabel?: string;
 }
 
 interface SessionContextType {
@@ -79,6 +84,11 @@ const defaultSession: ActiveSession = {
   participants: [],
   customKeywords: [],
   customGlossary: {},
+  isLangSwitching: false,
+  langPauseCountdown: 0,
+  langSwitchFrom: 'id',
+  langSwitchTo: 'id',
+  langSwitchLabel: '',
 };
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -203,9 +213,48 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const webSpeechRef = useRef<WebSpeechEngine | null>(null);
   const webMockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const langCountdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const accumulatedTranscriptRef = useRef<string>('');
   const customGlossaryRef = useRef<{ keywords: string[]; glossary: Record<string, string> }>({ keywords: [], glossary: {} });
   const teacherChannelRef = useRef<any>(null);
+
+  const triggerLangPause = useCallback((fromLang: string, toLang: string, labelStr: string) => {
+    if (langCountdownTimerRef.current) {
+      clearInterval(langCountdownTimerRef.current);
+      langCountdownTimerRef.current = null;
+    }
+
+    setSession(prev => ({
+      ...prev,
+      language: toLang,
+      isLangSwitching: true,
+      langPauseCountdown: 10,
+      langSwitchFrom: fromLang,
+      langSwitchTo: toLang,
+      langSwitchLabel: labelStr,
+    }));
+
+    let count = 10;
+    langCountdownTimerRef.current = setInterval(() => {
+      count -= 1;
+      if (count <= 0) {
+        if (langCountdownTimerRef.current) {
+          clearInterval(langCountdownTimerRef.current);
+          langCountdownTimerRef.current = null;
+        }
+        setSession(prev => ({
+          ...prev,
+          isLangSwitching: false,
+          langPauseCountdown: 0,
+        }));
+      } else {
+        setSession(prev => ({
+          ...prev,
+          langPauseCountdown: count,
+        }));
+      }
+    }, 1000);
+  }, []);
 
   // Initialize Web Speech Engine once
   useEffect(() => {
@@ -401,6 +450,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               customKeywords: data.keywords || [],
               customGlossary: data.glossary || {},
             }));
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'sync_language_switch' },
+          (payload) => {
+            const data = payload.payload;
+            if (data) {
+              triggerLangPause(data.fromLang || 'id', data.toLang || 'id', data.label || 'Perubahan Bahasa Transkrip');
+            }
           }
         )
         .subscribe((status) => {
@@ -919,8 +978,36 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setIsRecording(false);
   };
 
-  const updateLanguage = (language: string) => {
-    setSession(prev => ({ ...prev, language }));
+  const updateLanguage = (newLanguage: string) => {
+    const prevLang = session.language || 'id';
+    const getLangLabel = (code: string) => {
+      if (code === 'jv') return 'Bahasa Jawa';
+      if (code === 'mad') return 'Bahasa Madura';
+      return 'Indonesia';
+    };
+
+    const labelStr = `${getLangLabel(prevLang)} ➔ ${getLangLabel(newLanguage)}`;
+
+    // 1. Trigger 10s pause locally
+    triggerLangPause(prevLang, newLanguage, labelStr);
+
+    // 2. Broadcast to all students in live session
+    if (role === 'teacher' && teacherChannelRef.current) {
+      try {
+        teacherChannelRef.current.send({
+          type: 'broadcast',
+          event: 'sync_language_switch',
+          payload: {
+            language: newLanguage,
+            fromLang: prevLang,
+            toLang: newLanguage,
+            label: labelStr,
+          },
+        });
+      } catch (err) {
+        console.error('[SessionContext] Failed to broadcast language switch:', err);
+      }
+    }
   };
 
   const updateTranscript = async (newTranscript: string) => {

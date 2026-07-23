@@ -113,6 +113,7 @@ export async function getTeacherFullProfile(authUserId: string): Promise<Teacher
       full_name: teacher.full_name,
       email: teacher.email,
       nip: teacher.nip,
+      photo_url: teacher.photo_url,
       is_verified: teacher.is_verified,
       created_at: teacher.created_at,
     },

@@ -423,28 +423,64 @@ export function ClassPicker({
   };
 
   return (
-    <SmartDropdown
-      label={appLang === 'en' ? 'Class' : 'Kelas yang Diajar'}
-      placeholder={!schoolId || !gradeId
-        ? (appLang === 'en' ? 'Select grade first' : 'Pilih tingkat terlebih dahulu')
-        : (appLang === 'en' ? 'Select classes...' : 'Pilih kelas...')
-      }
-      items={items}
-      selectedId={null}
-      onSelect={() => {}}
-      multiSelect
-      selectedIds={selectedClassIds}
-      onMultiSelect={(selected) => {
-        const selectedClasses = classes.filter(c => selected.some(s => s.id === c.id));
-        onSelectClasses(selectedClasses);
-      }}
-      disabled={!schoolId || !gradeId}
-      hc={hc}
-      loading={loading}
-      allowCustom
-      customPlaceholder={appLang === 'en' ? 'Create new class (e.g. A, IPA 1)' : 'Buat kelas baru (misal: A, IPA 1)'}
-      onCreateCustom={handleCreateClass}
-    />
+    <View style={{ gap: 8 }}>
+      <SmartDropdown
+        label={appLang === 'en' ? 'Class' : 'Kelas yang Diajar'}
+        placeholder={!schoolId || !gradeId
+          ? (appLang === 'en' ? 'Select grade first' : 'Pilih tingkat terlebih dahulu')
+          : (appLang === 'en' ? 'Select classes...' : 'Pilih kelas...')
+        }
+        items={items}
+        selectedId={null}
+        onSelect={() => {}}
+        multiSelect
+        selectedIds={selectedClassIds}
+        onMultiSelect={(selected) => {
+          const selectedClasses = classes.filter(c => selected.some(s => s.id === c.id));
+          onSelectClasses(selectedClasses);
+        }}
+        disabled={!schoolId || !gradeId}
+        hc={hc}
+        loading={loading}
+        allowCustom
+        customPlaceholder={appLang === 'en' ? 'Create new class (e.g. A, B, IPA 1)' : 'Buat nama kelas baru (misal: A, B, IPA 1)'}
+        onCreateCustom={handleCreateClass}
+      />
+
+      {/* Quick Sub-class Letter Chips (Opsional SD/SMP: A-F / Tanpa Abjad) */}
+      {schoolId && gradeId && (
+        <View style={{ gap: 4 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b' }}>
+            {appLang === 'en' ? 'Sub-class Suffix (Optional for SD/SMP):' : 'Abjad Sub-kelas (Opsional untuk SD/SMP):'}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {['Polos (Tanpa Abjad)', 'A', 'B', 'C', 'D', 'E', 'F'].map(letter => {
+              const classNameToCreate = letter.startsWith('Polos') ? 'Utama' : letter;
+              const isAlreadyCreated = classes.some(c => c.class_name.toLowerCase() === classNameToCreate.toLowerCase());
+              return (
+                <TouchableOpacity
+                  key={letter}
+                  onPress={() => !isAlreadyCreated && handleCreateClass(classNameToCreate)}
+                  disabled={isAlreadyCreated}
+                  style={{
+                    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+                    backgroundColor: isAlreadyCreated ? (hc ? '#1e293b' : '#e2e8f0') : (hc ? '#334155' : '#eff6ff'),
+                    borderWidth: 1, borderColor: isAlreadyCreated ? (hc ? '#334155' : '#cbd5e1') : (hc ? '#3b82f6' : '#bfdbfe'),
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 12, fontWeight: '700',
+                    color: isAlreadyCreated ? (hc ? '#64748b' : '#94a3b8') : (hc ? '#93c5fd' : '#1e40af'),
+                  }}>
+                    {isAlreadyCreated ? `✓ ${letter}` : `+ ${letter}`}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+    </View>
   );
 }
 

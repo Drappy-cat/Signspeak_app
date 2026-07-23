@@ -63,7 +63,7 @@ export default function RoleSelectScreen() {
 
   const handleSelect = async (selectedRole: Role) => {
     await setRole(selectedRole);
-    router.replace('/(auth)/login' as any);
+    router.push('/(auth)/login' as any);
   };
 
   return (

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image, ScrollView, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Headphones, Eye, EyeOff, ChevronDown } from 'lucide-react-native';
+import { Headphones, Eye, EyeOff, ChevronDown, ArrowLeft } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
@@ -60,6 +60,20 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login, role } = useAuth();
   const { settings } = useSettings();
+
+  useEffect(() => {
+    const handleBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(auth)/role-select' as any);
+      }
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    return () => subscription.remove();
+  }, [router]);
   
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';
@@ -202,6 +216,31 @@ export default function LoginScreen() {
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
         <BubbleBackground hc={hc} />
+
+        {/* Top Header Navigation Bar */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(auth)/role-select' as any);
+              }
+            }}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+              backgroundColor: hc ? '#1e293b' : '#ffffff',
+              ...getCardShadow(hc, 'sm'),
+            }}
+          >
+            <ArrowLeft size={18} color={textColor} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: textColor }}>
+              {appLang === 'en' ? 'Back' : 'Kembali'}
+            </Text>
+          </TouchableOpacity>
+        </View>
         
         {/* Validation Modal Popup Card */}
         <Modal transparent visible={showModal} animationType="fade">

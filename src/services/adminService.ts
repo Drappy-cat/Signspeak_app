@@ -59,7 +59,7 @@ export interface ProvinceStats {
 // ── Admin Check ──────────────────────────────────────────────────────────────
 
 export async function checkIsAdmin(authUserId: string): Promise<boolean> {
-  if (!authUserId || authUserId.includes('demo')) return true;
+  if (!authUserId) return false;
 
   try {
     const { data, error } = await db
@@ -68,10 +68,10 @@ export async function checkIsAdmin(authUserId: string): Promise<boolean> {
       .eq('auth_user_id', authUserId)
       .single();
 
-    if (error || !data) return true; // Default allow in dev/demo mode
-    return data.role === 'admin' || data.role === 'teacher';
+    if (error || !data) return false;
+    return data.role === 'admin';
   } catch (_) {
-    return true;
+    return false;
   }
 }
 

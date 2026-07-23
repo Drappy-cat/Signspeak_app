@@ -180,12 +180,8 @@ export default function HomeScreen() {
       alert(appLang === 'en' ? 'Please select a grade.' : 'Mohon pilih tingkat kelas.');
       return;
     }
-    if (!newClassNameInput.trim()) {
-      alert(appLang === 'en' ? 'Class name is required.' : 'Nama kelas wajib diisi.');
-      return;
-    }
 
-    const classNameCreated = newClassNameInput.trim();
+    const classNameCreated = newClassNameInput.trim() || 'Utama';
     setIsAddingClass(true);
     try {
       await createAndAssignClassForTeacher({
@@ -1240,6 +1236,38 @@ export default function HomeScreen() {
                     color: hc ? '#f8fafc' : '#0f172a',
                   }}
                 />
+              </View>
+
+              {/* Optional Sub-class Letter Chips (SD / SMP) */}
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b' }}>
+                  {appLang === 'en' ? 'Quick Sub-class Letter (Optional for SD/SMP):' : 'Pilihan Abjad Sub-kelas (Opsional SD/SMP):'}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {['Tanpa Abjad', 'A', 'B', 'C', 'D', 'E', 'F'].map(letter => {
+                    const value = letter === 'Tanpa Abjad' ? 'Utama' : letter;
+                    const isSelected = newClassNameInput === value;
+                    return (
+                      <TouchableOpacity
+                        key={letter}
+                        activeOpacity={0.7}
+                        onPress={() => setNewClassNameInput(value)}
+                        style={{
+                          paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+                          backgroundColor: isSelected ? '#1e3a8a' : (hc ? '#334155' : '#eff6ff'),
+                          borderWidth: 1, borderColor: isSelected ? '#1e3a8a' : (hc ? '#475569' : '#bfdbfe'),
+                        }}
+                      >
+                        <Text style={{
+                          fontSize: 11, fontWeight: '700',
+                          color: isSelected ? '#ffffff' : (hc ? '#93c5fd' : '#1e40af'),
+                        }}>
+                          {letter}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
               <TouchableOpacity

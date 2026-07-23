@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, ScrollView, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, ScrollView, Image, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Headphones, ArrowLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -37,6 +37,22 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { register, role, login, refreshUser } = useAuth();
   const { settings } = useSettings();
+
+  useEffect(() => {
+    const handleBackPress = () => {
+      if (step > 1) {
+        setStep(prev => prev - 1);
+      } else if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(auth)/login' as any);
+      }
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    return () => subscription.remove();
+  }, [step, router]);
 
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';

@@ -116,20 +116,23 @@ export default function AdminDashboard() {
   const loadData = useCallback(async () => {
     try {
       // Check admin first
-      let admin = true;
+      let admin = false;
       if (user?.id) {
         try {
           admin = await checkIsAdmin(user.id);
         } catch (_) {
-          admin = true;
+          admin = false;
         }
       } else {
-        // If user is not logged in (e.g. just clicked Demo switcher without login)
         setIsAdmin(false);
         setLoading(false);
         return;
       }
       setIsAdmin(admin);
+      if (!admin) {
+        setLoading(false);
+        return;
+      }
 
       const [metricsData, provincesData] = await Promise.all([
         getAdminMetrics().catch(() => ({

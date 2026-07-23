@@ -34,23 +34,34 @@ export default function NotificationsScreen() {
   };
 
   const handleClearAll = async () => {
-    Alert.alert(
-      appLang === 'en' ? 'Clear All' : 'Hapus Semua',
-      appLang === 'en' 
-        ? 'Are you sure you want to clear all notifications?' 
-        : 'Apakah Anda yakin ingin menghapus semua notifikasi?',
-      [
-        { text: appLang === 'en' ? 'Cancel' : 'Batal', style: 'cancel' },
-        {
-          text: appLang === 'en' ? 'Delete' : 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            await clearAllNotifications(notifications.map(n => n.id));
-            setNotifications([]);
+    const confirmMsg = appLang === 'en' 
+      ? 'Are you sure you want to clear all notifications?' 
+      : 'Apakah Anda yakin ingin menghapus semua notifikasi?';
+
+    const clearAction = async () => {
+      const ids = notifications.map(n => n.id);
+      await clearAllNotifications(ids);
+      setNotifications([]);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(confirmMsg)) {
+        await clearAction();
+      }
+    } else {
+      Alert.alert(
+        appLang === 'en' ? 'Clear All' : 'Hapus Semua',
+        confirmMsg,
+        [
+          { text: appLang === 'en' ? 'Batal' : 'Batal', style: 'cancel' },
+          {
+            text: appLang === 'en' ? 'Delete' : 'Hapus',
+            style: 'destructive',
+            onPress: clearAction
           }
-        }
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleNotificationPress = async (item: AppNotification) => {

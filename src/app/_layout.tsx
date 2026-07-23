@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { View, Text, TouchableOpacity, Platform, Modal, SafeAreaView } from 'react-native';
+import * as SystemUI from 'expo-system-ui';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import '../../global.css';
@@ -157,6 +158,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';
   const d = DICT[appLang];
+
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(hc ? '#0f172a' : '#F0F7FF');
+  }, [hc]);
 
   if (Platform.OS !== 'web') {
     return (

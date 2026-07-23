@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView, Platform, StatusBar as RNStatusBar, Modal, Share } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, SafeAreaView, Platform, StatusBar as RNStatusBar, Modal, Share } from 'react-native';
 import { Search, BookOpen, Clock, HelpCircle, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
@@ -282,82 +282,84 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      <ScrollView
+      <FlatList
+        data={filteredHistory}
+        keyExtractor={(item) => item.id.toString()}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, gap: 10 }}
         showsVerticalScrollIndicator={false}
-      >
-        <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', color: mutedColor, marginBottom: 2 }}>
-          {sectionHeader}
-        </Text>
-
-        {loading ? (
-          <View style={{ padding: 40, alignItems: 'center' }}>
-            <Text style={{ color: mutedColor, fontSize: 14 }}>
-              {appLang === 'en' ? 'Loading history...' : 'Memuat riwayat...'}
-            </Text>
-          </View>
-        ) : filteredHistory.length === 0 ? (
-          <View style={{ padding: 40, alignItems: 'center' }}>
-            <Text style={{ color: mutedColor, fontSize: 14 }}>
-              {appLang === 'en' ? 'No history records found' : 'Tidak ada riwayat kelas'}
-            </Text>
-          </View>
-        ) : (
-          filteredHistory.map(item => (
-            <TouchableOpacity 
-              key={item.id} 
-              activeOpacity={0.9} 
-              onPress={() => setSelectedSession(item)}
-              style={cardStyle}
-            >
-              {/* Card body */}
-              <View style={{ padding: 16, flexDirection: 'row', gap: 12 }}>
-                <View style={{
-                  width: 40, height: 40, borderRadius: 10,
-                  backgroundColor: iconBgColor,
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
-                }}>
-                  <BookOpen size={17} color={iconColor} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{item.subject}</Text>
-                  <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>{item.teacherName} · {item.className}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                    <Clock size={10} color={mutedColor} />
-                    <Text style={{ fontSize: 12, color: mutedColor }}>
-                      {item.date} · {Math.floor(item.duration / 60)} mnt {item.duration % 60} dtk
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 12, color: mutedColor, marginTop: 6, fontStyle: 'italic', lineHeight: 18 }} numberOfLines={2}>
-                    {item.excerpt}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Card footer */}
+        ListHeaderComponent={
+          <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', color: mutedColor, marginBottom: 2 }}>
+            {sectionHeader}
+          </Text>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <Text style={{ color: mutedColor, fontSize: 14 }}>
+                {appLang === 'en' ? 'Loading history...' : 'Memuat riwayat...'}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <Text style={{ color: mutedColor, fontSize: 14 }}>
+                {appLang === 'en' ? 'No history records found' : 'Tidak ada riwayat kelas'}
+              </Text>
+            </View>
+          )
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            activeOpacity={0.9} 
+            onPress={() => setSelectedSession(item)}
+            style={cardStyle}
+          >
+            {/* Card body */}
+            <View style={{ padding: 16, flexDirection: 'row', gap: 12 }}>
               <View style={{
-                marginHorizontal: 16, paddingTop: 10, paddingBottom: 12,
-                borderTopWidth: 1, borderTopColor: dividerColor,
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                width: 40, height: 40, borderRadius: 10,
+                backgroundColor: iconBgColor,
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
               }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>
-                    {item.wordCount.toLocaleString('id-ID')} {wordsLabel}
-                  </Text>
-                  <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: hc ? '#475569' : '#cbd5e1' }} />
-                  <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: hc ? '#1e293b' : '#ecfdf5' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#94a3b8' : '#059669' }}>{completedLabel}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedSession(item)}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: linkColor }}>{openLabel}</Text>
-                </TouchableOpacity>
+                <BookOpen size={17} color={iconColor} />
               </View>
-            </TouchableOpacity>
-          ))
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{item.subject}</Text>
+                <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>{item.teacherName} · {item.className}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                  <Clock size={10} color={mutedColor} />
+                  <Text style={{ fontSize: 12, color: mutedColor }}>
+                    {item.date} · {Math.floor(item.duration / 60)} mnt {item.duration % 60} dtk
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: mutedColor, marginTop: 6, fontStyle: 'italic', lineHeight: 18 }} numberOfLines={2}>
+                  {item.excerpt}
+                </Text>
+              </View>
+            </View>
+
+            {/* Card footer */}
+            <View style={{
+              marginHorizontal: 16, paddingTop: 10, paddingBottom: 12,
+              borderTopWidth: 1, borderTopColor: dividerColor,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>
+                  {item.wordCount.toLocaleString('id-ID')} {wordsLabel}
+                </Text>
+                <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: hc ? '#475569' : '#cbd5e1' }} />
+                <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: hc ? '#1e293b' : '#ecfdf5' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#94a3b8' : '#059669' }}>{completedLabel}</Text>
+                </View>
+              </View>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedSession(item)}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: linkColor }}>{openLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         )}
-      </ScrollView>
+      />
 
       {/* Detail Modal */}
       <Modal

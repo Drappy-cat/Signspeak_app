@@ -484,6 +484,11 @@ DECLARE
   v_school_id UUID;
   v_teacher_id UUID;
 BEGIN
+  IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'profiles') THEN
+    RAISE NOTICE 'Skipping teacher migration, public.profiles does not exist';
+    RETURN;
+  END IF;
+
   FOR rec IN
     SELECT id, email, name, school, role
     FROM public.profiles
@@ -536,6 +541,11 @@ DECLARE
   rec RECORD;
   v_teacher_id UUID;
 BEGIN
+  IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sessions') THEN
+    RAISE NOTICE 'Skipping session migration, public.sessions does not exist';
+    RETURN;
+  END IF;
+
   FOR rec IN
     SELECT s.*, p.name as teacher_display_name
     FROM public.sessions s

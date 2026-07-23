@@ -84,7 +84,7 @@ export function BubbleBackground({ hc }: { hc: boolean }) {
   ];
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
       {bubbles.map(b => (
         <FloatingBubble key={b.id} color={bubbleColor} {...b} />
       ))}

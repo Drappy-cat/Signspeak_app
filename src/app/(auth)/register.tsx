@@ -5,7 +5,7 @@ import { Headphones, ArrowLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react-n
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { DICT } from '../../constants/i18n';
-import { GOOGLE_LOGO_BASE64 } from '../../constants/assets';
+
 import { getCardShadow } from '../../utils/formatters';
 import PinModal from '../../components/PinModal';
 
@@ -35,7 +35,7 @@ export default function RegisterScreen() {
   const [showPinModal, setShowPinModal] = useState(false);
 
   const router = useRouter();
-  const { register, loginWithGoogle, role, login, refreshUser } = useAuth();
+  const { register, role, login, refreshUser } = useAuth();
   const { settings } = useSettings();
 
   const hc = settings.highContrast;
@@ -152,20 +152,7 @@ export default function RegisterScreen() {
     }
   };
 
-  const handleGoogleRegister = async () => {
-    setLoading(true);
-    try {
-      if (loginWithGoogle) {
-        await loginWithGoogle();
-      } else {
-        throw new Error('Daftar dengan Google belum dikonfigurasi');
-      }
-    } catch (e: any) {
-      setErrorMsg(e.message || 'Gagal mendaftar dengan Google');
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
 
@@ -349,29 +336,7 @@ export default function RegisterScreen() {
                   )}
                 </TouchableOpacity>
 
-                {/* Divider — atau / or */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-                  <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-                  <Text style={{ marginHorizontal: 12, fontSize: 12, fontWeight: '600', color: mutedColor }}>{d.orDivider}</Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-                </View>
 
-                {/* Google Sign-Up button */}
-                <TouchableOpacity
-                  onPress={handleGoogleRegister}
-                  disabled={loading}
-                  activeOpacity={0.9}
-                  style={{
-                    width: '100%', paddingVertical: 12, borderRadius: 12,
-                    alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: hc ? '#334155' : '#ffffff',
-                    borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
-                    flexDirection: 'row', gap: 10,
-                  }}
-                >
-                  <Image source={{ uri: GOOGLE_LOGO_BASE64 }} style={{ width: 24, height: 24 }} />
-                  <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.registerWithGoogle}</Text>
-                </TouchableOpacity>
               </>
             )}
 

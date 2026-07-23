@@ -1,0 +1,512 @@
+diff --git a/src/app/(tabs)/home.tsx b/src/app/(tabs)/home.tsx
+index bfd5eb2..fac78fd 100644
+--- a/src/app/(tabs)/home.tsx
++++ b/src/app/(tabs)/home.tsx
+@@ -1,5 +1,5 @@
+ import React from 'react';
+-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput } from 'react-native';
++import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Image } from 'react-native';
+ import { useRouter, useFocusEffect } from 'expo-router';
+ import { useAuth } from '../../contexts/AuthContext';
+ import { useSession } from '../../contexts/SessionContext';
+@@ -7,7 +7,7 @@ import { useSettings } from '../../contexts/SettingsContext';
+ import { getTeacherClasses, getTeacherSubjects } from '../../services/teacherService';
+ import { db } from '../../services/supabase';
+ import type { ClassWithDetails, Subject } from '../../types/database';
+-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2 } from 'lucide-react-native';
++import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, User, Camera } from 'lucide-react-native';
+ import { LinearGradient } from 'expo-linear-gradient';
+ import { Animated, Easing } from 'react-native';
+ import { LANGUAGE_LABELS } from '../../constants/keywords';
+@@ -44,7 +44,7 @@ function PulseDot() {
+ }
+ 
+ export default function HomeScreen() {
+-  const { role, user } = useAuth();
++  const { role, user, refreshUser, logout } = useAuth();
+   const { session, startSession } = useSession();
+   const { settings } = useSettings();
+   const router = useRouter();
+@@ -86,6 +86,89 @@ export default function HomeScreen() {
+   const [totalSessionsCount, setTotalSessionsCount] = React.useState<number>(0);
+   const [totalWordsCount, setTotalWordsCount] = React.useState<number>(0);
+ 
++  // Profile Dropdown & Edit Profile States
++  const [profileDropdownVisible, setProfileDropdownVisible] = React.useState(false);
++  const [editProfileModalVisible, setEditProfileModalVisible] = React.useState(false);
++  const [editName, setEditName] = React.useState('');
++  const [editSchool, setEditSchool] = React.useState('');
++  const [editNip, setEditNip] = React.useState('');
++  const [editClassName, setEditClassName] = React.useState('');
++  const [editPhotoUri, setEditPhotoUri] = React.useState<string | null>(null);
++  const [savingProfile, setSavingProfile] = React.useState(false);
++
++  const pickPhoto = async () => {
++    const result = await ImagePicker.launchImageLibraryAsync({
++      mediaTypes: ['images'],
++      allowsEditing: true,
++      aspect: [1, 1],
++      quality: 0.8,
++    });
++
++    if (!result.canceled && result.assets[0]) {
++      setEditPhotoUri(result.assets[0].uri);
++    }
++  };
++
++  const handleOpenEditProfile = () => {
++    setEditName(user?.name || '');
++    setEditSchool(user?.school || '');
++    setEditNip(user?.nip || '');
++    setEditClassName(user?.className || '');
++    setEditPhotoUri(user?.photoUri || null);
++    setProfileDropdownVisible(false);
++    setEditProfileModalVisible(true);
++  };
++
++  const handleSaveProfile = async () => {
++    if (!editName.trim()) return;
++    setSavingProfile(true);
++    try {
++      let finalPhotoUri = editPhotoUri || undefined;
++      if (editPhotoUri && editPhotoUri !== user?.photoUri) {
++        try {
++          const photoToUpload = Platform.OS === 'web' 
++            ? editPhotoUri 
++            : await saveProfilePhotoLocally(editPhotoUri, `profile-${Date.now()}`);
++          finalPhotoUri = await uploadProfilePhoto(photoToUpload, `profile-${Date.now()}`);
++        } catch (errPhoto) {
++          console.warn('Photo processing notice:', errPhoto);
++        }
++      }
++
++      if (role === 'teacher' && user?.teacher_id) {
++        try {
++          await updateTeacherProfile(user.teacher_id, {
++            full_name: editName.trim(),
++            nip: editNip.trim() || undefined,
++            photo_url: finalPhotoUri,
++          });
++        } catch (errDb) {
++          console.warn('DB teacher profile update notice:', errDb);
++        }
++      }
++
++      // Update local user storage
++      const stored = await AsyncStorage.getItem('@lentera/user');
++      const currentUser = stored ? JSON.parse(stored) : {};
++      const updatedUser = {
++        ...currentUser,
++        name: editName.trim(),
++        school: editSchool.trim() || currentUser.school,
++        nip: role === 'teacher' ? editNip.trim() : currentUser.nip,
++        className: role === 'student' ? editClassName.trim() : currentUser.className,
++        photoUri: finalPhotoUri || currentUser.photoUri,
++      };
++      await AsyncStorage.setItem('@lentera/user', JSON.stringify(updatedUser));
++      await refreshUser();
++
++      setEditProfileModalVisible(false);
++    } catch (e) {
++      console.error('Failed to update profile:', e);
++    } finally {
++      setSavingProfile(false);
++    }
++  };
++
+   // Fetch real data on focus
+   useFocusEffect(
+     React.useCallback(() => {
+@@ -164,19 +247,40 @@ export default function HomeScreen() {
+             </Text>
+           )}
+         </View>
+-        <TouchableOpacity
+-          activeOpacity={0.7}
+-          onPress={() => router.push('/notifications')}
+-          style={{
+-            width: 40, height: 40, borderRadius: 20,
+-            backgroundColor: bellBg,
+-            alignItems: 'center', justifyContent: 'center',
+-            shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+-            shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+-          }}
+-        >
+-          <Bell size={17} color={hc ? "#94a3b8" : "#64748b"} />
+-        </TouchableOpacity>
++        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
++          <TouchableOpacity
++            activeOpacity={0.7}
++            onPress={() => router.push('/notifications')}
++            style={{
++              width: 40, height: 40, borderRadius: 20,
++              backgroundColor: bellBg,
++              alignItems: 'center', justifyContent: 'center',
++              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
++              shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
++            }}
++          >
++            <Bell size={17} color={hc ? "#94a3b8" : "#64748b"} />
++          </TouchableOpacity>
++          <TouchableOpacity
++            activeOpacity={0.7}
++            onPress={() => setProfileDropdownVisible(true)}
++            style={{
++              width: 40, height: 40, borderRadius: 20,
++              backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
++              alignItems: 'center', justifyContent: 'center',
++              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
++              shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
++              borderWidth: 1, borderColor: hc ? '#3b82f6' : '#bfdbfe',
++              overflow: 'hidden',
++            }}
++          >
++            {user?.photoUri ? (
++              <Image source={{ uri: user.photoUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
++            ) : (
++              <User size={18} color={hc ? "#93c5fd" : "#1d4ed8"} />
++            )}
++          </TouchableOpacity>
++        </View>
+       </View>
+ 
+       {/* Active session card */}
+@@ -297,19 +401,40 @@ export default function HomeScreen() {
+             </Text>
+           )}
+         </View>
+-        <TouchableOpacity
+-          activeOpacity={0.7}
+-          onPress={() => router.push('/notifications')}
+-          style={{
+-            width: 40, height: 40, borderRadius: 20,
+-            backgroundColor: bellBg,
+-            alignItems: 'center', justifyContent: 'center',
+-            shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+-            shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+-          }}
+-        >
+-          <Bell size={17} color={hc ? "#94a3b8" : "#64748b"} />
+-        </TouchableOpacity>
++        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
++          <TouchableOpacity
++            activeOpacity={0.7}
++            onPress={() => router.push('/notifications')}
++            style={{
++              width: 40, height: 40, borderRadius: 20,
++              backgroundColor: bellBg,
++              alignItems: 'center', justifyContent: 'center',
++              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
++              shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
++            }}
++          >
++            <Bell size={17} color={hc ? "#94a3b8" : "#64748b"} />
++          </TouchableOpacity>
++          <TouchableOpacity
++            activeOpacity={0.7}
++            onPress={() => setProfileDropdownVisible(true)}
++            style={{
++              width: 40, height: 40, borderRadius: 20,
++              backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
++              alignItems: 'center', justifyContent: 'center',
++              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
++              shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
++              borderWidth: 1, borderColor: hc ? '#3b82f6' : '#bfdbfe',
++              overflow: 'hidden',
++            }}
++          >
++            {user?.photoUri ? (
++              <Image source={{ uri: user.photoUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
++            ) : (
++              <User size={18} color={hc ? "#93c5fd" : "#1d4ed8"} />
++            )}
++          </TouchableOpacity>
++        </View>
+       </View>
+ 
+       {/* Language Selector */}
+@@ -718,6 +843,284 @@ export default function HomeScreen() {
+           </View>
+         </View>
+       )}
++      {/* Profile Dropdown Popover (Inline View constrained inside App Frame) */}
++      {profileDropdownVisible && (
++        <View style={{
++          position: 'absolute',
++          top: 0,
++          left: 0,
++          right: 0,
++          bottom: 0,
++          zIndex: 2000,
++          alignItems: 'flex-end',
++          paddingTop: Platform.OS === 'ios' ? 56 : 48,
++          paddingRight: 16,
++        }}>
++          <TouchableOpacity
++            activeOpacity={1}
++            onPress={() => setProfileDropdownVisible(false)}
++            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
++          />
++          <TouchableOpacity
++            activeOpacity={1}
++            onPress={(e) => e.stopPropagation()}
++            style={{
++              width: 220,
++              backgroundColor: hc ? '#1e293b' : '#ffffff',
++              borderRadius: 16,
++              padding: 12,
++              borderWidth: 1,
++              borderColor: hc ? '#334155' : '#e2e8f0',
++              zIndex: 2001,
++              ...getCardShadow(hc, 'lg'),
++            }}
++          >
++            {/* User Header */}
++            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: hc ? '#334155' : '#f1f5f9' }}>
++              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: hc ? '#1e3a8a' : '#dbeafe', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
++                {user?.photoUri ? (
++                  <Image source={{ uri: user.photoUri }} style={{ width: 36, height: 36, borderRadius: 18 }} />
++                ) : (
++                  <User size={18} color={hc ? "#93c5fd" : "#1d4ed8"} />
++                )}
++              </View>
++              <View style={{ flex: 1 }}>
++                <Text style={{ fontWeight: '800', fontSize: 13, color: textColorVal }} numberOfLines={1}>
++                  {user?.name || (role === 'teacher' ? 'Guru LENTERA' : 'Siswa LENTERA')}
++                </Text>
++                <Text style={{ fontSize: 10, color: mutedColorVal, marginTop: 1 }} numberOfLines={1}>
++                  {role === 'teacher' ? 'Guru' : 'Siswa'} {user?.school ? `• ${user.school}` : ''}
++                </Text>
++              </View>
++            </View>
++
++            {/* Menu Items */}
++            <View style={{ paddingTop: 6, gap: 2 }}>
++              <TouchableOpacity
++                activeOpacity={0.7}
++                onPress={handleOpenEditProfile}
++                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8, backgroundColor: hc ? '#334155' : '#f8fafc' }}
++              >
++                <BookOpen size={15} color={hc ? '#60a5fa' : '#1e40af'} />
++                <Text style={{ fontSize: 12, fontWeight: '700', color: textColorVal }}>
++                  Ubah Profil
++                </Text>
++              </TouchableOpacity>
++
++              <TouchableOpacity
++                activeOpacity={0.7}
++                onPress={() => {
++                  setProfileDropdownVisible(false);
++                  router.push('/(tabs)/settings');
++                }}
++                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8 }}
++              >
++                <Globe size={15} color={mutedColorVal} />
++                <Text style={{ fontSize: 12, fontWeight: '600', color: textColorVal }}>
++                  Pengaturan Aplikasi
++                </Text>
++              </TouchableOpacity>
++
++              <TouchableOpacity
++                activeOpacity={0.7}
++                onPress={async () => {
++                  setProfileDropdownVisible(false);
++                  await logout();
++                  router.replace('/(auth)/login');
++                }}
++                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8, marginTop: 2, borderTopWidth: 1, borderTopColor: hc ? '#334155' : '#f1f5f9' }}
++              >
++                <X size={15} color="#ef4444" />
++                <Text style={{ fontSize: 12, fontWeight: '700', color: '#ef4444' }}>
++                  Keluar Akun
++                </Text>
++              </TouchableOpacity>
++            </View>
++          </TouchableOpacity>
++        </View>
++      )}
++
++      {/* Edit Profile Modal (Inline View constrained inside App Frame) */}
++      {editProfileModalVisible && (
++        <View style={{
++          position: 'absolute',
++          top: 0,
++          left: 0,
++          right: 0,
++          bottom: 0,
++          backgroundColor: 'rgba(15, 23, 42, 0.6)',
++          justifyContent: 'flex-end',
++          zIndex: 3000,
++        }}>
++          <TouchableOpacity
++            activeOpacity={1}
++            onPress={() => setEditProfileModalVisible(false)}
++            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
++          />
++
++          <View style={{
++            backgroundColor: hc ? '#1e293b' : '#ffffff',
++            borderTopLeftRadius: 24,
++            borderTopRightRadius: 24,
++            paddingHorizontal: 24,
++            paddingTop: 24,
++            paddingBottom: Platform.OS === 'ios' ? 44 : 32,
++            zIndex: 3001,
++            ...getCardShadow(hc, 'lg'),
++          }}>
++            {/* Header */}
++            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
++              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
++                <User size={20} color={hc ? '#60a5fa' : '#1e40af'} />
++                <Text style={{ fontSize: 18, fontWeight: '900', color: hc ? '#ffffff' : '#0f172a' }}>
++                  {role === 'teacher' ? 'Ubah Profil Guru' : 'Ubah Profil Siswa'}
++                </Text>
++              </View>
++              <TouchableOpacity
++                activeOpacity={0.7}
++                onPress={() => setEditProfileModalVisible(false)}
++                style={{
++                  width: 32, height: 32, borderRadius: 16,
++                  backgroundColor: hc ? '#334155' : '#f1f5f9',
++                  alignItems: 'center', justifyContent: 'center',
++                }}
++              >
++                <X size={16} color={hc ? '#94a3b8' : '#64748b'} />
++              </TouchableOpacity>
++            </View>
++
++            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400, marginBottom: 16 }}>
++              {/* Photo Avatar Picker */}
++              <View style={{ alignItems: 'center', marginBottom: 20 }}>
++                <TouchableOpacity
++                  activeOpacity={0.8}
++                  onPress={pickPhoto}
++                  style={{ position: 'relative' }}
++                >
++                  {editPhotoUri ? (
++                    <Image
++                      source={{ uri: editPhotoUri }}
++                      style={{ width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: hc ? '#3b82f6' : '#bfdbfe' }}
++                    />
++                  ) : (
++                    <View style={{
++                      width: 80, height: 80, borderRadius: 40,
++                      backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
++                      alignItems: 'center', justifyContent: 'center',
++                      borderWidth: 3, borderColor: hc ? '#3b82f6' : '#bfdbfe'
++                    }}>
++                      <User size={36} color={hc ? '#93c5fd' : '#1d4ed8'} />
++                    </View>
++                  )}
++                  <View style={{
++                    position: 'absolute', bottom: 0, right: 0,
++                    width: 26, height: 26, borderRadius: 13,
++                    backgroundColor: '#1e40af', alignItems: 'center', justifyContent: 'center',
++                    borderWidth: 2, borderColor: '#ffffff',
++                  }}>
++                    <Camera size={13} color="#ffffff" />
++                  </View>
++                </TouchableOpacity>
++                <TouchableOpacity onPress={pickPhoto} activeOpacity={0.7} style={{ marginTop: 6, alignItems: 'center' }}>
++                  <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#60a5fa' : '#1e40af' }}>
++                    Pilih / Ubah Foto Profil
++                  </Text>
++                  <Text style={{ fontSize: 10, color: mutedColorVal, marginTop: 2 }}>
++                    Maksimal ukuran foto 1 MB (Format: JPG, PNG, WEBP)
++                  </Text>
++                </TouchableOpacity>
++              </View>
++
++              {/* Full Name */}
++              <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 6 }}>
++                Nama Lengkap
++              </Text>
++              <TextInput
++                value={editName}
++                onChangeText={setEditName}
++                placeholder="Masukkan nama lengkap"
++                placeholderTextColor={hc ? '#64748b' : '#94a3b8'}
++                style={{
++                  paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, fontSize: 14,
++                  color: textColorVal, marginBottom: 16,
++                  backgroundColor: hc ? '#334155' : '#f8fafc',
++                  borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
++                }}
++              />
++
++              {/* School */}
++              <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 6 }}>
++                Nama Sekolah
++              </Text>
++              <TextInput
++                value={editSchool}
++                onChangeText={setEditSchool}
++                placeholder="Masukkan nama sekolah"
++                placeholderTextColor={hc ? '#64748b' : '#94a3b8'}
++                style={{
++                  paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, fontSize: 14,
++                  color: textColorVal, marginBottom: 16,
++                  backgroundColor: hc ? '#334155' : '#f8fafc',
++                  borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
++                }}
++              />
++
++              {/* NIP (Teacher) or ClassName (Student) */}
++              {role === 'teacher' ? (
++                <>
++                  <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 6 }}>
++                    NIP (Nomor Induk Pegawai)
++                  </Text>
++                  <TextInput
++                    value={editNip}
++                    onChangeText={setEditNip}
++                    placeholder="Contoh: 198503152010011002"
++                    placeholderTextColor={hc ? '#64748b' : '#94a3b8'}
++                    style={{
++                      paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, fontSize: 14,
++                      color: textColorVal, marginBottom: 16,
++                      backgroundColor: hc ? '#334155' : '#f8fafc',
++                      borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
++                    }}
++                  />
++                </>
++              ) : (
++                <>
++                  <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 6 }}>
++                    Kelas
++                  </Text>
++                  <TextInput
++                    value={editClassName}
++                    onChangeText={setEditClassName}
++                    placeholder="Contoh: X DKV 1"
++                    placeholderTextColor={hc ? '#64748b' : '#94a3b8'}
++                    style={{
++                      paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, fontSize: 14,
++                      color: textColorVal, marginBottom: 16,
++                      backgroundColor: hc ? '#334155' : '#f8fafc',
++                      borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
++                    }}
++                  />
++                </>
++              )}
++            </ScrollView>
++
++            <TouchableOpacity
++              activeOpacity={0.9}
++              disabled={savingProfile}
++              onPress={handleSaveProfile}
++              style={{
++                backgroundColor: savingProfile ? '#94a3b8' : '#1e3a8a',
++                paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
++              }}
++            >
++              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 15 }}>
++                {savingProfile ? 'Menyimpan...' : 'Simpan Perubahan'}
++              </Text>
++            </TouchableOpacity>
++          </View>
++        </View>
++      )}
+     </SafeAreaView>
+   );
+ }

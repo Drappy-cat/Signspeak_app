@@ -426,6 +426,7 @@ export type Database = {
           id: string
           is_verified: boolean
           nip: string | null
+          photo_url: string | null
           role: string
           school_id: string
         }
@@ -438,6 +439,7 @@ export type Database = {
           id?: string
           is_verified?: boolean
           nip?: string | null
+          photo_url?: string | null
           role?: string
           school_id: string
         }
@@ -450,6 +452,7 @@ export type Database = {
           id?: string
           is_verified?: boolean
           nip?: string | null
+          photo_url?: string | null
           role?: string
           school_id?: string
         }

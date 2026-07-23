@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform,
   StatusBar as RNStatusBar, ActivityIndicator, Modal, TextInput, Alert,
-  RefreshControl, FlatList, Animated, Easing,
+  RefreshControl, FlatList, Animated, Easing, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
@@ -405,10 +405,15 @@ export default function AdminDashboard() {
                 width: 44, height: 44, borderRadius: 22,
                 backgroundColor: hc ? '#334155' : '#eff6ff',
                 justifyContent: 'center', alignItems: 'center',
+                overflow: 'hidden'
               }}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: accentBlue }}>
-                  {teacher.full_name?.charAt(0)?.toUpperCase() || '?'}
-                </Text>
+                {teacher.photo_url && teacher.photo_url.startsWith('http') ? (
+                  <Image source={{ uri: teacher.photo_url }} style={{ width: 44, height: 44 }} />
+                ) : (
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: accentBlue }}>
+                    {teacher.full_name?.charAt(0)?.toUpperCase() || '?'}
+                  </Text>
+                )}
               </View>
 
               {/* Info */}

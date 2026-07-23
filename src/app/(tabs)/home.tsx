@@ -11,7 +11,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory, generateUniqueRoomCode, assignTeacherToClass, createAndAssignClassForTeacher, removeTeacherFromClass, updateTeacherProfile } from '../../services/teacherService';
 import { getClassesBySchool, getAllGrades, getSchoolById, getGradesBySchoolType } from '../../services/schoolService';
 import type { ClassWithDetails, Subject, Grade } from '../../types/database';
-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2, User } from 'lucide-react-native';
+import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2, User, LogOut } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -139,6 +139,7 @@ export default function HomeScreen() {
   
   // Profile Edit States
   const [profileDropdownVisible, setProfileDropdownVisible] = React.useState(false);
+  const [profileDetailModalVisible, setProfileDetailModalVisible] = React.useState(false);
   const [editProfileModalVisible, setEditProfileModalVisible] = React.useState(false);
   const [editName, setEditName] = React.useState('');
   const [editSchool, setEditSchool] = React.useState('');
@@ -314,6 +315,7 @@ export default function HomeScreen() {
         await updateTeacherProfile(user.teacher_id, {
           full_name: editName.trim(),
           nip: editNip.trim() || undefined,
+          photo_url: finalPhotoUri || undefined,
         });
       }
 
@@ -381,7 +383,7 @@ export default function HomeScreen() {
               overflow: 'hidden',
             }}
           >
-            {user?.photoUri ? (
+            {user?.photoUri && user.photoUri.startsWith('http') ? (
               <Image source={{ uri: user.photoUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
             ) : (
               <User size={18} color={hc ? "#93c5fd" : "#1d4ed8"} />
@@ -514,7 +516,7 @@ export default function HomeScreen() {
               overflow: 'hidden',
             }}
           >
-            {user?.photoUri ? (
+            {user?.photoUri && user.photoUri.startsWith('http') ? (
               <Image source={{ uri: user.photoUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
             ) : (
               <User size={18} color={hc ? "#93c5fd" : "#1d4ed8"} />
@@ -1309,6 +1311,304 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
+      {/* Profile Popover Menu (Small) */}
+      {profileDropdownVisible && (
+        <Modal transparent={true} animationType="fade" visible={profileDropdownVisible} onRequestClose={() => setProfileDropdownVisible(false)}>
+          <TouchableOpacity 
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.1)' }} 
+            activeOpacity={1} 
+            onPress={() => setProfileDropdownVisible(false)}
+          >
+            <View style={{
+              position: 'absolute',
+              top: Platform.OS === 'ios' ? 90 : 60,
+              right: 20,
+              width: 200,
+              backgroundColor: hc ? '#1e293b' : '#ffffff',
+              borderRadius: 16,
+              padding: 8,
+              ...getCardShadow(hc, 'md'),
+              borderWidth: 1,
+              borderColor: hc ? '#334155' : '#e2e8f0',
+            }}>
+              <TouchableOpacity
+                style={{ paddingHorizontal: 10, paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 }}
+                onPress={() => {
+                  setProfileDropdownVisible(false);
+                  setProfileDetailModalVisible(true);
+                }}
+              >
+                <User size={16} color={hc ? '#94a3b8' : '#475569'} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: hc ? '#cbd5e1' : '#334155' }}>Lihat Profil</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{ paddingHorizontal: 10, paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 }}
+                onPress={() => {
+                  setProfileDropdownVisible(false);
+                  router.push('/(tabs)/settings');
+                }}
+              >
+                <Globe size={16} color={hc ? '#94a3b8' : '#475569'} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: hc ? '#cbd5e1' : '#334155' }}>Pengaturan & Akun</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{ paddingHorizontal: 10, paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                onPress={async () => {
+                  setProfileDropdownVisible(false);
+                  router.replace('/(auth)/role-select');
+                  await logout();
+                }}
+              >
+                <LogOut size={16} color="#ef4444" />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#ef4444' }}>Keluar dari Akun</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Centered Profile Detail Modal */}
+      {profileDetailModalVisible && (
+        <Modal transparent={true} animationType="fade" visible={profileDetailModalVisible} onRequestClose={() => setProfileDetailModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View style={{
+              width: '100%',
+              maxWidth: 340,
+              backgroundColor: hc ? '#1e293b' : '#ffffff',
+              borderRadius: 24,
+              overflow: 'hidden',
+              ...getCardShadow(hc, 'lg'),
+              borderWidth: 1,
+              borderColor: hc ? '#334155' : '#e2e8f0',
+            }}>
+              {/* Header Cover */}
+              <View style={{ height: 80, backgroundColor: hc ? '#1e3a8a' : '#dbeafe', position: 'relative' }}>
+                <TouchableOpacity 
+                  onPress={() => setProfileDetailModalVisible(false)}
+                  style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.2)', padding: 6, borderRadius: 20 }}
+                >
+                  <X size={18} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Avatar */}
+              <View style={{ alignItems: 'center', marginTop: -40 }}>
+                <View style={{
+                  width: 80, height: 80, borderRadius: 40,
+                  backgroundColor: hc ? '#0f172a' : '#ffffff',
+                  justifyContent: 'center', alignItems: 'center',
+                  borderWidth: 4, borderColor: hc ? '#1e293b' : '#ffffff',
+                }}>
+                  {user?.photoUri ? (
+                    <Image source={{ uri: user.photoUri }} style={{ width: 72, height: 72, borderRadius: 36 }} />
+                  ) : (
+                    <User size={36} color={hc ? "#60a5fa" : "#1d4ed8"} />
+                  )}
+                </View>
+              </View>
+
+              {/* Details */}
+              <View style={{ padding: 24, paddingTop: 12, alignItems: 'center' }}>
+                <Text style={{ fontWeight: '900', fontSize: 20, color: textColorVal, textAlign: 'center' }}>
+                  {user?.name || 'Pengguna'}
+                </Text>
+
+                {role === 'teacher' ? (
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: hc ? '#1e3a8a' : '#eff6ff' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: hc ? '#93c5fd' : '#1d4ed8' }}>GURU</Text>
+                      </View>
+                      {user?.isVerified && (
+                        <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: hc ? '#064e3b' : '#dcfce7' }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: hc ? '#34d399' : '#166534' }}>TERVERIFIKASI</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={{ width: '100%', marginTop: 24, gap: 16 }}>
+                      {user?.nip && (
+                        <View>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: mutedColorVal, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Nomor Induk Pegawai (NIP)</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: textColorVal }}>{user.nip}</Text>
+                        </View>
+                      )}
+                      {user?.school && (
+                        <View>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: mutedColorVal, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Asal Sekolah</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: textColorVal }}>{user.school}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: hc ? '#334155' : '#f1f5f9', marginTop: 8 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: hc ? '#cbd5e1' : '#475569' }}>SISWA</Text>
+                    </View>
+                    <View style={{ width: '100%', marginTop: 24, gap: 16 }}>
+                      {(user?.className || user?.school) && (
+                        <View>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: mutedColorVal, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Kelas & Sekolah</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: textColorVal }}>
+                            {[user.className, user.school].filter(Boolean).join(' • ')}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </>
+                )}
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={{
+                    marginTop: 32,
+                    width: '100%',
+                    backgroundColor: hc ? '#1d4ed8' : '#1e3a8a',
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => {
+                    setProfileDetailModalVisible(false);
+                    handleOpenEditProfile();
+                  }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>Edit Profil</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Edit Profile Modal */}
+      {editProfileModalVisible && (
+        <Modal transparent={true} animationType="slide" visible={editProfileModalVisible} onRequestClose={() => setEditProfileModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View style={{
+              width: '100%',
+              maxWidth: 340,
+              backgroundColor: hc ? '#1e293b' : '#ffffff',
+              borderRadius: 24,
+              overflow: 'hidden',
+              ...getCardShadow(hc, 'lg'),
+              borderWidth: 1,
+              borderColor: hc ? '#334155' : '#e2e8f0',
+            }}>
+              <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: hc ? '#334155' : '#e2e8f0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: textColorVal }}>Edit Profil</Text>
+                <TouchableOpacity onPress={() => setEditProfileModalVisible(false)} style={{ padding: 4 }}>
+                  <X size={20} color={hc ? '#94a3b8' : '#64748b'} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ padding: 20, maxHeight: 400 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b', marginBottom: 4 }}>
+                  NAMA LENGKAP
+                </Text>
+                <TextInput
+                  value={editName}
+                  onChangeText={setEditName}
+                  style={{
+                    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
+                    backgroundColor: hc ? '#334155' : '#f8fafc',
+                    borderColor: hc ? '#475569' : '#cbd5e1', borderWidth: 1,
+                    color: hc ? '#f8fafc' : '#0f172a', marginBottom: 16
+                  }}
+                />
+
+                {role === 'teacher' && (
+                  <>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b', marginBottom: 4 }}>
+                      NIP
+                    </Text>
+                    <TextInput
+                      value={editNip}
+                      onChangeText={setEditNip}
+                      placeholder="Masukkan NIP"
+                      placeholderTextColor={hc ? '#64748b' : '#94a3b8'}
+                      keyboardType="numeric"
+                      style={{
+                        borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
+                        backgroundColor: hc ? '#334155' : '#f8fafc',
+                        borderColor: hc ? '#475569' : '#cbd5e1', borderWidth: 1,
+                        color: hc ? '#f8fafc' : '#0f172a', marginBottom: 16
+                      }}
+                    />
+                  </>
+                )}
+
+                <Text style={{ fontSize: 11, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b', marginBottom: 4 }}>
+                  ASAL SEKOLAH
+                </Text>
+                <TextInput
+                  value={editSchool}
+                  onChangeText={setEditSchool}
+                  placeholder="Misal: SLB Negeri 1 Jakarta"
+                  placeholderTextColor={hc ? '#64748b' : '#94a3b8'}
+                  style={{
+                    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
+                    backgroundColor: hc ? '#334155' : '#f8fafc',
+                    borderColor: hc ? '#475569' : '#cbd5e1', borderWidth: 1,
+                    color: hc ? '#f8fafc' : '#0f172a', marginBottom: 16
+                  }}
+                />
+
+                <Text style={{ fontSize: 11, fontWeight: '700', color: hc ? '#94a3b8' : '#64748b', marginBottom: 4 }}>
+                  FOTO PROFIL
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                  <View style={{
+                    width: 60, height: 60, borderRadius: 30, backgroundColor: hc ? '#334155' : '#e2e8f0',
+                    justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
+                    borderWidth: 1, borderColor: hc ? '#475569' : '#cbd5e1'
+                  }}>
+                    {editPhotoUri ? (
+                      <Image source={{ uri: editPhotoUri }} style={{ width: 60, height: 60 }} />
+                    ) : (
+                      <User size={24} color={hc ? '#94a3b8' : '#64748b'} />
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={pickPhoto}
+                    style={{
+                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+                      backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+                      borderWidth: 1, borderColor: hc ? '#1e40af' : '#bfdbfe'
+                    }}
+                  >
+                    <Text style={{ fontWeight: '700', fontSize: 13, color: hc ? '#93c5fd' : '#1d4ed8' }}>Pilih Foto</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+
+              <View style={{ padding: 20, borderTopWidth: 1, borderTopColor: hc ? '#334155' : '#e2e8f0', flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: hc ? '#334155' : '#f1f5f9', alignItems: 'center' }}
+                  onPress={() => setEditProfileModalVisible(false)}
+                >
+                  <Text style={{ fontWeight: '700', color: hc ? '#cbd5e1' : '#475569' }}>Batal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: savingProfile ? (hc ? '#475569' : '#94a3b8') : (hc ? '#1d4ed8' : '#1e3a8a'), alignItems: 'center' }}
+                  onPress={handleSaveProfile}
+                  disabled={savingProfile}
+                >
+                  <Text style={{ fontWeight: '800', color: '#ffffff' }}>{savingProfile ? 'Menyimpan...' : 'Simpan'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
     </SafeAreaView>
   );
 }

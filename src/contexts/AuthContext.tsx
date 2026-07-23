@@ -105,6 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Find teacher profile
         const profile = await getTeacherFullProfile(session.user.id);
         if (profile) {
+          const existingUserRaw = await AsyncStorage.getItem(USER_STORAGE_KEY);
+          const existingUser = existingUserRaw ? JSON.parse(existingUserRaw) : {};
+
           const syncedUser: User = {
             id: session.user.id,
             teacher_id: profile.teacher.id,
@@ -115,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             schoolId: profile.school?.id,
             nip: profile.teacher.nip || undefined,
             isVerified: profile.teacher.is_verified,
+            photoUri: profile.teacher.photo_url || existingUser.photoUri || undefined, // Mencegah photoUri terhapus saat direfresh, prioritas dari DB
           };
           await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(syncedUser));
           setUser(syncedUser);

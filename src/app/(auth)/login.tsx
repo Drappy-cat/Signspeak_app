@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image, ScrollView, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Headphones, Eye, EyeOff, ChevronDown, ArrowLeft } from 'lucide-react-native';
-import { useAuth } from '../../contexts/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth, STUDENT_CACHE_KEY } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
 import { supabase, db } from '../../services/supabase';
@@ -58,8 +59,25 @@ export default function LoginScreen() {
   }, [showModal, modalScale, modalOpacity]);
 
   const router = useRouter();
-  const { login, role } = useAuth();
+  const { login, role, user } = useAuth();
   const { settings } = useSettings();
+
+  useEffect(() => {
+    if (role === 'student') {
+      AsyncStorage.getItem(STUDENT_CACHE_KEY).then(res => {
+        if (res) {
+          try {
+            const parsed = JSON.parse(res);
+            if (parsed.name) setStudentName(parsed.name);
+            if (parsed.absen) setStudentAbsen(parsed.absen);
+          } catch (_) {}
+        } else if (user) {
+          if (user.name) setStudentName(user.name);
+          if (user.absen) setStudentAbsen(user.absen);
+        }
+      });
+    }
+  }, [role, user]);
 
   useEffect(() => {
     const handleBackPress = () => {
@@ -303,6 +321,25 @@ export default function LoginScreen() {
             {/* Conditional Form Fields */}
             {role === 'student' ? (
               <>
+                {/* Welcome Back Cached Student Banner */}
+                {studentName ? (
+                  <View style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+                    borderWidth: 1,
+                    borderColor: hc ? '#3b82f6' : '#bfdbfe',
+                    marginBottom: 8,
+                  }}>
+                    <Text style={{ fontSize: 13, fontWeight: '900', color: hc ? '#93c5fd' : '#1d4ed8' }}>
+                      👋 Selamat Datang Kembali, {studentName}! {studentAbsen ? `(No. Absen: ${studentAbsen})` : ''}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: hc ? '#cbd5e1' : '#475569', marginTop: 4, lineHeight: 18 }}>
+                      Identitas Anda tersimpan dari sesi sebelumnya. Silakan masukkan Kode Kelas Baru dari guru untuk bergabung.
+                    </Text>
+                  </View>
+                ) : null}
+
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{(d as any).loginClassCode || 'Kode Kelas'}</Text>
                   <TextInput

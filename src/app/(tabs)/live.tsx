@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -126,7 +126,7 @@ function HighlightText({
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveScreen() {
-  const { role, logout } = useAuth();
+  const { role, logout, clearStudentRoomCode } = useAuth();
   const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
@@ -235,8 +235,21 @@ export default function LiveScreen() {
   const d = DICT[appLang];
   const alertedRef = useRef(false);
 
+  const handleStudentRedirectPostSession = React.useCallback(async () => {
+    try {
+      await clearStudentRoomCode();
+    } catch (_) {}
+    router.replace('/(auth)/login');
+  }, [clearStudentRoomCode, router]);
+
   useEffect(() => {
-    if (role === 'student' && !session.isActive) {
+    if (role === 'student' && session.isSessionEnding && (session.sessionEndingCountdown ?? 0) <= 0) {
+      handleStudentRedirectPostSession();
+    }
+  }, [role, session.isSessionEnding, session.sessionEndingCountdown, handleStudentRedirectPostSession]);
+
+  useEffect(() => {
+    if (role === 'student' && !session.isActive && !session.isSessionEnding) {
       if (!alertedRef.current) {
         Alert.alert(
           appLang === 'en' ? 'Waiting for Teacher' : 'Menunggu Sesi Guru',
@@ -1222,6 +1235,81 @@ export default function LiveScreen() {
                 ⏸ PAUSE ({session.langPauseCountdown || 10}s)
               </Text>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 10-Second Session Ended Pop-Up Modal */}
+      <Modal
+        transparent
+        visible={Boolean(role === 'student' && (session.isSessionEnding || (session.sessionEndingCountdown && session.sessionEndingCountdown > 0)))}
+        animationType="fade"
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.85)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 340,
+            backgroundColor: hc ? '#1e293b' : '#ffffff',
+            borderRadius: 24,
+            padding: 24,
+            alignItems: 'center',
+            ...getCardShadow(hc, 'lg'),
+          }}>
+            <View style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: hc ? '#7f1d1d' : '#fee2e2',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+            }}>
+              <CheckCircle2 size={32} color={hc ? '#fca5a5' : '#dc2626'} />
+            </View>
+
+            <Text style={{ fontSize: 18, fontWeight: '900', color: textColor, textAlign: 'center', marginBottom: 6 }}>
+              {appLang === 'en' ? 'Class Session Ended' : 'Sesi Kelas Berakhir'}
+            </Text>
+
+            <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', lineHeight: 20, marginVertical: 8 }}>
+              {session.sessionEndingMessage || (appLang === 'en' ? 'Session ended by teacher.' : 'Sesi telah diakhiri oleh guru.')}
+            </Text>
+            
+            <Text style={{ fontSize: 12, color: hc ? '#94a3b8' : '#64748b', textAlign: 'center', fontStyle: 'italic', marginBottom: 12 }}>
+              Profil & identitas Anda tetap tersimpan. Mengalihkan ke Halaman Masuk Kode Baru dalam {session.sessionEndingCountdown || 10} detik...
+            </Text>
+
+            {/* Live 10s Countdown Badge */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: '#ef4444',
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 20,
+              marginBottom: 16,
+            }}>
+              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, letterSpacing: 0.5 }}>
+                ⏸ MENGALIHKAN ({session.sessionEndingCountdown || 10}s)
+              </Text>
+            </View>
+
+            {/* Direct Button */}
+            <TouchableOpacity
+              onPress={handleStudentRedirectPostSession}
+              style={{
+                width: '100%',
+                paddingVertical: 14,
+                borderRadius: 14,
+                backgroundColor: '#1d4ed8',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+                Masuk Kode Baru Sekarang
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

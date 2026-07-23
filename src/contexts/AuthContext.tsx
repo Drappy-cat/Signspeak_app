@@ -43,6 +43,7 @@ interface AuthContextType {
   login: (email: string, password?: string, roomCode?: string, targetRole?: Role, name?: string, className?: string, absen?: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  clearStudentRoomCode: () => Promise<void>;
   setRole: (role: Role) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   register: (name: string, email: string, password?: string) => Promise<{ id: string; email: string }>;
@@ -58,6 +59,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const USER_STORAGE_KEY = '@lentera/user';
 const ONBOARDING_STORAGE_KEY = '@lentera/onboarded';
+export const STUDENT_CACHE_KEY = '@lentera/student_cache';
 const ROLE_STORAGE_KEY = '@lentera/role';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -167,6 +169,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         absen: absen || '0',
       };
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
+      await AsyncStorage.setItem(STUDENT_CACHE_KEY, JSON.stringify({
+        name: mockUser.name,
+        absen: mockUser.absen,
+        className: mockUser.className,
+      }));
       setUser(mockUser);
       return;
     }
@@ -322,6 +329,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearStudentRoomCode = async () => {
+    if (user && user.role === 'student') {
+      const updatedUser: User = { ...user, joinedRoomCode: undefined };
+      setUser(updatedUser);
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+    }
+  };
+
   const updatePassword = async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw new Error(error.message);
@@ -331,7 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user, role, isReady, hasOnboarded, needsProfileCompletion,
-        login, loginWithGoogle, logout, setRole, completeOnboarding,
+        login, loginWithGoogle, logout, clearStudentRoomCode, setRole, completeOnboarding,
         register, resetPassword, verifyRecoveryOtp, updatePassword, completeProfile, refreshUser
       }}
     >

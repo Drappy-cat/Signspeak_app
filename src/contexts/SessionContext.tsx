@@ -53,6 +53,9 @@ export interface ActiveSession {
   langSwitchFrom?: string;
   langSwitchTo?: string;
   langSwitchLabel?: string;
+  isSessionEnding?: boolean;
+  sessionEndingCountdown?: number;
+  sessionEndingMessage?: string;
 }
 
 interface SessionContextType {
@@ -89,6 +92,9 @@ const defaultSession: ActiveSession = {
   langSwitchFrom: 'id',
   langSwitchTo: 'id',
   langSwitchLabel: '',
+  isSessionEnding: false,
+  sessionEndingCountdown: 0,
+  sessionEndingMessage: '',
 };
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -256,6 +262,44 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }, 1000);
   }, []);
 
+  const endingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const triggerSessionEnding = useCallback((countdownSec: number = 10, msgStr: string = 'Sesi telah diakhiri oleh guru.') => {
+    if (endingTimerRef.current) {
+      clearInterval(endingTimerRef.current);
+      endingTimerRef.current = null;
+    }
+
+    setSession(prev => ({
+      ...prev,
+      isSessionEnding: true,
+      sessionEndingCountdown: countdownSec,
+      sessionEndingMessage: msgStr,
+    }));
+
+    let count = countdownSec;
+    endingTimerRef.current = setInterval(() => {
+      count -= 1;
+      if (count <= 0) {
+        if (endingTimerRef.current) {
+          clearInterval(endingTimerRef.current);
+          endingTimerRef.current = null;
+        }
+        setSession(prev => ({
+          ...prev,
+          isActive: false,
+          isSessionEnding: false,
+          sessionEndingCountdown: 0,
+        }));
+      } else {
+        setSession(prev => ({
+          ...prev,
+          sessionEndingCountdown: count,
+        }));
+      }
+    }, 1000);
+  }, []);
+
   // Initialize Web Speech Engine once
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -392,7 +436,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           (payload) => {
             const updated = payload.new;
             if (!updated.is_active) {
-              setSession(prev => ({ ...prev, isActive: false, errorMessage: 'Sesi telah diakhiri oleh guru.' }));
+              triggerSessionEnding(10, 'Sesi telah diakhiri oleh guru.');
             }
           }
         )
@@ -414,8 +458,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         .on(
           'broadcast',
           { event: 'end_session' },
-          () => {
-            setSession(prev => ({ ...prev, isActive: false, errorMessage: 'Sesi telah diakhiri oleh guru.' }));
+          (payload) => {
+            const cd = payload.payload?.countdown || 10;
+            const msg = payload.payload?.message || 'Sesi telah diakhiri oleh guru.';
+            triggerSessionEnding(cd, msg);
           }
         )
         .on(

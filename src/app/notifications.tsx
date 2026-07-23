@@ -7,6 +7,7 @@ import { getCardShadow } from '../utils/formatters';
 import { ArrowLeft, Bell, Trash2, Mic, Users, BookOpen, ChevronRight, Check } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { getNotifications, saveNotifications, clearAllNotifications, AppNotification } from '../services/notificationService';
+import * as Haptics from 'expo-haptics';
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -104,6 +105,20 @@ export default function NotificationsScreen() {
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
 
+  const handleMarkAllRead = async () => {
+    if (notifications.every(n => n.read)) return;
+    const updated = notifications.map(n => ({ ...n, read: true }));
+    setNotifications(updated);
+    await saveNotifications(updated);
+    if (settings.vibrate) {
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (_) {}
+    }
+  };
+
+  const hasUnread = notifications.some(n => !n.read);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
       {/* Header */}
@@ -143,21 +158,44 @@ export default function NotificationsScreen() {
         </View>
 
         {notifications.length > 0 && (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleClearAll}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: cardBg,
-              alignItems: 'center',
-              justifyContent: 'center',
-              ...getCardShadow(hc, 'sm'),
-            }}
-          >
-            <Trash2 size={18} color={hc ? '#f87171' : '#dc2626'} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {hasUnread && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleMarkAllRead}
+                style={{
+                  height: 40,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor: cardBg,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  ...getCardShadow(hc, 'sm'),
+                }}
+              >
+                <Check size={16} color={hc ? '#60a5fa' : '#1d4ed8'} />
+                <Text style={{ fontSize: 12, fontWeight: '800', color: hc ? '#60a5fa' : '#1d4ed8' }}>
+                  {appLang === 'en' ? 'Mark Read' : 'Tandai Dibaca'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleClearAll}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: cardBg,
+                alignItems: 'center',
+                justifyContent: 'center',
+                ...getCardShadow(hc, 'sm'),
+              }}
+            >
+              <Trash2 size={18} color={hc ? '#f87171' : '#dc2626'} />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 

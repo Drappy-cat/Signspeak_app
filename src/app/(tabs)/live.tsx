@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3 } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -178,6 +178,25 @@ export default function LiveScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
   const [studentQuestion, setStudentQuestion] = useState('');
+  const [copiedLiveText, setCopiedLiveText] = useState(false);
+
+  const handleCopyLiveTranscript = async () => {
+    const textToCopy = (session.transcript + ' ' + session.interimTranscript).trim();
+    if (!textToCopy) return;
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(textToCopy);
+      } else {
+        const { Share } = require('react-native');
+        await Share.share({ message: textToCopy });
+      }
+      setCopiedLiveText(true);
+      if (settings.vibrate) {
+        try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
+      }
+      setTimeout(() => setCopiedLiveText(false), 2000);
+    } catch (_) {}
+  };
   const scrollViewRef = useRef<ScrollView>(null);
   const pulseAnim = React.useMemo(() => new RNAnimated.Value(1), []);
 
@@ -331,6 +350,16 @@ export default function LiveScreen() {
 
             {/* Accessibility Buttons */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Copy Live Text Button */}
+              {((session.transcript || '') + (session.interimTranscript || '')).trim().length > 0 && (
+                <TouchableOpacity
+                  onPress={handleCopyLiveTranscript}
+                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: copiedLiveText ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#334155' : '#e2e8f0'), alignItems: 'center', justifyContent: 'center' }}
+                >
+                  {copiedLiveText ? <Check size={16} color={hc ? '#34d399' : '#059669'} /> : <Copy size={15} color={textColor} />}
+                </TouchableOpacity>
+              )}
+              
               {/* Size Button */}
               <TouchableOpacity
                 onPress={() => {

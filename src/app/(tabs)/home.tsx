@@ -153,6 +153,7 @@ export default function HomeScreen() {
 
   const openAddClassModal = async () => {
     setAddClassModalVisible(true);
+    setNewClassNameInput('');
     try {
       let grades: Grade[] = [];
       if (user?.schoolId) {

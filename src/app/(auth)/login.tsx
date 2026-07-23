@@ -185,23 +185,24 @@ export default function LoginScreen() {
         setShowModal(true);
         return;
       }
-    }
-    try {
-      await login(email.trim(), pass, undefined, 'teacher');
-      setLoading(false);
-      router.replace('/(tabs)/home');
-    } catch (e: any) {
-      setLoading(false);
-      const errMsg = e.message?.toLowerCase() || '';
-      setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
-      if (errMsg.includes('invalid login credentials')) {
-        setModalMsg(appLang === 'en' 
-          ? 'Account unrecognized or incorrect password. Please register as a teacher first.' 
-          : 'Akun tidak dikenali atau sandi salah. Silakan mendaftar sebagai guru terlebih dahulu.');
-      } else {
-        setModalMsg(e.message || (appLang === 'en' ? 'Login failed' : 'Masuk gagal'));
+      setLoading(true);
+      try {
+        await login(email.trim(), pass, undefined, 'teacher');
+        setLoading(false);
+        router.replace('/(tabs)/home');
+      } catch (e: any) {
+        setLoading(false);
+        const errMsg = e.message?.toLowerCase() || '';
+        setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
+        if (errMsg.includes('invalid login credentials')) {
+          setModalMsg(appLang === 'en' 
+            ? 'Account unrecognized or incorrect password. Please register as a teacher first.' 
+            : 'Akun tidak dikenali atau sandi salah. Silakan mendaftar sebagai guru terlebih dahulu.');
+        } else {
+          setModalMsg(e.message || (appLang === 'en' ? 'Login failed' : 'Masuk gagal'));
+        }
+        setShowModal(true);
       }
-      setShowModal(true);
     }
   };
   

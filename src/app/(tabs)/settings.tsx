@@ -11,8 +11,15 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Animated, Easing } from 'react-native';
 import { checkIsAdmin } from '../../services/adminService';
 
+import * as Haptics from 'expo-haptics';
+
 function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => void; hc: boolean }) {
   const anim = React.useMemo(() => new Animated.Value(val ? 22 : 2), []);
+
+  const handleToggle = async () => {
+    try { await Haptics.selectionAsync(); } catch (_) {}
+    onChange();
+  };
 
   React.useEffect(() => {
     Animated.timing(anim, {
@@ -26,7 +33,7 @@ function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => voi
   return (
     <TouchableOpacity
       activeOpacity={1}
-      onPress={onChange}
+      onPress={handleToggle}
       style={{
         width: 48, height: 28, borderRadius: 14, justifyContent: 'center',
         backgroundColor: val ? '#1d4ed8' : hc ? '#475569' : '#cbd5e1',

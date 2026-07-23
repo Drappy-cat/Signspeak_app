@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, SafeAreaView, Platform, StatusBar as RNStatusBar, Modal, Share } from 'react-native';
-import { Search, BookOpen, Clock, HelpCircle, X } from 'lucide-react-native';
+import { Search, BookOpen, Clock, HelpCircle, X, Copy, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -339,6 +339,24 @@ export default function HistoryScreen() {
     }
   };
 
+  const [copiedSessionId, setCopiedSessionId] = React.useState<number | string | null>(null);
+
+  const handleCopyTranscript = async (session: SessionRecord) => {
+    try {
+      const textToCopy = `Transkrip ${session.subject} (${session.className}):\n"${session.transcriptFull || session.excerpt}"`;
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(textToCopy);
+      } else {
+        await Share.share({ message: textToCopy });
+      }
+      setCopiedSessionId(session.id);
+      if (settings.vibrate) {
+        try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
+      }
+      setTimeout(() => setCopiedSessionId(null), 2500);
+    } catch (_) {}
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
       {/* Header */}
@@ -354,6 +372,11 @@ export default function HistoryScreen() {
             onChangeText={setSearchQuery}
             style={{ flex: 1, fontSize: 14, fontWeight: '500', color: textColor, padding: 0 }}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <X size={15} color={mutedColor} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Modern Time Filter Bar */}
@@ -581,25 +604,55 @@ export default function HistoryScreen() {
                   })()}
                 </View>
 
-                {/* Actions Button */}
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => handleShare(selectedSession)}
-                  style={{
-                    backgroundColor: '#1e3a8a',
-                    paddingVertical: 14,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    marginBottom: 24,
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    gap: 8
-                  }}
-                >
-                  <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
-                    {appLang === 'en' ? 'Share Transcript' : 'Bagikan Kelas (WhatsApp)'}
-                  </Text>
-                </TouchableOpacity>
+                {/* Actions Buttons Row */}
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleCopyTranscript(selectedSession)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: hc ? '#1e293b' : '#ffffff',
+                      borderWidth: 1,
+                      borderColor: hc ? '#334155' : '#cbd5e1',
+                      paddingVertical: 14,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    {copiedSessionId === selectedSession.id ? (
+                      <Check size={16} color={hc ? '#34d399' : '#059669'} />
+                    ) : (
+                      <Copy size={16} color={textColor} />
+                    )}
+                    <Text style={{ color: copiedSessionId === selectedSession.id ? (hc ? '#34d399' : '#059669') : textColor, fontWeight: '800', fontSize: 13 }}>
+                      {copiedSessionId === selectedSession.id
+                        ? (appLang === 'en' ? 'Copied!' : 'Tersalin!')
+                        : (appLang === 'en' ? 'Copy Text' : 'Salin Transkrip')}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleShare(selectedSession)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#1e3a8a',
+                      paddingVertical: 14,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 8
+                    }}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13 }}>
+                      {appLang === 'en' ? 'Share WhatsApp' : 'Bagikan WhatsApp'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </View>

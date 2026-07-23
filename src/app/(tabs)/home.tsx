@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import { saveProfilePhotoLocally, uploadProfilePhoto } from '../../services/storageService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -81,9 +83,9 @@ function PulseDot() {
 }
 
 export default function HomeScreen() {
-  const { role, user } = useAuth();
-  const { startSession } = useSession();
-  const { settings } = useSettings();
+  const { role, user, logout, refreshUser } = useAuth();
+  const { session, startSession } = useSession();
+  const { settings, updateSettings } = useSettings();
   const router = useRouter();
   
   const hc = settings.highContrast;
@@ -109,6 +111,17 @@ export default function HomeScreen() {
   const mutedColorVal = hc ? '#94a3b8' : '#64748b';
 
   const [selectedLang, setSelectedLang] = React.useState(settings.language || 'id');
+
+  React.useEffect(() => {
+    if (settings.language) {
+      setSelectedLang(settings.language);
+    }
+  }, [settings.language]);
+
+  const handleSelectLang = (code: string) => {
+    setSelectedLang(code);
+    updateSettings({ language: code });
+  };
   const [startModalVisible, setStartModalVisible] = React.useState(false);
   const [teacherClasses, setTeacherClasses] = React.useState<ClassWithDetails[]>([]);
   const [teacherSubjects, setTeacherSubjects] = React.useState<Subject[]>([]);
@@ -253,6 +266,68 @@ export default function HomeScreen() {
     }
   }, [customGlossaryList, user?.teacher_id, isGlossaryLoaded]);
 
+  const pickPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setEditPhotoUri(result.assets[0].uri);
+    }
+  };
+
+  const handleOpenEditProfile = () => {
+    setEditName(user?.name || '');
+    setEditSchool(user?.school || '');
+    setEditNip(user?.nip || '');
+    setEditClassName(user?.className || '');
+    setEditPhotoUri(user?.photoUri || null);
+    setProfileDropdownVisible(false);
+    setEditProfileModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) return;
+    setSavingProfile(true);
+    try {
+      let finalPhotoUri = editPhotoUri || undefined;
+      if (editPhotoUri && editPhotoUri !== user?.photoUri && !editPhotoUri.startsWith('http')) {
+        const localPath = await saveProfilePhotoLocally(editPhotoUri, `profile-${Date.now()}`);
+        finalPhotoUri = await uploadProfilePhoto(localPath, `profile-${Date.now()}`);
+      }
+
+      if (role === 'teacher' && user?.teacher_id) {
+        await updateTeacherProfile(user.teacher_id, {
+          full_name: editName.trim(),
+          nip: editNip.trim() || undefined,
+        });
+      }
+
+      // Update local user storage
+      const stored = await AsyncStorage.getItem('@lentera/user');
+      const currentUser = stored ? JSON.parse(stored) : {};
+      const updatedUser = {
+        ...currentUser,
+        name: editName.trim(),
+        school: editSchool.trim() || currentUser.school,
+        nip: role === 'teacher' ? editNip.trim() : currentUser.nip,
+        className: role === 'student' ? editClassName.trim() : currentUser.className,
+        photoUri: finalPhotoUri || currentUser.photoUri,
+      };
+      await AsyncStorage.setItem('@lentera/user', JSON.stringify(updatedUser));
+      await refreshUser();
+
+      setEditProfileModalVisible(false);
+    } catch (e) {
+      console.error('Failed to update profile:', e);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   const renderStudentHome = () => (
     <View className="pb-10">
       {/* Header */}
@@ -260,7 +335,7 @@ export default function HomeScreen() {
         <View style={{ flex: 1, marginRight: 16 }}>
           <Text className={`text-xs font-bold ${muted}`}>{getGreeting(appLang)}</Text>
           <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>
-            {user?.name || 'Budi Santoso'}
+            {user?.name || (appLang === 'en' ? 'Student' : 'Siswa LENTERA')}
           </Text>
           {(user?.className || user?.school) && (
             <Text className={`text-xs ${muted} mt-0.5`} numberOfLines={1}>
@@ -268,19 +343,40 @@ export default function HomeScreen() {
             </Text>
           )}
         </View>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => router.push('/notifications')}
-          style={{
-            width: 40, height: 40, borderRadius: 20,
-            backgroundColor: bellBg,
-            alignItems: 'center', justifyContent: 'center',
-            shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
-          }}
-        >
-          <Bell size={17} color={hc ? "#94a3b8" : "#64748b"} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/notifications')}
+            style={{
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: bellBg,
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+            }}
+          >
+            <Bell size={17} color={hc ? "#94a3b8" : "#64748b"} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setProfileDropdownVisible(true)}
+            style={{
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+              borderWidth: 1, borderColor: hc ? '#3b82f6' : '#bfdbfe',
+              overflow: 'hidden',
+            }}
+          >
+            {user?.photoUri ? (
+              <Image source={{ uri: user.photoUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+            ) : (
+              <User size={18} color={hc ? "#93c5fd" : "#1d4ed8"} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Active session card */}
@@ -302,8 +398,12 @@ export default function HomeScreen() {
                 <PulseDot />
                 <Text style={{ color: '#fca5a5', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' }}>{d.activeSession}</Text>
               </View>
-              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 18, lineHeight: 24 }}>Biologi — XII IPA 3</Text>
-              <Text style={{ color: '#93c5fd', fontSize: 14, marginTop: 4 }}>Bu Sari Dewi • {appLang === 'en' ? 'In progress' : 'Sedang berlangsung'}</Text>
+              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 18, lineHeight: 24 }}>
+                {session.isActive ? (session.subject || 'Sesi Pembelajaran') : (user?.className || 'Sesi Kelas')}
+              </Text>
+              <Text style={{ color: '#93c5fd', fontSize: 14, marginTop: 4 }}>
+                {session.isActive ? `${session.teacherName || 'Guru'} • ${appLang === 'en' ? 'In progress' : 'Sedang berlangsung'}` : (user?.school || 'Aplikasi LENTERA')}
+              </Text>
               <View style={{
                 marginTop: 16, alignSelf: 'flex-start',
                 flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -368,7 +468,7 @@ export default function HomeScreen() {
         <View style={{ flex: 1, marginRight: 16 }}>
           <Text className={`text-xs font-bold ${muted}`}>{getGreeting(appLang)}</Text>
           <Text style={{ fontSize: 20, fontWeight: '900', marginTop: 2, color: hc ? '#f8fafc' : '#0f172a' }}>
-            {user?.name || 'Bu Sari Dewi'}
+            {user?.name || (appLang === 'en' ? 'Teacher' : 'Guru LENTERA')}
           </Text>
           {user?.school && (
             <Text className={`text-xs ${muted} mt-0.5`} numberOfLines={1}>
@@ -376,19 +476,40 @@ export default function HomeScreen() {
             </Text>
           )}
         </View>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => router.push('/notifications')}
-          style={{
-            width: 40, height: 40, borderRadius: 20,
-            backgroundColor: bellBg,
-            alignItems: 'center', justifyContent: 'center',
-            shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
-          }}
-        >
-          <Bell size={17} color={hc ? "#94a3b8" : "#64748b"} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/notifications')}
+            style={{
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: bellBg,
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+            }}
+          >
+            <Bell size={17} color={hc ? "#94a3b8" : "#64748b"} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setProfileDropdownVisible(true)}
+            style={{
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: hc ? '#1e3a8a' : '#dbeafe',
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+              borderWidth: 1, borderColor: hc ? '#3b82f6' : '#bfdbfe',
+              overflow: 'hidden',
+            }}
+          >
+            {user?.photoUri ? (
+              <Image source={{ uri: user.photoUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+            ) : (
+              <User size={18} color={hc ? "#93c5fd" : "#1d4ed8"} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Language Selector */}
@@ -403,7 +524,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={code}
                 activeOpacity={0.7}
-                onPress={() => setSelectedLang(code)}
+                onPress={() => handleSelectLang(code)}
                 style={{
                   flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
                   backgroundColor: selectedLang === code ? '#1e3a8a' : hc ? '#334155' : '#f1f5f9',
@@ -428,7 +549,6 @@ export default function HomeScreen() {
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => {
-            setCustomGlossaryList([]);
             setStartModalVisible(true);
           }}
         >
@@ -470,32 +590,50 @@ export default function HomeScreen() {
               {appLang === 'en' ? 'No classes registered yet.' : 'Belum ada kelas yang didaftarkan.'}
             </Text>
           ) : teacherClasses.map((cls, i) => (
-            <TouchableOpacity 
+            <View 
               key={cls.id || i} 
-              activeOpacity={0.7}
-              onPress={() => {
-                setSelectedClassId(cls.id);
-                setStartModalVisible(true);
-              }}
               style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }, cardStyle]}
             >
-              <View style={{
-                width: 40, height: 40, borderRadius: 10,
-                backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
-                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <GraduationCap size={17} color={hc ? "#93c5fd" : "#1d4ed8"} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>
-                  {cls.grade?.grade_name ? `Kelas ${cls.grade.grade_name} ${cls.class_name}` : cls.class_name}
-                </Text>
-                <Text className={`text-xs ${muted} mt-0.5`}>
-                  {cls.school?.school_name || (appLang === 'en' ? 'No school info' : 'Tanpa info sekolah')}
-                </Text>
-              </View>
-              <ChevronRight size={16} color={hc ? "#64748b" : "#94a3b8"} />
-            </TouchableOpacity>
+              <TouchableOpacity 
+                activeOpacity={0.7}
+                onPress={() => {
+                  setSelectedClassId(cls.id);
+                  setStartModalVisible(true);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}
+              >
+                <View style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <GraduationCap size={17} color={hc ? "#93c5fd" : "#1d4ed8"} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>
+                    {cls.grade?.grade_name ? `Kelas ${cls.grade.grade_name} ${cls.class_name}` : cls.class_name}
+                  </Text>
+                  <Text className={`text-xs ${muted} mt-0.5`}>
+                    {cls.school?.school_name || (appLang === 'en' ? 'No school info' : 'Tanpa info sekolah')}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!user?.teacher_id) return;
+                  try {
+                    await removeTeacherFromClass(user.teacher_id, cls.id);
+                    const updated = await getTeacherClasses(user.teacher_id);
+                    setTeacherClasses(updated);
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                style={{ padding: 6, marginLeft: 4 }}
+              >
+                <Trash2 size={16} color={hc ? '#ef4444' : '#dc2626'} />
+              </TouchableOpacity>
+            </View>
           ))}
         </View>
       </View>
@@ -701,6 +839,40 @@ export default function HomeScreen() {
                         color: isSelected ? '#ffffff' : hc ? '#e2e8f0' : '#475569',
                       }}>
                         {cls.class_name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Language Selection */}
+              <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#94a3b8' : '#475569', marginBottom: 8 }}>
+                {appLang === 'en' ? 'Select Language' : 'Pilih Bahasa Transkripsi'}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                {Object.entries(LANGUAGE_LABELS).map(([code, label]) => {
+                  const isSelected = selectedLang === code;
+                  return (
+                    <TouchableOpacity
+                      key={code}
+                      activeOpacity={0.8}
+                      onPress={() => handleSelectLang(code)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        backgroundColor: isSelected ? '#1e40af' : hc ? '#334155' : '#f1f5f9',
+                        borderWidth: 1,
+                        borderColor: isSelected ? '#1e3a8a' : hc ? '#475569' : '#e2e8f0',
+                      }}
+                    >
+                      <Text style={{
+                        fontSize: 13,
+                        fontWeight: isSelected ? '800' : '600',
+                        color: isSelected ? '#ffffff' : hc ? '#e2e8f0' : '#475569',
+                      }}>
+                        {label}
                       </Text>
                     </TouchableOpacity>
                   );

@@ -91,8 +91,8 @@ export default function SettingsScreen() {
     : { backgroundColor: '#f1f5f9' };
 
   const handleLogout = async () => {
-    await logout();
     router.replace('/(auth)/role-select');
+    await logout();
   };
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;

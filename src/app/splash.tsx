@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function SplashScreen() {
   const router = useRouter();
   const { isReady, hasOnboarded, user, needsProfileCompletion } = useAuth();
+  const [minTimePassed, setMinTimePassed] = useState(false);
 
   // Animation values
   const logoScale = useRef(new Animated.Value(0.7)).current;
@@ -200,22 +201,32 @@ export default function SplashScreen() {
       ])
     ).start();
 
-    // 2. Auto-redirection timer
+    // 2. Minimum display time flag
     const timer = setTimeout(() => {
-      if (!isReady) return;
-      if (!hasOnboarded) {
-        router.replace('/onboarding');
-      } else if (!user) {
-        router.replace('/(auth)/role-select');
-      } else if (needsProfileCompletion) {
-        router.replace('/(auth)/complete-profile' as any);
+      setMinTimePassed(true);
+    }, 2200);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 3. Perform redirection once both minimum splash animation time has passed and AuthContext is ready
+  useEffect(() => {
+    if (!minTimePassed || !isReady) return;
+
+    if (!hasOnboarded) {
+      router.replace('/onboarding');
+    } else if (!user) {
+      router.replace('/(auth)/role-select');
+    } else if (needsProfileCompletion) {
+      router.replace('/(auth)/complete-profile' as any);
+    } else {
+      if (user.role === 'student') {
+        router.replace('/(tabs)/live');
       } else {
         router.replace('/(tabs)/home');
       }
-    }, 2800);
-
-    return () => clearTimeout(timer);
-  }, [isReady, hasOnboarded, user, needsProfileCompletion]);
+    }
+  }, [minTimePassed, isReady, hasOnboarded, user, needsProfileCompletion]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#030712', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>

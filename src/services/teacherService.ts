@@ -35,7 +35,47 @@ export async function getTeacherByAuthId(authUserId: string): Promise<Teacher | 
   return data as Teacher | null;
 }
 
-/** Get full teacher profile with school, classes, and subjects */
+/** Get full teacher profile with school, classes, and subjects by teacherId */
+export async function getTeacherProfile(teacherId: string): Promise<TeacherProfile | null> {
+  const { data: teacherData, error: teacherError } = await db
+    .from('teachers')
+    .select('*, school:schools(*)')
+    .eq('id', teacherId)
+    .single();
+
+  if (teacherError && teacherError.code !== 'PGRST116') throw teacherError;
+  if (!teacherData) return null;
+
+  const teacher = teacherData as any;
+
+  const { data: classesData } = await db
+    .from('teacher_classes')
+    .select('*, class:classes(*, grade:grades(*), school:schools(*))')
+    .eq('teacher_id', teacher.id);
+
+  const { data: subjectsData } = await db
+    .from('teacher_subjects')
+    .select('*, subject:subjects(*)')
+    .eq('teacher_id', teacher.id);
+
+  return {
+    teacher: {
+      id: teacher.id,
+      auth_user_id: teacher.auth_user_id,
+      school_id: teacher.school_id,
+      full_name: teacher.full_name,
+      email: teacher.email,
+      nip: teacher.nip,
+      is_verified: teacher.is_verified,
+      created_at: teacher.created_at,
+    },
+    school: teacher.school,
+    classes: (classesData ?? []).map((tc: any) => tc.class).filter(Boolean) as ClassWithDetails[],
+    subjects: (subjectsData ?? []).map((ts: any) => ts.subject).filter(Boolean) as Subject[],
+  };
+}
+
+/** Get full teacher profile with school, classes, and subjects by authUserId */
 export async function getTeacherFullProfile(authUserId: string): Promise<TeacherProfile | null> {
   // 1. Get teacher + school
   const { data: teacherData, error: teacherError } = await db

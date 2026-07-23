@@ -36,49 +36,53 @@ export const initDb = async () => {
   }
 
   if (!db) {
-    db = await SQLite.openDatabaseAsync('lentera.db');
-    await db.execAsync(`
-      PRAGMA journal_mode = WAL;
-      CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subject TEXT,
-        className TEXT,
-        teacherName TEXT,
-        date TEXT,
-        duration INTEGER,
-        wordCount INTEGER,
-        language TEXT,
-        excerpt TEXT,
-        transcriptFull TEXT
-      );
-    `);
-    
-    const countResult = await db.getAllAsync<{ 'COUNT(*)': number }>('SELECT COUNT(*) FROM sessions');
-    const count = countResult[0]['COUNT(*)'];
-    
-    if (count === 0) {
-      console.log('Seeding demo history data...');
-      const statement = await db.prepareAsync(
-        'INSERT INTO sessions (subject, className, teacherName, date, duration, wordCount, language, excerpt, transcriptFull) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)'
-      );
+    try {
+      db = await SQLite.openDatabaseAsync('lentera.db');
+      await db.execAsync(`
+        PRAGMA journal_mode = WAL;
+        CREATE TABLE IF NOT EXISTS sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          subject TEXT,
+          className TEXT,
+          teacherName TEXT,
+          date TEXT,
+          duration INTEGER,
+          wordCount INTEGER,
+          language TEXT,
+          excerpt TEXT,
+          transcriptFull TEXT
+        );
+      `);
       
-      try {
-        for (const demo of DEMO_HISTORY) {
-          await statement.executeAsync([
-            demo.subject,
-            demo.className,
-            demo.teacherName,
-            demo.date,
-            demo.duration,
-            demo.wordCount,
-            demo.language,
-            demo.excerpt,
-            demo.excerpt
-          ]);
+      const countResult = await db.getAllAsync<any>('SELECT COUNT(*) as count FROM sessions');
+      const count = (countResult && countResult[0]) ? (countResult[0].count ?? countResult[0]['COUNT(*)'] ?? 0) : 0;
+      
+      if (count === 0) {
+        console.log('Seeding demo history data...');
+        const statement = await db.prepareAsync(
+          'INSERT INTO sessions (subject, className, teacherName, date, duration, wordCount, language, excerpt, transcriptFull) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)'
+        );
+        
+        try {
+          for (const demo of DEMO_HISTORY) {
+            await statement.executeAsync([
+              demo.subject,
+              demo.className,
+              demo.teacherName,
+              demo.date,
+              demo.duration,
+              demo.wordCount,
+              demo.language,
+              demo.excerpt,
+              demo.excerpt
+            ]);
+          }
+        } finally {
+          await statement.finalizeAsync();
         }
-      } finally {
-        await statement.finalizeAsync();
       }
+    } catch (e) {
+      console.error('[SQLite] Error initializing database:', e);
     }
   }
   return db;

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { saveSession } from '../services/db';
+import { addNotification } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
 import { Platform } from 'react-native';
@@ -54,6 +55,7 @@ interface SessionContextType {
   startSession: (roomCode: string, subject: string, language: string, classId: string, subjectId: string, customGlossaryList?: Array<{ word: string; definition: string }>) => Promise<void>;
   endSession: () => Promise<void>;
   updateLanguage: (language: string) => void;
+  updateTranscript: (newTranscript: string) => Promise<void>;
   pauseRecording: () => Promise<void>;
   resumeRecording: () => Promise<void>;
   isRecording: boolean;
@@ -255,31 +257,53 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const roomCode = user.joinedRoomCode;
       
       const fetchInitial = async () => {
-        const { data } = await db.from('live_sessions')
-          .select('*, teacher:teachers(full_name, nip, school:schools(school_name)), subject_rel:subjects(subject_name)')
-          .eq('room_code', roomCode)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (data) {
-          const teacherObj: any = data.teacher;
-          setSession({
-            isActive: true,
-            roomCode: data.room_code,
-            subject: data.subject_rel?.subject_name || 'Sesi Pembelajaran', 
-            teacherName: teacherObj?.full_name || 'Guru Pengampu',
-            teacherNip: teacherObj?.nip || null,
-            teacherSchool: teacherObj?.school?.school_name || null,
-            subjectId: data.subject_id,
-            classId: data.class_id,
-            language: data.language || 'id',
-            transcript: data.transcript || '',
-            interimTranscript: data.interim_transcript || '',
-            errorMessage: null,
-            startTime: new Date(data.started_at).getTime(),
-            participants: [],
-            customKeywords: [],
-            customGlossary: {},
-          });
+        try {
+          const { data } = await db.from('live_sessions')
+            .select('*, teacher:teachers(full_name, nip, school:schools(school_name)), subject_rel:subjects(subject_name)')
+            .eq('room_code', roomCode)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (data) {
+            const teacherObj: any = data.teacher;
+            let resolvedTeacherName = teacherObj?.full_name || data.teacher_name;
+            let resolvedSchool = teacherObj?.school?.school_name || data.teacher_school;
+            let resolvedNip = teacherObj?.nip;
+
+            // Direct fallback lookup if relation returned null
+            if (!resolvedTeacherName && data.teacher_id) {
+              const { data: directTeacher } = await db.from('teachers')
+                .select('full_name, nip, school:schools(school_name)')
+                .eq('id', data.teacher_id)
+                .maybeSingle();
+              if (directTeacher) {
+                resolvedTeacherName = directTeacher.full_name;
+                resolvedNip = directTeacher.nip;
+                resolvedSchool = (directTeacher.school as any)?.school_name || resolvedSchool;
+              }
+            }
+
+            setSession({
+              isActive: true,
+              roomCode: data.room_code,
+              subject: data.subject_rel?.subject_name || 'Sesi Pembelajaran', 
+              teacherName: resolvedTeacherName || 'Guru Pengampu',
+              teacherNip: resolvedNip || null,
+              teacherSchool: resolvedSchool || null,
+              subjectId: data.subject_id,
+              classId: data.class_id,
+              language: data.language || 'id',
+              transcript: data.transcript || '',
+              interimTranscript: data.interim_transcript || '',
+              errorMessage: null,
+              startTime: new Date(data.started_at).getTime(),
+              participants: [],
+              customKeywords: [],
+              customGlossary: {},
+            });
+          }
+        } catch (err) {
+          console.warn('Failed fetchInitial for session:', err);
         }
       };
       fetchInitial();
@@ -305,6 +329,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               ...prev,
               transcript: data.transcript,
               interimTranscript: data.interimTranscript,
+              teacherName: data.teacherName || prev.teacherName,
+              teacherSchool: data.teacherSchool || prev.teacherSchool,
             }));
           }
         )
@@ -313,6 +339,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           { event: 'end_session' },
           () => {
             setSession(prev => ({ ...prev, isActive: false, errorMessage: 'Sesi telah diakhiri oleh guru.' }));
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'sync_teacher_info' },
+          (payload) => {
+            const data = payload.payload;
+            if (data?.teacherName) {
+              setSession(prev => ({
+                ...prev,
+                teacherName: data.teacherName,
+                teacherSchool: data.teacherSchool || prev.teacherSchool,
+              }));
+            }
           }
         )
         .on(
@@ -376,6 +416,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           payload: {
             transcript: session.transcript,
             interimTranscript: session.interimTranscript,
+            teacherName: user?.name || session.teacherName || 'Guru',
+            teacherSchool: user?.school || session.teacherSchool || null,
           }
         });
       }
@@ -391,7 +433,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }, 1000); // Debounce interval
       return () => clearTimeout(timer);
     }
-  }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript]);
+  }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript, user?.name, user?.school]);
 
   // ── Supabase Teacher Participants Receiver ──────────────────────────────────
   useEffect(() => {
@@ -406,6 +448,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           { event: 'student_presence' },
           (payload) => {
             const student = payload.payload;
+            channel.send({
+              type: 'broadcast',
+              event: 'sync_teacher_info',
+              payload: {
+                teacherName: user?.name || 'Guru',
+                teacherSchool: user?.school || null,
+              }
+            });
+
             setSession(prev => {
               const currentParticipants = prev.participants || [];
               const idx = currentParticipants.findIndex(p => p.absen === student.absen && p.name === student.name);
@@ -445,7 +496,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }
           }
         )
-        .subscribe();
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            channel.send({
+              type: 'broadcast',
+              event: 'sync_teacher_info',
+              payload: {
+                teacherName: user?.name || 'Guru',
+                teacherSchool: user?.school || null,
+              }
+            });
+          }
+        });
         
       teacherChannelRef.current = channel;
         
@@ -478,7 +540,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         return prev;
       });
     }
-  }, [role, session.isActive, session.roomCode]);
+  }, [role, session.isActive, session.roomCode, user?.name, user?.school]);
 
   // ── Native STT via expo-speech-recognition ──────────────────────────────────
   // We import these conditionally to avoid crashes on web
@@ -659,16 +721,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     customGlossaryRef.current = { keywords, glossary };
     
     if (user?.teacher_id) {
-      const { error } = await db.from('live_sessions').insert({
+      let insertPayload: any = {
         room_code: roomCode,
         teacher_id: user.teacher_id,
+        teacher_name: user?.name || 'Guru',
+        teacher_school: user?.school || null,
         class_id: classId,
         subject_id: subjectId,
         language: language,
         is_active: true,
         transcript: '',
         interim_transcript: ''
-      });
+      };
+
+      let { error } = await db.from('live_sessions').insert(insertPayload);
+
+      // Graceful fallback if database schema cache doesn't have teacher_name column yet
+      if (error && error.code === 'PGRST204') {
+        delete insertPayload.teacher_name;
+        delete insertPayload.teacher_school;
+        const res = await db.from('live_sessions').insert(insertPayload);
+        error = res.error;
+      }
+
       if (error) {
         console.error('[Supabase] Failed to start session', error);
       }
@@ -690,6 +765,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       participants: [],
       customKeywords: keywords,
       customGlossary: glossary,
+    });
+
+    addNotification({
+      title: 'Sesi Kelas Live Dimulai',
+      body: `Sesi ${subject} dengan Kode: ${roomCode} telah aktif. Siswa dapat bergabung sekarang.`,
+      type: 'live_session',
+      actionData: { roomCode },
     });
 
     await startRecording(language);
@@ -750,6 +832,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           classId: session.classId, 
           subjectId: session.subjectId 
         });
+
+        addNotification({
+          title: 'Transkrip Sesi Tersedia',
+          body: `Transkripsi sesi ${session.subject || 'Sesi'} (${wordCount} kata) telah tersimpan di Riwayat.`,
+          type: 'history_ready',
+        });
       }
 
       try {
@@ -779,6 +867,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setSession(prev => ({ ...prev, language }));
   };
 
+  const updateTranscript = async (newTranscript: string) => {
+    accumulatedTranscriptRef.current = newTranscript;
+    setSession(prev => ({
+      ...prev,
+      transcript: newTranscript,
+      interimTranscript: '',
+    }));
+
+    if (session.isActive && session.roomCode && supabase) {
+      try {
+        await supabase
+          .from('active_sessions')
+          .update({ transcript: newTranscript } as any)
+          .eq('class_code', session.roomCode);
+      } catch (err) {
+        console.error('[Supabase] Failed to update transcript correction:', err);
+      }
+    }
+  };
+
   const resumeRecording = async () => {
     await startRecording(session.language);
   };
@@ -794,9 +902,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Native event hooks (only used when running natively) ─────────────────────
   // We can't call hooks conditionally, so we always register but they only fire natively
   const NativeEventBridge = () => {
-    const { useSpeechRecognitionEvent } = nativeSTT.current!;
+    const hook = nativeSTT.current?.useEvent;
+    if (!hook) return null;
 
-    useSpeechRecognitionEvent('result', (event: any) => {
+    hook('result', (event: any) => {
       let finalStr = '';
       let interimStr = '';
 
@@ -830,7 +939,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       resetAutoPauseTimer();
     });
 
-    useSpeechRecognitionEvent('error', (event: any) => {
+    hook('error', (event: any) => {
       if (event.error === 'no-speech') return;
       setSession(prev => ({
         ...prev,
@@ -847,6 +956,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       startSession,
       endSession,
       updateLanguage,
+      updateTranscript,
       pauseRecording,
       resumeRecording,
       isRecording,

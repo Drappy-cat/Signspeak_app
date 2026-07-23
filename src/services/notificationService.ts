@@ -101,6 +101,22 @@ export async function getNotifications(teacherId?: string): Promise<AppNotificat
   }
 }
 
+export async function addNotification(notif: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): Promise<void> {
+  try {
+    const current = await getNotifications();
+    const newNotif: AppNotification = {
+      ...notif,
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: Date.now(),
+      read: false,
+    };
+    const updated = [newNotif, ...current];
+    await saveNotifications(updated);
+  } catch (error) {
+    console.error('addNotification error:', error);
+  }
+}
+
 export async function saveNotifications(notifications: AppNotification[]): Promise<void> {
   try {
     const readIds = notifications.filter(n => n.read).map(n => n.id);

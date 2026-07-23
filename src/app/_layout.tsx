@@ -14,10 +14,10 @@ import { SessionProvider } from '../contexts/SessionContext';
 import { DICT } from '../constants/i18n';
 
 // ── Developer Mode Switch ───────────────────────────────────────────────────
-// Set to FALSE to completely remove the Dev Tool button and modal from the build.
-const SHOW_DEV_MENU = false;
+// Automatically TRUE during local development (__DEV__), and FALSE in production APK build.
+const SHOW_DEV_MENU = __DEV__;
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.hideAsync().catch(() => {});
 
 function FloatingDevMenu() {
   const [open, setOpen] = useState(false);
@@ -181,87 +181,89 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <View className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.08)', filter: 'blur(100px)', pointerEvents: 'none' } as any} />
       
       {/* Demo Switcher (Web Only) */}
-      <View style={{ position: 'absolute', top: 24, left: 24, zIndex: 100, gap: 10 } as any}>
-        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-          {d.demoMode}
-        </Text>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={async () => {
-            await setRole('student');
-            router.replace('/(auth)/login');
-          }}
-          style={{
-            backgroundColor: role === 'student' ? '#ffffff' : 'rgba(255,255,255,0.12)',
-            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
-            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2, shadowRadius: 4,
-          }}
-        >
-          <Text style={{ color: role === 'student' ? '#0f172a' : '#ffffff', fontSize: 12, fontWeight: '800' }}>
-            👨‍🎓 {d.studentView}
+      {SHOW_DEV_MENU && (
+        <View style={{ position: 'absolute', top: 24, left: 24, zIndex: 100, gap: 10 } as any}>
+          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+            {d.demoMode}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={async () => {
-            await setRole('teacher');
-            router.replace('/(auth)/login');
-          }}
-          style={{
-            backgroundColor: role === 'teacher' ? '#ffffff' : 'rgba(255,255,255,0.12)',
-            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
-            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2, shadowRadius: 4,
-          }}
-        >
-          <Text style={{ color: role === 'teacher' ? '#0f172a' : '#ffffff', fontSize: 12, fontWeight: '800' }}>
-            👩‍🏫 {d.teacherView}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            router.replace('/onboarding');
-          }}
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
-          }}
-        >
-          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '800' }}>
-            ↩ Onboarding
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            router.replace('/admin' as any);
-          }}
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
-          }}
-        >
-          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '800' }}>
-            👑 Admin
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            router.replace('/splash' as any);
-          }}
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
-          }}
-        >
-          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '800' }}>
-            ✨ Splashscreen
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={async () => {
+              await setRole('student');
+              router.replace('/(auth)/login');
+            }}
+            style={{
+              backgroundColor: role === 'student' ? '#ffffff' : 'rgba(255,255,255,0.12)',
+              paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2, shadowRadius: 4,
+            }}
+          >
+            <Text style={{ color: role === 'student' ? '#0f172a' : '#ffffff', fontSize: 12, fontWeight: '800' }}>
+              👨‍🎓 {d.studentView}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={async () => {
+              await setRole('teacher');
+              router.replace('/(auth)/login');
+            }}
+            style={{
+              backgroundColor: role === 'teacher' ? '#ffffff' : 'rgba(255,255,255,0.12)',
+              paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2, shadowRadius: 4,
+            }}
+          >
+            <Text style={{ color: role === 'teacher' ? '#0f172a' : '#ffffff', fontSize: 12, fontWeight: '800' }}>
+              👩‍🏫 {d.teacherView}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              router.replace('/onboarding');
+            }}
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '800' }}>
+              ↩ Onboarding
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              router.replace('/admin' as any);
+            }}
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '800' }}>
+              👑 Admin
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              router.replace('/splash' as any);
+            }}
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '800' }}>
+              ✨ Splashscreen
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Legend (Web Only) */}
       <View style={{ position: 'absolute', top: 24, right: 24, zIndex: 100, alignItems: 'flex-end', gap: 6 } as any}>

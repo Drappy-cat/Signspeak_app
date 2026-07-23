@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -203,36 +203,46 @@ export default function HomeScreen() {
     }
   };
 
-  React.useEffect(() => {
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const loadHomeData = async () => {
     if (role === 'teacher' && user?.teacher_id) {
-      getTeacherClasses(user.teacher_id).then(classes => {
+      try {
+        const [classes, subjects, history, glossary] = await Promise.all([
+          getTeacherClasses(user.teacher_id),
+          getTeacherSubjects(user.teacher_id),
+          getTeacherSessionHistory(user.teacher_id, 3),
+          getTeacherGlossary(user.teacher_id)
+        ]);
+        
         setTeacherClasses(classes);
-        if (classes.length > 0) setSelectedClassId(classes[0].id);
-      }).catch(console.error);
-      
-      getTeacherSubjects(user.teacher_id).then(subjects => {
+        if (classes.length > 0 && !selectedClassId) setSelectedClassId(classes[0].id);
+        
         setTeacherSubjects(subjects);
-        if (subjects.length > 0) setSelectedSubjectId(subjects[0].id);
-      }).catch(console.error);
-
-      getTeacherSessionHistory(user.teacher_id, 3).then(data => {
-        setRecentSessions(data);
-      }).catch(console.error);
-    }
-  }, [role, user?.teacher_id]);
-
-  // Load saved custom glossary from database
-  React.useEffect(() => {
-    if (user?.teacher_id) {
-      getTeacherGlossary(user.teacher_id).then(data => {
-        if (data && data.length > 0) {
-          setCustomGlossaryList(data);
+        if (subjects.length > 0 && !selectedSubjectId) setSelectedSubjectId(subjects[0].id);
+        
+        setRecentSessions(history);
+        
+        if (glossary && glossary.length > 0) {
+          setCustomGlossaryList(glossary);
         }
-      }).catch(console.error).finally(() => {
+      } catch (err) {
+        console.error('Error loading home data:', err);
+      } finally {
         setIsGlossaryLoaded(true);
-      });
+      }
     }
-  }, [user?.teacher_id]);
+  };
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await loadHomeData();
+    setRefreshing(false);
+  }, [role, user?.teacher_id, selectedClassId, selectedSubjectId]);
+
+  React.useEffect(() => {
+    loadHomeData();
+  }, [role, user?.teacher_id]);
 
   // Save custom glossary to database when it changes
   React.useEffect(() => {
@@ -560,6 +570,14 @@ export default function HomeScreen() {
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={['#2563eb']} // blue-600
+            tintColor={hc ? '#60a5fa' : '#2563eb'}
+          />
+        }
       >
         {role === 'teacher' ? renderTeacherHome() : renderStudentHome()}
       </ScrollView>

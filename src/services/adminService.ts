@@ -59,19 +59,19 @@ export interface ProvinceStats {
 // ── Admin Check ──────────────────────────────────────────────────────────────
 
 export async function checkIsAdmin(authUserId: string): Promise<boolean> {
-  if (!authUserId || authUserId.includes('demo')) return true;
+  if (!authUserId) return false;
 
   try {
     const { data, error } = await db
       .from('teachers')
-      .select('role')
+      .select('role, email')
       .eq('auth_user_id', authUserId)
       .single();
 
-    if (error || !data) return true; // Default allow in dev/demo mode
-    return data.role === 'admin' || data.role === 'teacher';
+    if (error || !data) return false;
+    return data.role === 'admin' || data.email === 'faridnovian61@gmail.com';
   } catch (_) {
-    return true;
+    return false;
   }
 }
 

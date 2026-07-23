@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, Easing, StatusBar, SafeAreaView, Platform, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -34,13 +34,12 @@ export default function SplashScreen() {
   useEffect(() => {
     // 1. Entrance Animations
     Animated.sequence([
-        Animated.spring(logoScale, {
-          toValue: 1,
-          friction: 6,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-      ]),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 6,
+        tension: 40,
+        useNativeDriver: true,
+      }),
       Animated.parallel([
         Animated.timing(textOpacity, {
           toValue: 1,

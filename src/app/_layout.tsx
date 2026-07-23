@@ -15,7 +15,7 @@ import { DICT } from '../constants/i18n';
 
 // ── Developer Mode Switch ───────────────────────────────────────────────────
 // Automatically TRUE during local development (__DEV__), and FALSE in production APK build.
-const SHOW_DEV_MENU = __DEV__;
+const SHOW_DEV_MENU = false;
 
 SplashScreen.hideAsync().catch(() => {});
 

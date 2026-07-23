@@ -3,14 +3,15 @@ import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, Statu
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { saveProfilePhotoLocally, uploadProfilePhoto } from '../../services/storageService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory, generateUniqueRoomCode, assignTeacherToClass, createAndAssignClassForTeacher, removeTeacherFromClass } from '../../services/teacherService';
+import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory, generateUniqueRoomCode, assignTeacherToClass, createAndAssignClassForTeacher, removeTeacherFromClass, updateTeacherProfile } from '../../services/teacherService';
 import { getClassesBySchool, getAllGrades, getSchoolById, getGradesBySchoolType } from '../../services/schoolService';
 import type { ClassWithDetails, Subject, Grade } from '../../types/database';
-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2 } from 'lucide-react-native';
+import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -135,6 +136,16 @@ export default function HomeScreen() {
   const [newDefinition, setNewDefinition] = React.useState('');
 
   const [addClassModalVisible, setAddClassModalVisible] = React.useState(false);
+  
+  // Profile Edit States
+  const [profileDropdownVisible, setProfileDropdownVisible] = React.useState(false);
+  const [editProfileModalVisible, setEditProfileModalVisible] = React.useState(false);
+  const [editName, setEditName] = React.useState('');
+  const [editSchool, setEditSchool] = React.useState('');
+  const [editNip, setEditNip] = React.useState('');
+  const [editClassName, setEditClassName] = React.useState('');
+  const [editPhotoUri, setEditPhotoUri] = React.useState('');
+  const [savingProfile, setSavingProfile] = React.useState(false);
   const [allGradesList, setAllGradesList] = React.useState<Grade[]>([]);
   const [selectedGradeId, setSelectedGradeId] = React.useState<string>('');
   const [newClassNameInput, setNewClassNameInput] = React.useState<string>('');
@@ -284,7 +295,7 @@ export default function HomeScreen() {
     setEditSchool(user?.school || '');
     setEditNip(user?.nip || '');
     setEditClassName(user?.className || '');
-    setEditPhotoUri(user?.photoUri || null);
+    setEditPhotoUri(user?.photoUri || '');
     setProfileDropdownVisible(false);
     setEditProfileModalVisible(true);
   };
@@ -962,10 +973,9 @@ export default function HomeScreen() {
               activeOpacity={0.9}
               onPress={async () => {
                 setStartModalVisible(false);
-                const roomCode = await generateUniqueRoomCode();
-                
                 const selectedSubjObj = teacherSubjects.find(s => s.id === selectedSubjectId);
                 const selectedClassObj = teacherClasses.find(c => c.id === selectedClassId);
+                const roomCode = selectedClassObj?.room_code || await generateUniqueRoomCode();
                 const sessionSubject = `${selectedSubjObj?.subject_name} (${selectedClassObj?.class_name})`;
                 
                 await startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);

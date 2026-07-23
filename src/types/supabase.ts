@@ -468,6 +468,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_teacher_email: { Args: { p_email: string }; Returns: boolean }
       generate_room_code: { Args: never; Returns: string }
       get_teacher_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }

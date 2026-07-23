@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
-import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { View, Text, TouchableOpacity, Platform, Modal, SafeAreaView } from 'react-native';
+import * as SystemUI from 'expo-system-ui';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import '../../global.css';
@@ -159,20 +159,14 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const appLang = settings.appLang || 'id';
   const d = DICT[appLang];
 
-  const appTheme = {
-    ...DefaultTheme,
-    colors: {
-      ...DefaultTheme.colors,
-      background: hc ? '#0f172a' : '#F0F7FF',
-    },
-  };
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(hc ? '#0f172a' : '#F0F7FF');
+  }, [hc]);
 
   if (Platform.OS !== 'web') {
     return (
       <View style={{ flex: 1 }}>
-        <ThemeProvider value={appTheme}>
-          {children}
-        </ThemeProvider>
+        {children}
         <FloatingDevMenu />
       </View>
     );
@@ -299,9 +293,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           boxShadow: '0 30px 80px rgba(0,0,0,0.8)',
         } as any}
       >
-        <ThemeProvider value={appTheme}>
-          {children}
-        </ThemeProvider>
+        {children}
         <FloatingDevMenu />
       </View>
 

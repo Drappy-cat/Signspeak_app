@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "LENTERA",
-    "slug": "Signspeak_app",
+    "name": "Signspeak_app",
+    "slug": "fnovians",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
@@ -56,9 +56,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "adc91b21-4289-4225-9d3b-8553185a063b"
+        "projectId": "c294f3a0-339e-4d8f-9e62-5405ffe7157b"
       }
     },
-    "owner": "draapy"
+    "owner": "fnovians-team"
   }
 }

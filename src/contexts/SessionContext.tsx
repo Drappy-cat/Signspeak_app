@@ -806,7 +806,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
       // Save to sessions table in Supabase
       if (user?.teacher_id && session.classId && session.subjectId) {
-        await db.from('session_history').insert({
+        const { error: historyError } = await db.from('session_history').insert({
           teacher_id: user.teacher_id,
           class_id: session.classId,
           subject_id: session.subjectId,
@@ -818,6 +818,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           word_count: wordCount,
           excerpt: text.substring(0, 120) + (text.length > 120 ? '...' : ''),
           transcript_full: finalTranscriptText,
+          session_date: new Date().toISOString(),
+        });
+        
+        if (historyError) {
+          console.error('[SessionContext] Failed to save session history to Supabase:', historyError);
+        } else {
+          console.log('[SessionContext] Session history saved successfully.');
+        }
+      } else {
+        console.warn('[SessionContext] Skipped saving history to Supabase because of missing IDs:', { 
+          teacherId: user?.teacher_id, 
+          classId: session.classId, 
+          subjectId: session.subjectId 
         });
 
         addNotification({
@@ -864,9 +877,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     if (session.isActive && session.roomCode && supabase) {
       try {
-        await supabase
+        await (supabase as any)
           .from('active_sessions')
-          .update({ transcript: newTranscript } as any)
+          .update({ transcript: newTranscript })
           .eq('class_code', session.roomCode);
       } catch (err) {
         console.error('[Supabase] Failed to update transcript correction:', err);

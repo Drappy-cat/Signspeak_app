@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Animated, Easing, StatusBar, SafeAreaView, Platform, StyleSheet } from 'react-native';
+import { View, Text, Animated, Easing, StatusBar, SafeAreaView, Platform, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -364,7 +365,7 @@ export default function SplashScreen() {
               <Image
                 source={require('../../assets/images/app-icon.png')}
                 style={{ width: 120, height: 120 }}
-                resizeMode="contain"
+                contentFit="contain"
               />
             </Animated.View>
           </View>

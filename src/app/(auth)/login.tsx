@@ -8,7 +8,7 @@ import { BubbleBackground } from '../../components/BubbleBackground';
 import { supabase, db } from '../../services/supabase';
 import { getActiveSessionByRoomCode, upsertStudent, addSessionParticipant } from '../../services/teacherService';
 import { DICT } from '../../constants/i18n';
-import { GOOGLE_LOGO_BASE64 } from '../../constants/assets';
+
 import { getCardShadow } from '../../utils/formatters';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -58,7 +58,7 @@ export default function LoginScreen() {
   }, [showModal, modalScale, modalOpacity]);
 
   const router = useRouter();
-  const { login, loginWithGoogle, role } = useAuth();
+  const { login, role } = useAuth();
   const { settings } = useSettings();
   
   const hc = settings.highContrast;
@@ -191,24 +191,7 @@ export default function LoginScreen() {
     }
   };
   
-  const handleGoogleLogin = async () => {
-    setErrorMsg('');
-    setLoading(true);
-    try {
-      if (loginWithGoogle) {
-        await loginWithGoogle();
-        router.replace('/(tabs)/home');
-      } else {
-        throw new Error(appLang === 'en' ? 'Google Sign-In is not configured' : 'Masuk dengan Google belum dikonfigurasi');
-      }
-    } catch (e: any) {
-      setModalTitle(appLang === 'en' ? 'Login Failed' : 'Gagal Masuk');
-      setModalMsg(e.message || (appLang === 'en' ? 'Google Sign-In failed' : 'Gagal masuk dengan Google'));
-      setShowModal(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
 
@@ -246,9 +229,14 @@ export default function LoginScreen() {
           </View>
         </Modal>
 
-        <View style={{ flex: 1, paddingHorizontal: 24 }}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingVertical: 48 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Logo area */}
-          <View style={{ alignItems: 'center', paddingTop: 40, paddingBottom: 20, gap: 12 }}>
+          <View style={{ alignItems: 'center', paddingBottom: 32, gap: 12 }}>
             <Image 
               source={require('../../../assets/images/app-icon.png')} 
               style={{ width: 80, height: 80 }}
@@ -407,36 +395,7 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Google Sign-In button - Teacher Only */}
-            {role !== 'student' && (
-              <>
-                {/* Divider — atau / or */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-                  <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-                  <Text style={{ marginHorizontal: 12, fontSize: 12, fontWeight: '600', color: mutedColor }}>{d.orDivider}</Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: hc ? '#334155' : '#e2e8f0' }} />
-                </View>
 
-                <TouchableOpacity
-                  onPress={handleGoogleLogin}
-                  disabled={loading}
-                  activeOpacity={0.9}
-                  style={{
-                    width: '100%', paddingVertical: 14, borderRadius: 12,
-                    alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: hc ? '#334155' : '#ffffff',
-                    borderWidth: 1, borderColor: hc ? '#475569' : '#e2e8f0',
-                    flexDirection: 'row', gap: 10,
-                  }}
-                >
-                  <Image 
-                    source={{ uri: GOOGLE_LOGO_BASE64 }} 
-                    style={{ width: 24, height: 24 }} 
-                  />
-                  <Text style={{ color: textColor, fontWeight: '700', fontSize: 14 }}>{d.loginWithGoogle}</Text>
-                </TouchableOpacity>
-              </>
-            )}
           </View>
 
           {/* Register link - Teacher Only */}
@@ -449,8 +408,7 @@ export default function LoginScreen() {
             </View>
           )}
 
-          <View style={{ flex: 1 }} />
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

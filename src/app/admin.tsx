@@ -377,12 +377,18 @@ export default function AdminDashboard() {
   // ══════════════════════════════════════════════════════════════════════════
   function renderUsers() {
     return (
-      <View style={{ gap: 8 }}>
-        <Text style={{ fontSize: 13, color: mutedColor, marginBottom: 4 }}>
-          {filteredTeachers.length} guru ditemukan
-        </Text>
-        {filteredTeachers.map(teacher => (
-          <View key={teacher.id} style={{ ...cardStyle, padding: 14 }}>
+      <FlatList
+        data={filteredTeachers}
+        keyExtractor={t => t.id}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 8 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentBlue} />}
+        ListHeaderComponent={
+          <Text style={{ fontSize: 13, color: mutedColor, marginBottom: 4 }}>
+            {filteredTeachers.length} guru ditemukan
+          </Text>
+        }
+        renderItem={({ item: teacher }) => (
+          <View style={{ ...cardStyle, padding: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               {/* Avatar */}
               <View style={{
@@ -450,8 +456,8 @@ export default function AdminDashboard() {
               </View>
             </View>
           </View>
-        ))}
-      </View>
+        )}
+      />
     );
   }
 
@@ -460,12 +466,18 @@ export default function AdminDashboard() {
   // ══════════════════════════════════════════════════════════════════════════
   function renderClasses() {
     return (
-      <View style={{ gap: 8 }}>
-        <Text style={{ fontSize: 13, color: mutedColor, marginBottom: 4 }}>
-          {filteredClasses.length} kelas ditemukan
-        </Text>
-        {filteredClasses.map(cls => (
-          <View key={cls.id} style={{ ...cardStyle, padding: 14 }}>
+      <FlatList
+        data={filteredClasses}
+        keyExtractor={c => c.id}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 8 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentBlue} />}
+        ListHeaderComponent={
+          <Text style={{ fontSize: 13, color: mutedColor, marginBottom: 4 }}>
+            {filteredClasses.length} kelas ditemukan
+          </Text>
+        }
+        renderItem={({ item: cls }) => (
+          <View style={{ ...cardStyle, padding: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <View style={{
                 width: 44, height: 44, borderRadius: 12,
@@ -506,8 +518,8 @@ export default function AdminDashboard() {
               </TouchableOpacity>
             </View>
           </View>
-        ))}
-      </View>
+        )}
+      />
     );
   }
 
@@ -516,11 +528,17 @@ export default function AdminDashboard() {
   // ══════════════════════════════════════════════════════════════════════════
   function renderSessions() {
     return (
-      <View style={{ gap: 8 }}>
-        <Text style={{ fontSize: 13, color: mutedColor, marginBottom: 4 }}>
-          {sessions.length} sesi terakhir
-        </Text>
-        {sessions.map(session => {
+      <FlatList
+        data={sessions}
+        keyExtractor={s => s.id}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 8 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentBlue} />}
+        ListHeaderComponent={
+          <Text style={{ fontSize: 13, color: mutedColor, marginBottom: 4 }}>
+            {sessions.length} sesi terakhir
+          </Text>
+        }
+        renderItem={({ item: session }) => {
           const teacherName = (session.teacher as any)?.full_name || 'Unknown';
           const className = (session.class as any)?.class_name || '-';
           const schoolName = (session.class as any)?.school?.school_name || '-';
@@ -529,7 +547,7 @@ export default function AdminDashboard() {
           const isActive = session.is_active;
 
           return (
-            <View key={session.id} style={{ ...cardStyle, padding: 14 }}>
+            <View style={{ ...cardStyle, padding: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={{
                   width: 44, height: 44, borderRadius: 12,
@@ -575,8 +593,8 @@ export default function AdminDashboard() {
               </View>
             </View>
           );
-        })}
-      </View>
+        }}
+      />
     );
   }
 
@@ -657,16 +675,21 @@ export default function AdminDashboard() {
       )}
 
       {/* ── Content ────────────────────────────────────────────────────── */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentBlue} />}
-      >
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'users' && renderUsers()}
-        {activeTab === 'classes' && renderClasses()}
-        {activeTab === 'sessions' && renderSessions()}
-      </ScrollView>
+      {activeTab === 'overview' ? (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentBlue} />}
+        >
+          {renderOverview()}
+        </ScrollView>
+      ) : (
+        <View style={{ flex: 1 }}>
+          {activeTab === 'users' && renderUsers()}
+          {activeTab === 'classes' && renderClasses()}
+          {activeTab === 'sessions' && renderSessions()}
+        </View>
+      )}
 
       {/* ── Delete Confirmation Modal ──────────────────────────────────── */}
       <Modal visible={deleteModalVisible} transparent animationType="fade">

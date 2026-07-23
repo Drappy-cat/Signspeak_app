@@ -2,11 +2,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import { useState } from 'react';
-import { Dimensions, Image, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeInDown, FadeOut, FadeOutUp } from 'react-native-reanimated';
 import { DICT } from '../constants/i18n';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
+
 
 function LangToggle() {
   const { settings, updateSettings } = useSettings();
@@ -103,13 +105,13 @@ export default function OnboardingScreen() {
 
       {appLang === 'en' ? (
         s.imageEn ? (
-          <Animated.Image
+          <Image
             key={`en-${slide}`}
             source={s.imageEn}
-            entering={FadeIn.duration(400)}
-            exiting={FadeOut.duration(400)}
             style={{ position: 'absolute', width: '100%', height: '100%', top: 0 }}
-            resizeMode="cover"
+            contentFit="cover"
+            transition={300}
+            cachePolicy="memory-disk"
           />
         ) : (
           <View style={{ flex: 1, backgroundColor: s.colors[0], alignItems: 'center', justifyContent: 'center' }}>
@@ -117,13 +119,13 @@ export default function OnboardingScreen() {
           </View>
         )
       ) : (
-        <Animated.Image
+        <Image
           key={`id-${slide}`}
           source={s.imageId}
-          entering={FadeIn.duration(400)}
-          exiting={FadeOut.duration(400)}
           style={{ position: 'absolute', width: '100%', height: '100%', top: 0 }}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={300}
+          cachePolicy="memory-disk"
         />
       )}
 

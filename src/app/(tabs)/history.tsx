@@ -79,6 +79,78 @@ function HighlightText({
   );
 }
 
+export type TimeFilterKey = 'all' | 'today' | 'yesterday' | 'this_month' | 'last_month';
+
+const TIME_FILTER_OPTIONS: { key: TimeFilterKey; label: string; icon: string }[] = [
+  { key: 'all', label: 'Semua', icon: '⚡' },
+  { key: 'today', label: 'Hari Ini', icon: '📅' },
+  { key: 'yesterday', label: 'Kemarin', icon: '⏮️' },
+  { key: 'this_month', label: 'Bulan Ini', icon: '🗓️' },
+  { key: 'last_month', label: 'Bulan Lalu', icon: '📜' },
+];
+
+export function isSessionInTimeFilter(session: SessionRecord, filter: TimeFilterKey): boolean {
+  if (filter === 'all') return true;
+
+  const now = new Date();
+  let sessionDate: Date | null = null;
+
+  if (session.rawDate) {
+    const d = new Date(session.rawDate);
+    if (!isNaN(d.getTime())) sessionDate = d;
+  }
+
+  if (!sessionDate && session.date) {
+    const dateLower = session.date.toLowerCase();
+    if (dateLower.includes('hari ini')) {
+      sessionDate = new Date();
+    } else if (dateLower.includes('kemarin')) {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      sessionDate = y;
+    } else {
+      const parsed = new Date(session.date);
+      if (!isNaN(parsed.getTime())) sessionDate = parsed;
+    }
+  }
+
+  if (!sessionDate) return true;
+
+  const isToday =
+    sessionDate.getDate() === now.getDate() &&
+    sessionDate.getMonth() === now.getMonth() &&
+    sessionDate.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    sessionDate.getDate() === yesterday.getDate() &&
+    sessionDate.getMonth() === yesterday.getMonth() &&
+    sessionDate.getFullYear() === yesterday.getFullYear();
+
+  const isThisMonth =
+    sessionDate.getMonth() === now.getMonth() &&
+    sessionDate.getFullYear() === now.getFullYear();
+
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const isLastMonth =
+    sessionDate.getMonth() === lastMonthDate.getMonth() &&
+    sessionDate.getFullYear() === lastMonthDate.getFullYear();
+
+  switch (filter) {
+    case 'today':
+      return isToday;
+    case 'yesterday':
+      return isYesterday;
+    case 'this_month':
+      return isThisMonth;
+    case 'last_month':
+      return isLastMonth;
+    default:
+      return true;
+  }
+}
+
 export default function HistoryScreen() {
   const { user, role } = useAuth();
   const { settings } = useSettings();
@@ -89,6 +161,7 @@ export default function HistoryScreen() {
   const [historyList, setHistoryList] = React.useState<SessionRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [timeFilter, setTimeFilter] = React.useState<TimeFilterKey>('all');
   const [selectedSession, setSelectedSession] = React.useState<SessionRecord | null>(null);
 
   // Glossary and Word Info Modal states
@@ -227,16 +300,18 @@ export default function HistoryScreen() {
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
 
-  // Filter history based on search query
+  // Filter history based on search query and time range filter
   const filteredHistory = historyList.filter(item => {
     const query = searchQuery.toLowerCase();
-    return (
+    const matchesSearch =
       (item.subject || '').toLowerCase().includes(query) ||
       (item.teacherName || '').toLowerCase().includes(query) ||
       (item.className || '').toLowerCase().includes(query) ||
       (item.excerpt || '').toLowerCase().includes(query) ||
-      (item.transcriptFull || '').toLowerCase().includes(query)
-    );
+      (item.transcriptFull || '').toLowerCase().includes(query);
+
+    const matchesTime = isSessionInTimeFilter(item, timeFilter);
+    return matchesSearch && matchesTime;
   });
 
   const handleShare = async (session: SessionRecord) => {
@@ -267,8 +342,8 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, paddingTop: androidPadding }}>
       {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 }}>
-        <Text style={{ fontSize: 20, fontWeight: '900', marginBottom: 12, color: textColor }}>{headerTitle}</Text>
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 10 }}>
+        <Text style={{ fontSize: 20, fontWeight: '900', color: textColor }}>{headerTitle}</Text>
         {/* Search bar */}
         <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }, searchStyle]}>
           <Search size={15} color={mutedColor} />
@@ -280,6 +355,45 @@ export default function HistoryScreen() {
             style={{ flex: 1, fontSize: 14, fontWeight: '500', color: textColor, padding: 0 }}
           />
         </View>
+
+        {/* Modern Time Filter Bar */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
+        >
+          {TIME_FILTER_OPTIONS.map(opt => {
+            const isSelected = timeFilter === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                activeOpacity={0.8}
+                onPress={async () => {
+                  setTimeFilter(opt.key);
+                  if (settings.vibrate) {
+                    try { await Haptics.selectionAsync(); } catch (_) {}
+                  }
+                }}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+                  ...getCardShadow(hc, isSelected ? 'md' : 'sm'),
+                  backgroundColor: isSelected ? '#1e3a8a' : (hc ? '#1e293b' : '#ffffff'),
+                  borderWidth: 1,
+                  borderColor: isSelected ? '#3b82f6' : (hc ? '#334155' : '#e2e8f0'),
+                }}
+              >
+                <Text style={{ fontSize: 13 }}>{opt.icon}</Text>
+                <Text style={{
+                  fontSize: 12, fontWeight: isSelected ? '800' : '600',
+                  color: isSelected ? '#ffffff' : (hc ? '#cbd5e1' : '#475569'),
+                }}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <FlatList

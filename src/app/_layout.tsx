@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { SettingsProvider, useSettings } from '../contexts/SettingsContext';
 import { SessionProvider } from '../contexts/SessionContext';
 import { DICT } from '../constants/i18n';
+import { ThemeRippleOverlay } from '../components/ThemeRippleOverlay';
 
 // ── Developer Mode Switch ───────────────────────────────────────────────────
 // Automatically TRUE during local development (__DEV__), and FALSE in production APK build.
@@ -165,10 +166,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
 
   if (Platform.OS !== 'web') {
     return (
-      <View style={{ flex: 1 }}>
-        {children}
-        <FloatingDevMenu />
-      </View>
+      <ThemeRippleOverlay>
+        <View style={{ flex: 1 }}>
+          {children}
+          <FloatingDevMenu />
+        </View>
+      </ThemeRippleOverlay>
     );
   }
 
@@ -295,8 +298,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           boxShadow: '0 30px 80px rgba(0,0,0,0.8)',
         } as any}
       >
-        {children}
-        <FloatingDevMenu />
+        <ThemeRippleOverlay>
+          {children}
+          <FloatingDevMenu />
+        </ThemeRippleOverlay>
       </View>
 
       {/* Caption */}

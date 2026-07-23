@@ -197,7 +197,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<ActiveSession>(defaultSession);
   const [isRecording, setIsRecording] = useState(false);
   const [isSttReady, setIsSttReady] = useState(false);
-  const { user, role } = useAuth();
+  const { user, role, isReady: isAuthReady } = useAuth();
 
   // Refs for side-effect objects
   const webSpeechRef = useRef<WebSpeechEngine | null>(null);
@@ -254,7 +254,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     let heartbeatTimer: any = null;
     let pollTimer: any = null;
 
-    if (role === 'student' && user?.joinedRoomCode) {
+    if (isAuthReady && role === 'student' && user?.joinedRoomCode) {
       const roomCode = user.joinedRoomCode;
       
       const fetchInitial = async () => {
@@ -440,7 +440,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         supabase.removeChannel(channel);
       }
     };
-  }, [role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
+  }, [isAuthReady, role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
 
   // ── Supabase Teacher Sync ───────────────────────────────────────────────────
   useEffect(() => {
@@ -740,6 +740,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     subjectId: string,
     customGlossaryList?: Array<{ word: string; definition: string }>
   ) => {
+    if (role !== 'teacher') {
+      console.warn('Blocked attempt to create a room. Only teachers can start a session.');
+      return;
+    }
+
     accumulatedTranscriptRef.current = '';
     
     // Parse custom glossary list to active state

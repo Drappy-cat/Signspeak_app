@@ -12,7 +12,7 @@ export default function SplashScreen() {
 
   // Animation values
   const logoScale = useRef(new Animated.Value(0.7)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoOpacity = useRef(new Animated.Value(1)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
   const textTranslateY = useRef(new Animated.Value(15)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -34,17 +34,10 @@ export default function SplashScreen() {
   useEffect(() => {
     // 1. Entrance Animations
     Animated.sequence([
-      Animated.parallel([
         Animated.spring(logoScale, {
           toValue: 1,
           friction: 6,
           tension: 40,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 600,
-          easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
       ]),

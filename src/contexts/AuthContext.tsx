@@ -154,6 +154,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     if (activeRole === 'student') {
+      if (!roomCode) {
+        throw new Error('Kode ruangan wajib diisi');
+      }
+
+      // Check if there is an active session for this room code
+      const { data, error } = await supabase
+        .from('live_sessions')
+        .select('is_active')
+        .eq('room_code', roomCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error || !data) {
+        throw new Error('Kode kelas tidak valid atau guru belum memulai sesi ini.');
+      }
+
       const mockUser: User = {
         email: '',
         name: name || 'Siswa Tanpa Nama',

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Animated, Easing } from 'react-native';
 import { useRouter } from 'expo-router';
 import { UserCircle2, LogOut, Hash, ArrowRight, Info } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
@@ -100,6 +100,18 @@ export default function SessionEndedScreen() {
   const mutedColor = hc ? '#94a3b8' : '#64748b';
   const cardColor = hc ? '#1e293b' : '#ffffff';
 
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardScale = useRef(new Animated.Value(0.93)).current;
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(cardOpacity, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(cardScale, { toValue: 1, useNativeDriver: true, tension: 160, friction: 9 }),
+      ]).start();
+    }
+  }, [loading]);
+
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1, backgroundColor: hc ? '#0f172a' : '#F0F7FF' }} 
@@ -108,7 +120,9 @@ export default function SessionEndedScreen() {
       <BubbleBackground hc={hc} />
       
       <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
-        <View style={{
+        <Animated.View style={{
+          opacity: cardOpacity,
+          transform: [{ scale: cardScale }],
           backgroundColor: cardColor,
           padding: 28,
           borderRadius: 24,
@@ -244,7 +258,7 @@ export default function SessionEndedScreen() {
               {appLang === 'en' ? 'Switch Account / Logout' : 'Ganti Akun / Keluar'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </View>
     </KeyboardAvoidingView>
   );

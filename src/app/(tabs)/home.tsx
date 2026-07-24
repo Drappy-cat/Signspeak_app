@@ -85,6 +85,71 @@ function PulseDot() {
   return <Animated.View style={{ opacity: anim }} className="w-2.5 h-2.5 rounded-full bg-red-400" />;
 }
 
+// ── FadeInBanner: lightweight slide-down fade-in for banners ───────────────
+function FadeInBanner({ children, style }: { children: React.ReactNode; style?: any }) {
+  const opacity = React.useRef(new Animated.Value(0)).current;
+  const translateY = React.useRef(new Animated.Value(-10)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 340, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 340, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+// ── AnimatedSessionRow: staggered fade-in for Recent Sessions list ────────
+// Extracted from renderTeacherHome so React hooks are never called inside .map()
+function AnimatedSessionRow({ item, index, cardStyle, hc, mutedColorVal, muted, linkColor, appLang, onPress }: {
+  item: any; index: number; cardStyle: any; hc: boolean; mutedColorVal: string; muted: string; linkColor: string; appLang: string;
+  onPress: () => void;
+}) {
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(12)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 260, delay: Math.min(index * 50, 250), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 260, delay: Math.min(index * 50, 250), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onPress}
+        style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }, cardStyle]}
+      >
+        <View style={{
+          width: 36, height: 36, borderRadius: 10,
+          backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+          alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          <BookOpen size={16} color={hc ? "#93c5fd" : "#1d4ed8"} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{item.subject_display || 'Sesi'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <Clock size={11} color={mutedColorVal} />
+            <Text className={`text-xs ${muted}`}>
+              {formatSessionDateTime(item.created_at || item.session_date)} · {Math.floor((item.duration || 0) / 60)}m
+            </Text>
+          </View>
+        </View>
+        <Text className={`text-xs font-bold ${linkColor}`}>{item.word_count?.toLocaleString() || 0} {appLang === 'en' ? 'words' : 'kata'}</Text>
+        <ChevronRight size={15} color={hc ? "#64748b" : "#94a3b8"} />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const { role, user, logout, refreshUser } = useAuth();
   const { session, startSession, rejoinOngoingTeacherSession } = useSession();
@@ -541,7 +606,7 @@ export default function HomeScreen() {
 
       {/* Active Ongoing Session Recovery Card for Teacher */}
       {activeOngoingSession && (
-        <View style={{
+        <FadeInBanner style={{
           marginHorizontal: 20, marginTop: 12, marginBottom: 8, padding: 16, borderRadius: 16,
           backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
           ...getCardShadow(hc, 'md')
@@ -576,7 +641,7 @@ export default function HomeScreen() {
               {appLang === 'en' ? 'Re-join Live Session' : 'Kembali Ke Sesi Kelas Live'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </FadeInBanner>
       )}
 
       {/* Language Selector */}
@@ -719,31 +784,18 @@ export default function HomeScreen() {
               {appLang === 'en' ? 'No recent sessions.' : 'Belum ada riwayat sesi.'}
             </Text>
           ) : recentSessions.map((item, i) => (
-            <TouchableOpacity 
+            <AnimatedSessionRow
               key={item.id || i}
-              activeOpacity={0.8}
+              item={item}
+              index={i}
+              cardStyle={cardStyle}
+              hc={hc}
+              mutedColorVal={mutedColorVal}
+              muted={muted}
+              linkColor={linkColor}
+              appLang={appLang}
               onPress={() => setSelectedSessionHistory(item)}
-              style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }, cardStyle]}
-            >
-              <View style={{
-                width: 36, height: 36, borderRadius: 10,
-                backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
-                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <BookOpen size={16} color={hc ? "#93c5fd" : "#1d4ed8"} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{item.subject_display || 'Sesi'}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                  <Clock size={11} color={mutedColorVal} />
-                  <Text className={`text-xs ${muted}`}>
-                    {formatSessionDateTime(item.created_at || item.session_date)} · {Math.floor((item.duration || 0) / 60)}m
-                  </Text>
-                </View>
-              </View>
-              <Text className={`text-xs font-bold ${linkColor}`}>{item.word_count?.toLocaleString() || 0} {appLang === 'en' ? 'words' : 'kata'}</Text>
-              <ChevronRight size={15} color={hc ? "#64748b" : "#94a3b8"} />
-            </TouchableOpacity>
+            />
           ))}
         </View>
       </View>

@@ -56,6 +56,31 @@ function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => voi
   );
 }
 
+// ── AnimatedSettingsRow: scale-on-press for nav rows ─────────────────────
+function AnimatedSettingsRow({ onPress, style, children }: { onPress: () => void; style?: any; children: React.ReactNode }) {
+  const scale = React.useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.timing(scale, { toValue: 0.97, duration: 80, useNativeDriver: true }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 180, friction: 8 }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 export default function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
   const { role, user, logout, refreshUser } = useAuth();
@@ -249,8 +274,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Tentang Aplikasi / About App Link */}
-        <TouchableOpacity
-          activeOpacity={0.7}
+        <AnimatedSettingsRow
           onPress={() => router.push('/about')}
           style={[
             {
@@ -274,12 +298,11 @@ export default function SettingsScreen() {
             </View>
           </View>
           <ChevronRight size={18} color={mutedColor} />
-        </TouchableOpacity>
+        </AnimatedSettingsRow>
 
         {/* Admin Dashboard Button */}
         {isAdmin && (
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <AnimatedSettingsRow
             onPress={() => router.push('/admin' as any)}
             style={[
               {
@@ -309,7 +332,7 @@ export default function SettingsScreen() {
               </View>
             </View>
             <ChevronRight size={18} color={mutedColor} />
-          </TouchableOpacity>
+          </AnimatedSettingsRow>
         )}
 
         {/* Profile */}

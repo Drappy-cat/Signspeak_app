@@ -64,6 +64,13 @@ export const LANGUAGE_LABELS: Record<string, string> = {
   mad: 'Madura',
 };
 
+export function getLanguageSimpleName(code: string): string {
+  if (code === 'en') return 'Inggris';
+  if (code === 'jv') return 'Jawa';
+  if (code === 'mad') return 'Madura';
+  return 'Indonesia';
+}
+
 // Demo history data for offline mode
 export const DEMO_HISTORY = [
   {

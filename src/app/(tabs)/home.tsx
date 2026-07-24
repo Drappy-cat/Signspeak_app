@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share, RefreshControl, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -141,6 +141,7 @@ export default function HomeScreen() {
   const [newWord, setNewWord] = React.useState('');
   const [newDefinition, setNewDefinition] = React.useState('');
   const hasGlossaryChangedRef = React.useRef(false);
+  const [isStartingSession, setIsStartingSession] = React.useState(false);
 
   const [addClassModalVisible, setAddClassModalVisible] = React.useState(false);
   
@@ -981,15 +982,21 @@ export default function HomeScreen() {
             {/* Action - Confirm Start */}
             <TouchableOpacity
               activeOpacity={0.9}
+              disabled={isStartingSession}
               onPress={async () => {
+                setIsStartingSession(true);
                 setStartModalVisible(false);
                 const selectedSubjObj = teacherSubjects.find(s => s.id === selectedSubjectId);
                 const selectedClassObj = teacherClasses.find(c => c.id === selectedClassId);
                 const roomCode = selectedClassObj?.room_code || await generateUniqueRoomCode();
                 const sessionSubject = `${selectedSubjObj?.subject_name} (${selectedClassObj?.class_name})`;
                 
-                await startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);
-                router.push('/(tabs)/live');
+                router.replace('/(tabs)/live');
+                try {
+                  await startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);
+                } finally {
+                  setIsStartingSession(false);
+                }
               }}
             >
               <LinearGradient
@@ -1007,6 +1014,29 @@ export default function HomeScreen() {
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Starting Session Fullscreen Glassmorphic Loader */}
+      {isStartingSession && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999,
+          backgroundColor: hc ? 'rgba(15,23,42,0.92)' : 'rgba(240,247,255,0.92)',
+          alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <View style={{
+            padding: 28, borderRadius: 24, backgroundColor: hc ? '#1e293b' : '#ffffff',
+            alignItems: 'center', gap: 16, width: '100%', maxWidth: 300,
+            ...getCardShadow(hc, 'lg')
+          }}>
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text style={{ fontSize: 16, fontWeight: '900', color: textColorVal, textAlign: 'center' }}>
+              {appLang === 'en' ? 'Starting Class Session...' : 'Memulai Sesi Kelas...'}
+            </Text>
+            <Text style={{ fontSize: 12, color: mutedColorVal, textAlign: 'center' }}>
+              {appLang === 'en' ? 'Preparing live transcription room' : 'Menyiapkan ruangan transkripsi live'}
+            </Text>
           </View>
         </View>
       )}

@@ -10,13 +10,12 @@ import { formatAutoPunctuation, applyGlossaryCorrections } from '../utils/textPr
 import { supabase, db } from '../services/supabase';
 
 
-// ─── Language Mapping ─────────────────────────────────────────────────────────
-// Maps our internal language codes to BCP-47 tags recognized by Web Speech API & Android STT
+// All 4 translation modes use id-ID input because teacher speaks Indonesian in class!
 const LANG_TO_BCP47: Record<string, string> = {
-  id: 'id-ID',   // Bahasa Indonesia — full support in Chrome, Edge, Android
-  en: 'en-US',   // English
-  jv: 'id-ID',   // Bahasa Jawa — fallback to id-ID for dictionary translation
-  mad: 'id-ID',  // Bahasa Madura — no dedicated STT yet, fallback to id-ID
+  id: 'id-ID',   // Bahasa Indonesia ➔ Indonesia
+  en: 'id-ID',   // Bahasa Indonesia ➔ English
+  jv: 'id-ID',   // Bahasa Indonesia ➔ Jawa
+  mad: 'id-ID',  // Bahasa Indonesia ➔ Madura
 };
 
 function translateText(text: string, lang: string, customGlossary?: Record<string, string>): string {
@@ -79,6 +78,7 @@ interface SessionContextType {
   resumeRecording: () => Promise<void>;
   isRecording: boolean;
   toggleRecording: () => Promise<void>;
+  rejoinOngoingTeacherSession: (roomCode: string) => Promise<void>;
 }
 
 const defaultSession: ActiveSession = {
@@ -702,6 +702,30 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }
           }
         )
+        .on(
+          'broadcast',
+          { event: 'student_left' },
+          (payload) => {
+            const student = payload.payload;
+            if (student?.name) {
+              addNotification({
+                title: 'Siswa Keluar Kelas',
+                body: `Siswa ${student.name} (No. Absen: ${student.absen || '-'}) telah keluar dari ruangan kelas.`,
+                type: 'student_left',
+              });
+
+              setSession(prev => ({
+                ...prev,
+                participants: (prev.participants || []).map(p => {
+                  if (p.name === student.name && p.absen === student.absen) {
+                    return { ...p, status: 'offline' as const };
+                  }
+                  return p;
+                })
+              }));
+            }
+          }
+        )
         .subscribe((status: string) => {
           if (status === 'SUBSCRIBED') {
             channel.send({
@@ -933,6 +957,43 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     await startRecording(session.language, '');
+  };
+
+  // ── Rejoin Ongoing Active Session for Teacher ────────────────────────────────
+  const rejoinOngoingTeacherSession = async (roomCode: string) => {
+    try {
+      const { data } = await db.from('live_sessions')
+        .select('*')
+        .eq('room_code', roomCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (data) {
+        accumulatedTranscriptRef.current = data.transcript || '';
+        setSession({
+          isActive: true,
+          roomCode: data.room_code,
+          subject: 'Sesi Pembelajaran Berlangsung',
+          teacherName: data.teacher_name || user?.name || 'Guru',
+          teacherSchool: data.teacher_school || user?.school || null,
+          subjectId: data.subject_id,
+          classId: data.class_id,
+          language: data.language || 'id',
+          transcript: data.transcript || '',
+          interimTranscript: data.interim_transcript || '',
+          errorMessage: null,
+          startTime: data.started_at ? new Date(data.started_at).getTime() : Date.now(),
+          participants: [],
+          customKeywords: [],
+          customGlossary: {},
+          isPaused: false,
+          isReconnecting: false,
+        });
+        await startRecording(data.language || 'id', data.transcript || '');
+      }
+    } catch (e) {
+      console.error('Failed to rejoin ongoing session:', e);
+    }
   };
 
   // ── Session Lifecycle ────────────────────────────────────────────────────────
@@ -1279,6 +1340,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       resumeRecording,
       isRecording,
       toggleRecording,
+      rejoinOngoingTeacherSession,
     }}>
       {children}
       {Platform.OS !== 'web' && isSttReady && <NativeEventBridge />}

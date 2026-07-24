@@ -472,14 +472,46 @@ export default function LiveScreen() {
             </View>
 
             <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={async () => {
-                await logout();
-                router.replace('/(auth)/role-select');
+              activeOpacity={0.8}
+              onPress={() => {
+                Alert.alert(
+                  appLang === 'en' ? 'Leave Room' : 'Keluar Ruangan Kelas',
+                  appLang === 'en' ? 'Are you sure you want to leave this class session?' : 'Apakah Anda yakin ingin keluar dari kelas ini?',
+                  [
+                    { text: appLang === 'en' ? 'Cancel' : 'Batal', style: 'cancel' },
+                    {
+                      text: appLang === 'en' ? 'Leave' : 'Keluar',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const { supabase } = await import('../../services/supabase');
+                          if (session.roomCode) {
+                            const ch = supabase.channel(`room_${session.roomCode}`);
+                            ch.send({
+                              type: 'broadcast',
+                              event: 'student_left',
+                              payload: { name: user?.name, absen: user?.absen }
+                            });
+                          }
+                        } catch (_) {}
+                        await clearStudentRoomCode();
+                        router.replace('/(tabs)/home');
+                      }
+                    }
+                  ]
+                );
               }}
-              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hc ? '#ef4444' : '#fee2e2', alignItems: 'center', justifyContent: 'center' }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                backgroundColor: hc ? '#7f1d1d' : '#fee2e2',
+                paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+                borderWidth: 1, borderColor: hc ? '#ef4444' : '#fca5a5',
+              }}
             >
-              <LogOut size={14} color={hc ? '#ffffff' : '#ef4444'} />
+              <LogOut size={13} color={hc ? '#f87171' : '#dc2626'} />
+              <Text style={{ fontSize: 11, fontWeight: '800', color: hc ? '#f87171' : '#dc2626' }}>
+                {appLang === 'en' ? 'Exit' : 'Keluar'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

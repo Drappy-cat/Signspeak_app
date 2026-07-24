@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image, ScrollView, BackHandler } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Headphones, Eye, EyeOff, ChevronDown, ArrowLeft } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -259,6 +260,8 @@ export default function LoginScreen() {
 
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+  const insets = useSafeAreaInsets();
+  const safeBottomPadding = Math.max(insets.bottom, 16) + 32;
 
   return (
     <KeyboardAvoidingView 
@@ -321,7 +324,7 @@ export default function LoginScreen() {
 
         <ScrollView 
           style={{ flex: 1 }} 
-          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingVertical: 48 }}
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingTop: 24, paddingBottom: safeBottomPadding }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

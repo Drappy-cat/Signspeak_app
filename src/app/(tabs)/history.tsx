@@ -4,6 +4,7 @@ import { Search, BookOpen, Clock, HelpCircle, X, Copy, Check } from 'lucide-reac
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DICT } from '../../constants/i18n';
 import { getCardShadow, parseHighlights } from '../../utils/formatters';
 import { useFocusEffect } from 'expo-router';
@@ -152,10 +153,14 @@ export function isSessionInTimeFilter(session: SessionRecord, filter: TimeFilter
 }
 
 export default function HistoryScreen() {
-  const { user, role } = useAuth();
+  const { role, user } = useAuth();
   const { settings } = useSettings();
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';
+
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : (insets.bottom || 8);
+  const scrollPaddingBottom = (role === 'teacher' ? (58 + bottomPadding) : insets.bottom) + 36;
   const d = DICT[appLang];
 
   const [historyList, setHistoryList] = React.useState<SessionRecord[]>([]);
@@ -423,7 +428,7 @@ export default function HistoryScreen() {
         data={filteredHistory}
         keyExtractor={(item) => item.id.toString()}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, gap: 10 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: scrollPaddingBottom, gap: 10 }}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', color: mutedColor, marginBottom: 2 }}>

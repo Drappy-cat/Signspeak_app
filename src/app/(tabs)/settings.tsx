@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../../contexts/SettingsContext';
 import { FontSizeLabels, FontSizeKey, FontSizes } from '../../constants/theme';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -57,8 +58,12 @@ function CustomToggle({ val, onChange, hc }: { val: boolean; onChange: () => voi
 
 export default function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
-  const { user, logout, role, refreshUser } = useAuth();
+  const { role, user, logout, refreshUser } = useAuth();
   const router = useRouter();
+  
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : (insets.bottom || 8);
+  const scrollPaddingBottom = (role === 'teacher' ? (58 + bottomPadding) : insets.bottom) + 36;
   const [isAdmin, setIsAdmin] = React.useState(false);
 
   useFocusEffect(
@@ -114,7 +119,7 @@ export default function SettingsScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: scrollPaddingBottom, gap: 12 }}
         showsVerticalScrollIndicator={false}
       >
         {/* App Language Selection */}

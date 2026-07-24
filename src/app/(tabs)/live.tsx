@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut, RotateCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { db } from '../../services/supabase';
@@ -132,6 +133,11 @@ export default function LiveScreen() {
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
   const appLang = settings.appLang || 'id';
+
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : (insets.bottom || 8);
+  const teacherScrollBottomPadding = (58 + bottomPadding) + 32;
+  const studentScrollBottomPadding = Math.max(insets.bottom, 16) + 32;
 
   // Glossary and Word Info Modal states
   const [glossaryVisible, setGlossaryVisible] = useState(false);
@@ -502,7 +508,9 @@ export default function LiveScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 4,
-            backgroundColor: session.language === 'jv'
+            backgroundColor: session.language === 'en'
+              ? (hc ? '#4c1d95' : '#f3e8ff')
+              : session.language === 'jv'
               ? (hc ? '#713f12' : '#fef9c3')
               : session.language === 'mad'
               ? (hc ? '#14532d' : '#dcfce7')
@@ -511,7 +519,9 @@ export default function LiveScreen() {
             paddingVertical: 5,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: session.language === 'jv'
+            borderColor: session.language === 'en'
+              ? (hc ? '#7c3aed' : '#d8b4fe')
+              : session.language === 'jv'
               ? (hc ? '#a16207' : '#fde047')
               : session.language === 'mad'
               ? (hc ? '#15803d' : '#86efac')
@@ -520,13 +530,15 @@ export default function LiveScreen() {
             <Text style={{
               fontSize: 10,
               fontWeight: '900',
-              color: session.language === 'jv'
+              color: session.language === 'en'
+                ? (hc ? '#e9d5ff' : '#6b21a8')
+                : session.language === 'jv'
                 ? (hc ? '#fef08a' : '#854d0e')
                 : session.language === 'mad'
                 ? (hc ? '#86efac' : '#14532d')
                 : (hc ? '#93c5fd' : '#1e40af'),
             }}>
-              🇮🇩 {session.language === 'jv' ? 'ID JAWA' : session.language === 'mad' ? 'ID MADURA' : 'ID INDO'}
+              {session.language === 'en' ? '🇬🇧 EN ENGLISH' : session.language === 'jv' ? '🇮🇩 ID JAWA' : session.language === 'mad' ? '🇮🇩 ID MADURA' : '🇮🇩 ID INDO'}
             </Text>
           </View>
         </View>
@@ -602,7 +614,7 @@ export default function LiveScreen() {
         <ScrollView
           ref={scrollViewRef}
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, gap: 12 }}
+          contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: studentScrollBottomPadding }}
           showsVerticalScrollIndicator={false}
         >
           {!session.isActive ? (

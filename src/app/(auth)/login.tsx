@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image, ScrollView, BackHandler } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,6 +27,9 @@ export default function LoginScreen() {
   const [studentName, setStudentName] = useState('');
   const [studentClass, setStudentClass] = useState('');
   const [studentAbsen, setStudentAbsen] = useState('');
+  const studentNameRef = useRef<TextInput>(null);
+  const studentAbsenRef = useRef<TextInput>(null);
+  const passRef = useRef<TextInput>(null);
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [studentStep, setStudentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -383,6 +386,8 @@ export default function LoginScreen() {
                     placeholder={(d as any).loginClassCodePlaceholder || 'Masukkan kode kelas'}
                     placeholderTextColor={mutedColor}
                     autoCapitalize="characters"
+                    returnKeyType="next"
+                    onSubmitEditing={() => studentNameRef.current?.focus()}
                     style={[{
                       borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                       fontSize: 14, fontWeight: '700', letterSpacing: 2, textAlign: 'center',
@@ -405,10 +410,13 @@ export default function LoginScreen() {
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerName}</Text>
                   <TextInput
+                    ref={studentNameRef}
                     value={studentName}
                     onChangeText={setStudentName}
                     placeholder={appLang === 'en' ? "E.g. Budi Santoso" : "Misal: Budi Santoso"}
                     placeholderTextColor={mutedColor}
+                    returnKeyType="next"
+                    onSubmitEditing={() => studentAbsenRef.current?.focus()}
                     style={[{
                       borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                       fontSize: 14, fontWeight: '500',
@@ -421,11 +429,14 @@ export default function LoginScreen() {
                     {appLang === 'en' ? "Attendance Number" : "Nomor Absen"}
                   </Text>
                   <TextInput
+                    ref={studentAbsenRef}
                     value={studentAbsen}
                     onChangeText={setStudentAbsen}
                     placeholder={appLang === 'en' ? "E.g. 14" : "Misal: 14"}
                     placeholderTextColor={mutedColor}
                     keyboardType="numeric"
+                    returnKeyType="go"
+                    onSubmitEditing={handleLogin}
                     style={[{
                       borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                       fontSize: 14, fontWeight: '500',
@@ -445,6 +456,8 @@ export default function LoginScreen() {
                     placeholderTextColor={mutedColor}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passRef.current?.focus()}
                     style={[{
                       borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                       fontSize: 14, fontWeight: '500',
@@ -459,11 +472,14 @@ export default function LoginScreen() {
                     borderRadius: 12, paddingRight: 16,
                   }, inputStyle]}>
                     <TextInput
+                      ref={passRef}
                       value={pass}
                       onChangeText={setPass}
                       placeholder="••••••••"
                       placeholderTextColor={mutedColor}
                       secureTextEntry={!showPass}
+                      returnKeyType="go"
+                      onSubmitEditing={handleLogin}
                       style={{
                         flex: 1, paddingHorizontal: 16, paddingVertical: 12,
                         fontSize: 14, fontWeight: '500', color: textColor,

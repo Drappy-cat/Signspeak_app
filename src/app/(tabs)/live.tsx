@@ -218,6 +218,12 @@ export default function LiveScreen() {
 
   useEffect(() => {
     if (role === 'student' && !session.isActive) {
+      if (session.errorMessage === 'Sesi telah diakhiri oleh guru.') {
+        // Teacher just ended it live
+        router.replace('/session-ended');
+        return;
+      }
+      
       if (!alertedRef.current) {
         Alert.alert(
           appLang === 'en' ? 'Waiting for Teacher' : 'Menunggu Sesi Guru',
@@ -231,7 +237,7 @@ export default function LiveScreen() {
     } else if (session.isActive) {
       alertedRef.current = false;
     }
-  }, [session.isActive]);
+  }, [session.isActive, session.errorMessage, role, appLang]);
   // Elapsed timer for teacher
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;

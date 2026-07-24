@@ -16,14 +16,4 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-// Untyped client for new tables (schools, grades, classes, teachers, etc.)
-// TODO: After running SQL migration, regenerate types with `supabase gen types typescript`
-//       then remove this and use `supabase` directly everywhere
-export const db = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: Platform.OS === 'web',
-  },
-});
+export const db = supabase as any;

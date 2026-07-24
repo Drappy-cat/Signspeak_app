@@ -6,7 +6,7 @@ export interface AppNotification {
   title: string;
   body: string;
   timestamp: number; // epoch ms
-  type: 'live_session' | 'no_students' | 'history_ready';
+  type: 'live_session' | 'no_students' | 'history_ready' | 'student_left';
   actionData?: any; // e.g. roomCode, historyId, etc.
   read: boolean;
 }

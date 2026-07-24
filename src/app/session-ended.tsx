@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Animated, Easing } from 'react-native';
 import { useRouter } from 'expo-router';
 import { UserCircle2, LogOut, Hash, ArrowRight, Info } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,12 +7,14 @@ import { useSettings } from '../contexts/SettingsContext';
 import { loadStudentCache, StudentCacheData } from '../utils/studentCache';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BubbleBackground } from '../components/BubbleBackground';
+import { getActiveSessionByRoomCode } from '../services/teacherService';
+import { getClassByRoomCode } from '../services/schoolService';
 
 export default function SessionEndedScreen() {
   const router = useRouter();
   const { login } = useAuth();
   const { settings } = useSettings();
-  const appLang = settings.language;
+  const appLang = settings.appLang || 'id';
   const hc = settings.highContrast;
 
   const [loading, setLoading] = useState(true);
@@ -22,21 +24,22 @@ export default function SessionEndedScreen() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const init = async () => {
-      const data = await loadStudentCache();
-      if (!data) {
+    async function init() {
+      const cache = await loadStudentCache();
+      if (!cache) {
         // Cache expired or doesn't exist, force re-login
         router.replace('/(auth)/login');
         return;
       }
-      setCachedData(data);
+      setCachedData(cache);
       setLoading(false);
-    };
+    }
     init();
   }, []);
 
   const handleJoin = async () => {
-    if (!roomCode.trim()) {
+    const upperCode = roomCode.trim().toUpperCase();
+    if (!upperCode) {
       setErrorMsg(appLang === 'en' ? 'Please enter a room code' : 'Harap masukkan kode kelas');
       return;
     }
@@ -45,11 +48,34 @@ export default function SessionEndedScreen() {
     setErrorMsg('');
     setJoining(true);
     try {
+      // Check room code in Supabase
+      let activeSession: any = null;
+      try {
+        activeSession = await getActiveSessionByRoomCode(upperCode);
+      } catch (_) {}
+
+      if (!activeSession) {
+        let existingClass: any = null;
+        try {
+          existingClass = await getClassByRoomCode(upperCode);
+        } catch (_) {}
+
+        if (!existingClass) {
+          setErrorMsg(
+            appLang === 'en'
+              ? `Room code "${upperCode}" is invalid or inactive.`
+              : `Kode ruangan "${upperCode}" tidak ditemukan atau sedang tidak aktif.`
+          );
+          setJoining(false);
+          return;
+        }
+      }
+
       // Re-login using cached identity
       await login(
         '', 
         undefined, 
-        roomCode.trim().toUpperCase(), 
+        upperCode, 
         'student', 
         cachedData.name, 
         cachedData.className || 'Kelas Umum', 
@@ -74,6 +100,18 @@ export default function SessionEndedScreen() {
   const mutedColor = hc ? '#94a3b8' : '#64748b';
   const cardColor = hc ? '#1e293b' : '#ffffff';
 
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardScale = useRef(new Animated.Value(0.93)).current;
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(cardOpacity, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(cardScale, { toValue: 1, useNativeDriver: true, tension: 160, friction: 9 }),
+      ]).start();
+    }
+  }, [loading]);
+
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1, backgroundColor: hc ? '#0f172a' : '#F0F7FF' }} 
@@ -82,7 +120,9 @@ export default function SessionEndedScreen() {
       <BubbleBackground hc={hc} />
       
       <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
-        <View style={{
+        <Animated.View style={{
+          opacity: cardOpacity,
+          transform: [{ scale: cardScale }],
           backgroundColor: cardColor,
           padding: 28,
           borderRadius: 24,
@@ -218,7 +258,7 @@ export default function SessionEndedScreen() {
               {appLang === 'en' ? 'Switch Account / Logout' : 'Ganti Akun / Keluar'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </View>
     </KeyboardAvoidingView>
   );

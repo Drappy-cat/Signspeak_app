@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share, RefreshControl, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { saveProfilePhotoLocally, uploadProfilePhoto } from '../../services/storageService';
@@ -11,7 +12,8 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory, generateUniqueRoomCode, assignTeacherToClass, createAndAssignClassForTeacher, removeTeacherFromClass, updateTeacherProfile } from '../../services/teacherService';
 import { getClassesBySchool, getAllGrades, getSchoolById, getGradesBySchoolType } from '../../services/schoolService';
 import type { ClassWithDetails, Subject, Grade } from '../../types/database';
-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2, User, LogOut } from 'lucide-react-native';
+import { db } from '../../services/supabase';
+import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2, User, LogOut, Play } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -83,15 +85,85 @@ function PulseDot() {
   return <Animated.View style={{ opacity: anim }} className="w-2.5 h-2.5 rounded-full bg-red-400" />;
 }
 
+// ── FadeInBanner: lightweight slide-down fade-in for banners ───────────────
+function FadeInBanner({ children, style }: { children: React.ReactNode; style?: any }) {
+  const opacity = React.useRef(new Animated.Value(0)).current;
+  const translateY = React.useRef(new Animated.Value(-10)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 340, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 340, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+// ── AnimatedSessionRow: staggered fade-in for Recent Sessions list ────────
+// Extracted from renderTeacherHome so React hooks are never called inside .map()
+function AnimatedSessionRow({ item, index, cardStyle, hc, mutedColorVal, muted, linkColor, appLang, onPress }: {
+  item: any; index: number; cardStyle: any; hc: boolean; mutedColorVal: string; muted: string; linkColor: string; appLang: string;
+  onPress: () => void;
+}) {
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(12)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 260, delay: Math.min(index * 50, 250), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 260, delay: Math.min(index * 50, 250), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onPress}
+        style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }, cardStyle]}
+      >
+        <View style={{
+          width: 36, height: 36, borderRadius: 10,
+          backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+          alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          <BookOpen size={16} color={hc ? "#93c5fd" : "#1d4ed8"} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{item.subject_display || 'Sesi'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <Clock size={11} color={mutedColorVal} />
+            <Text className={`text-xs ${muted}`}>
+              {formatSessionDateTime(item.created_at || item.session_date)} · {Math.floor((item.duration || 0) / 60)}m
+            </Text>
+          </View>
+        </View>
+        <Text className={`text-xs font-bold ${linkColor}`}>{item.word_count?.toLocaleString() || 0} {appLang === 'en' ? 'words' : 'kata'}</Text>
+        <ChevronRight size={15} color={hc ? "#64748b" : "#94a3b8"} />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const { role, user, logout, refreshUser } = useAuth();
-  const { session, startSession } = useSession();
+  const { session, startSession, rejoinOngoingTeacherSession } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
   
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';
   const d = DICT[appLang];
+  
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : (insets.bottom || 8);
+  const tabBarHeight = role === 'teacher' ? (58 + bottomPadding) : insets.bottom;
+  const scrollPaddingBottom = tabBarHeight + 36;
 
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textMain = hc ? "text-white" : "text-slate-900";
@@ -134,6 +206,9 @@ export default function HomeScreen() {
   const [selectedSessionHistory, setSelectedSessionHistory] = React.useState<any | null>(null);
   const [newWord, setNewWord] = React.useState('');
   const [newDefinition, setNewDefinition] = React.useState('');
+  const [hasGlossaryChangedRef] = React.useState({ current: false });
+  const [isStartingSession, setIsStartingSession] = React.useState(false);
+  const [activeOngoingSession, setActiveOngoingSession] = React.useState<any | null>(null);
 
   const [addClassModalVisible, setAddClassModalVisible] = React.useState(false);
   
@@ -169,7 +244,7 @@ export default function HomeScreen() {
       setAllGradesList(grades);
       if (grades.length > 0) setSelectedGradeId(grades[0].id);
     } catch (e) {
-      console.error(e);
+      console.error('[Home] openAddClassModal - failed to load grades:', e);
     }
   };
 
@@ -202,7 +277,7 @@ export default function HomeScreen() {
         : `Berhasil! Kelas "${classNameCreated}" telah berhasil ditambahkan.`
       );
     } catch (e: any) {
-      console.error(e);
+      console.error('[Home] handleCreateNewClass - failed to create class:', e);
       alert(e.message || (appLang === 'en' ? 'Failed to create new class.' : 'Gagal membuat kelas baru.'));
     } finally {
       setIsAddingClass(false);
@@ -220,7 +295,7 @@ export default function HomeScreen() {
         : `Kelas ${classNameDisplay || ''} telah berhasil dihapus.`
       );
     } catch (e) {
-      console.error(e);
+      console.error('[Home] handleRemoveClass - failed to remove class relation:', e);
       alert(appLang === 'en' ? 'Failed to remove class.' : 'Gagal menghapus relasi kelas.');
     }
   };
@@ -248,6 +323,13 @@ export default function HomeScreen() {
         if (glossary && glossary.length > 0) {
           setCustomGlossaryList(glossary);
         }
+
+        const { data: ongoing } = await db.from('live_sessions')
+          .select('*, subject_rel:subjects(subject_name), class_rel:classes(class_name)')
+          .eq('teacher_id', user.teacher_id)
+          .eq('is_active', true)
+          .maybeSingle();
+        setActiveOngoingSession(ongoing || null);
       } catch (err) {
         console.error('Error loading home data:', err);
       } finally {
@@ -266,9 +348,9 @@ export default function HomeScreen() {
     loadHomeData();
   }, [role, user?.teacher_id]);
 
-  // Save custom glossary to database when it changes
+  // Save custom glossary to database only when explicitly modified by user
   React.useEffect(() => {
-    if (!isGlossaryLoaded) return;
+    if (!isGlossaryLoaded || !hasGlossaryChangedRef.current) return;
     
     if (user?.teacher_id) {
       saveTeacherGlossary(user.teacher_id, customGlossaryList).catch(console.error);
@@ -522,6 +604,46 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Active Ongoing Session Recovery Card for Teacher */}
+      {activeOngoingSession && (
+        <FadeInBanner style={{
+          marginHorizontal: 20, marginTop: 12, marginBottom: 8, padding: 16, borderRadius: 16,
+          backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+          ...getCardShadow(hc, 'md')
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <PulseDot />
+            <Text style={{ fontSize: 11, fontWeight: '900', color: '#ef4444', textTransform: 'uppercase', letterSpacing: 1 }}>
+              {appLang === 'en' ? 'Active Session Ongoing' : 'Sesi Kelas Masih Berjalan'}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 16, fontWeight: '900', color: textColorVal }}>
+            {activeOngoingSession.subject_rel?.subject_name || 'Sesi Pembelajaran'}
+          </Text>
+          <Text style={{ fontSize: 12, color: mutedColorVal, marginTop: 2 }}>
+            {appLang === 'en' ? 'Room Code:' : 'Kode Ruangan:'} <Text style={{ fontWeight: '800', color: '#2563eb', letterSpacing: 1.5 }}>{activeOngoingSession.room_code}</Text>
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={async () => {
+              await rejoinOngoingTeacherSession(activeOngoingSession.room_code);
+              router.replace('/(tabs)/live');
+            }}
+            style={{
+              marginTop: 14, backgroundColor: '#2563eb', paddingVertical: 12, borderRadius: 12,
+              alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8,
+              shadowColor: '#2563eb', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4
+            }}
+          >
+            <Play size={16} color="#ffffff" fill="#ffffff" />
+            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>
+              {appLang === 'en' ? 'Re-join Live Session' : 'Kembali Ke Sesi Kelas Live'}
+            </Text>
+          </TouchableOpacity>
+        </FadeInBanner>
+      )}
+
       {/* Language Selector */}
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
         <View style={[{ padding: 14 }, cardStyle]}>
@@ -636,7 +758,7 @@ export default function HomeScreen() {
                     const updated = await getTeacherClasses(user.teacher_id);
                     setTeacherClasses(updated);
                   } catch (e) {
-                    console.error(e);
+                    console.error('[Home] inline removeTeacherFromClass - failed:', e);
                   }
                 }}
                 style={{ padding: 6, marginLeft: 4 }}
@@ -662,31 +784,18 @@ export default function HomeScreen() {
               {appLang === 'en' ? 'No recent sessions.' : 'Belum ada riwayat sesi.'}
             </Text>
           ) : recentSessions.map((item, i) => (
-            <TouchableOpacity 
+            <AnimatedSessionRow
               key={item.id || i}
-              activeOpacity={0.8}
+              item={item}
+              index={i}
+              cardStyle={cardStyle}
+              hc={hc}
+              mutedColorVal={mutedColorVal}
+              muted={muted}
+              linkColor={linkColor}
+              appLang={appLang}
               onPress={() => setSelectedSessionHistory(item)}
-              style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }, cardStyle]}
-            >
-              <View style={{
-                width: 36, height: 36, borderRadius: 10,
-                backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
-                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <BookOpen size={16} color={hc ? "#93c5fd" : "#1d4ed8"} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontWeight: '700', fontSize: 14, color: hc ? '#f8fafc' : '#0f172a' }}>{item.subject_display || 'Sesi'}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                  <Clock size={11} color={mutedColorVal} />
-                  <Text className={`text-xs ${muted}`}>
-                    {formatSessionDateTime(item.created_at || item.session_date)} · {Math.floor((item.duration || 0) / 60)}m
-                  </Text>
-                </View>
-              </View>
-              <Text className={`text-xs font-bold ${linkColor}`}>{item.word_count?.toLocaleString() || 0} {appLang === 'en' ? 'words' : 'kata'}</Text>
-              <ChevronRight size={15} color={hc ? "#64748b" : "#94a3b8"} />
-            </TouchableOpacity>
+            />
           ))}
         </View>
       </View>
@@ -717,7 +826,7 @@ export default function HomeScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: scrollPaddingBottom }}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -909,6 +1018,7 @@ export default function HomeScreen() {
                     activeOpacity={0.8}
                     onPress={() => {
                       if (newWord.trim() && newDefinition.trim()) {
+                        hasGlossaryChangedRef.current = true;
                         setCustomGlossaryList(prev => [...prev, { word: newWord.trim(), definition: newDefinition.trim() }]);
                         setNewWord('');
                         setNewDefinition('');
@@ -955,7 +1065,10 @@ export default function HomeScreen() {
                         </View>
                         <TouchableOpacity
                           activeOpacity={0.7}
-                          onPress={() => setCustomGlossaryList(prev => prev.filter((_, i) => i !== index))}
+                          onPress={() => {
+                            hasGlossaryChangedRef.current = true;
+                            setCustomGlossaryList(prev => prev.filter((_, i) => i !== index));
+                          }}
                           style={{ padding: 4 }}
                         >
                           <Trash2 size={14} color="#ef4444" />
@@ -970,15 +1083,21 @@ export default function HomeScreen() {
             {/* Action - Confirm Start */}
             <TouchableOpacity
               activeOpacity={0.9}
+              disabled={isStartingSession}
               onPress={async () => {
+                setIsStartingSession(true);
                 setStartModalVisible(false);
                 const selectedSubjObj = teacherSubjects.find(s => s.id === selectedSubjectId);
                 const selectedClassObj = teacherClasses.find(c => c.id === selectedClassId);
                 const roomCode = selectedClassObj?.room_code || await generateUniqueRoomCode();
                 const sessionSubject = `${selectedSubjObj?.subject_name} (${selectedClassObj?.class_name})`;
                 
-                await startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);
-                router.push('/(tabs)/live');
+                router.replace('/(tabs)/live');
+                try {
+                  await startSession(roomCode, sessionSubject, selectedLang, selectedClassId || '', selectedSubjectId || '', customGlossaryList);
+                } finally {
+                  setIsStartingSession(false);
+                }
               }}
             >
               <LinearGradient
@@ -996,6 +1115,29 @@ export default function HomeScreen() {
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Starting Session Fullscreen Glassmorphic Loader */}
+      {isStartingSession && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999,
+          backgroundColor: hc ? 'rgba(15,23,42,0.92)' : 'rgba(240,247,255,0.92)',
+          alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <View style={{
+            padding: 28, borderRadius: 24, backgroundColor: hc ? '#1e293b' : '#ffffff',
+            alignItems: 'center', gap: 16, width: '100%', maxWidth: 300,
+            ...getCardShadow(hc, 'lg')
+          }}>
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text style={{ fontSize: 16, fontWeight: '900', color: textColorVal, textAlign: 'center' }}>
+              {appLang === 'en' ? 'Starting Class Session...' : 'Memulai Sesi Kelas...'}
+            </Text>
+            <Text style={{ fontSize: 12, color: mutedColorVal, textAlign: 'center' }}>
+              {appLang === 'en' ? 'Preparing live transcription room' : 'Menyiapkan ruangan transkripsi live'}
+            </Text>
           </View>
         </View>
       )}
@@ -1020,12 +1162,13 @@ export default function HomeScreen() {
             <View style={{
               width: '100%',
               maxWidth: 500,
-              height: '82%',
+              maxHeight: '92%',
               backgroundColor: hc ? '#0f172a' : '#f0f7ff',
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               paddingTop: 16,
               paddingHorizontal: 20,
+              paddingBottom: Math.max(insets.bottom + 8, 16),
               ...getCardShadow(hc, 'lg')
             }}>
               {/* Drag Handle */}
@@ -1517,7 +1660,10 @@ export default function HomeScreen() {
       {/* Edit Profile Modal */}
       {editProfileModalVisible && (
         <Modal transparent={true} animationType="slide" visible={editProfileModalVisible} onRequestClose={() => setEditProfileModalVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
+          >
             <View style={{
               width: '100%',
               maxWidth: 340,
@@ -1634,7 +1780,7 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       )}
 

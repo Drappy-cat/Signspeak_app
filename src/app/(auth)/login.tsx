@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, StatusBar as RNStatusBar, Animated, Dimensions, StyleSheet, Alert, Modal, Image, ScrollView, BackHandler } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Headphones, Eye, EyeOff, ChevronDown, ArrowLeft } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,6 +9,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
 import { supabase, db } from '../../services/supabase';
 import { getActiveSessionByRoomCode, upsertStudent, addSessionParticipant } from '../../services/teacherService';
+import { getClassByRoomCode } from '../../services/schoolService';
 import { loadStudentCache } from '../../utils/studentCache';
 import { DICT } from '../../constants/i18n';
 
@@ -25,6 +27,9 @@ export default function LoginScreen() {
   const [studentName, setStudentName] = useState('');
   const [studentClass, setStudentClass] = useState('');
   const [studentAbsen, setStudentAbsen] = useState('');
+  const studentNameRef = useRef<TextInput>(null);
+  const studentAbsenRef = useRef<TextInput>(null);
+  const passRef = useRef<TextInput>(null);
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [studentStep, setStudentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -153,25 +158,37 @@ export default function LoginScreen() {
           activeSession = await getActiveSessionByRoomCode(roomCodeUpper);
         } catch (_) {}
         
-        // If no DB session found, check if it's demo/testing mode
+        // Check active session in DB
         if (!activeSession) {
-          activeSession = {
-            id: 'demo-session-id',
-            class_id: 'demo-class-id',
-            room_code: roomCodeUpper,
-            is_active: true,
-          };
+          let existingClass: any = null;
+          try {
+            existingClass = await getClassByRoomCode(roomCodeUpper);
+          } catch (_) {}
+
+          if (!existingClass) {
+            setLoading(false);
+            setModalTitle(appLang === 'en' ? 'Class Not Found' : 'Kode Tidak Ditemukan');
+            setModalMsg(
+              appLang === 'en'
+                ? `Room code "${roomCodeUpper}" was not found. Please check the code or ask your teacher.`
+                : `Kode ruangan "${roomCodeUpper}" tidak ditemukan atau sedang tidak aktif. Pastikan kode benar atau tanyakan kepada guru.`
+            );
+            setShowModal(true);
+            return;
+          }
         }
 
         // Try upserting student in DB if online
         try {
-          const student = await upsertStudent({
-            class_id: activeSession.class_id,
-            name: studentName.trim(),
-            absen: studentAbsen.trim(),
-          });
-          if (student && activeSession.id !== 'demo-session-id') {
-            await addSessionParticipant(activeSession.id, student.id);
+          if (activeSession?.class_id) {
+            const student = await upsertStudent({
+              class_id: activeSession.class_id,
+              name: studentName.trim(),
+              absen: studentAbsen.trim(),
+            });
+            if (student && activeSession.id !== 'demo-session-id') {
+              await addSessionParticipant(activeSession.id, student.id);
+            }
           }
         } catch (dbErr: any) {
           if (dbErr?.message?.includes('sudah digunakan')) {
@@ -181,14 +198,14 @@ export default function LoginScreen() {
             setShowModal(true);
             return;
           }
-          console.log('[Demo] Running in offline demo mode for student:', dbErr?.message);
+          console.log('[Demo] Running in offline mode for student:', dbErr?.message);
         }
 
         // Format class and school identity
-        const gradeStr = activeSession.class?.grade?.grade_name ? `Kelas ${activeSession.class.grade.grade_name}` : '';
-        const classStr = activeSession.class?.class_name || '';
+        const gradeStr = activeSession?.class?.grade?.grade_name ? `Kelas ${activeSession.class.grade.grade_name}` : '';
+        const classStr = activeSession?.class?.class_name || '';
         const fullClassName = `${gradeStr} ${classStr}`.trim() || 'Kelas Umum';
-        const schoolName = activeSession.class?.school?.school_name || '';
+        const schoolName = activeSession?.class?.school?.school_name || '';
         const identityStr = schoolName ? `${fullClassName} • ${schoolName}` : fullClassName;
 
         // Store into AuthContext
@@ -197,10 +214,10 @@ export default function LoginScreen() {
         setLoading(false);
         router.replace('/(tabs)/live');
       } catch (err: any) {
-        // Safe fallback to enter demo session directly
-        await login('', undefined, classCode.trim().toUpperCase(), 'student', studentName.trim(), 'Kelas Umum', studentAbsen.trim());
         setLoading(false);
-        router.replace('/(tabs)/live');
+        setModalTitle(appLang === 'en' ? 'Failed to Join' : 'Gagal Masuk Kelas');
+        setModalMsg(err?.message || (appLang === 'en' ? 'Failed to verify room code. Please check your network connection.' : 'Gagal memverifikasi kode ruangan. Periksa koneksi internet Anda.'));
+        setShowModal(true);
         return;
       }
     } else {
@@ -246,6 +263,8 @@ export default function LoginScreen() {
 
 
   const androidPadding = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+  const insets = useSafeAreaInsets();
+  const safeBottomPadding = Math.max(insets.bottom, 16) + 32;
 
   return (
     <KeyboardAvoidingView 
@@ -308,7 +327,7 @@ export default function LoginScreen() {
 
         <ScrollView 
           style={{ flex: 1 }} 
-          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingVertical: 48 }}
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingTop: 24, paddingBottom: safeBottomPadding }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -367,6 +386,8 @@ export default function LoginScreen() {
                     placeholder={(d as any).loginClassCodePlaceholder || 'Masukkan kode kelas'}
                     placeholderTextColor={mutedColor}
                     autoCapitalize="characters"
+                    returnKeyType="next"
+                    onSubmitEditing={() => studentNameRef.current?.focus()}
                     style={[{
                       borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                       fontSize: 14, fontWeight: '700', letterSpacing: 2, textAlign: 'center',
@@ -389,10 +410,13 @@ export default function LoginScreen() {
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: textColor }}>{d.registerName}</Text>
                   <TextInput
+                    ref={studentNameRef}
                     value={studentName}
                     onChangeText={setStudentName}
                     placeholder={appLang === 'en' ? "E.g. Budi Santoso" : "Misal: Budi Santoso"}
                     placeholderTextColor={mutedColor}
+                    returnKeyType="next"
+                    onSubmitEditing={() => studentAbsenRef.current?.focus()}
                     style={[{
                       borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                       fontSize: 14, fontWeight: '500',
@@ -405,11 +429,14 @@ export default function LoginScreen() {
                     {appLang === 'en' ? "Attendance Number" : "Nomor Absen"}
                   </Text>
                   <TextInput
+                    ref={studentAbsenRef}
                     value={studentAbsen}
                     onChangeText={setStudentAbsen}
                     placeholder={appLang === 'en' ? "E.g. 14" : "Misal: 14"}
                     placeholderTextColor={mutedColor}
                     keyboardType="numeric"
+                    returnKeyType="go"
+                    onSubmitEditing={handleLogin}
                     style={[{
                       borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                       fontSize: 14, fontWeight: '500',
@@ -429,6 +456,8 @@ export default function LoginScreen() {
                     placeholderTextColor={mutedColor}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passRef.current?.focus()}
                     style={[{
                       borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
                       fontSize: 14, fontWeight: '500',
@@ -443,11 +472,14 @@ export default function LoginScreen() {
                     borderRadius: 12, paddingRight: 16,
                   }, inputStyle]}>
                     <TextInput
+                      ref={passRef}
                       value={pass}
                       onChangeText={setPass}
                       placeholder="••••••••"
                       placeholderTextColor={mutedColor}
                       secureTextEntry={!showPass}
+                      returnKeyType="go"
+                      onSubmitEditing={handleLogin}
                       style={{
                         flex: 1, paddingHorizontal: 16, paddingVertical: 12,
                         fontSize: 14, fontWeight: '500', color: textColor,

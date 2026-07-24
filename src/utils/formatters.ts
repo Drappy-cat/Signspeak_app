@@ -4,8 +4,9 @@ import { Platform } from 'react-native';
  * Format seconds into MM:SS string
  */
 export function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
+  const safeSecs = (!seconds || isNaN(seconds) || seconds < 0) ? 0 : Math.floor(seconds);
+  const mins = Math.floor(safeSecs / 60);
+  const secs = safeSecs % 60;
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
@@ -13,7 +14,8 @@ export function formatDuration(seconds: number): string {
  * Format seconds into human-readable duration (e.g., "45 mnt")
  */
 export function formatDurationLabel(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
+  const safeSecs = (!seconds || isNaN(seconds) || seconds < 0) ? 0 : Math.floor(seconds);
+  const mins = Math.floor(safeSecs / 60);
   if (mins < 60) return `${mins} mnt`;
   const hours = Math.floor(mins / 60);
   const remainingMins = mins % 60;

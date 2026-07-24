@@ -3,25 +3,29 @@ import { saveSession } from '../services/db';
 import { addNotification } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import { DEMO_SENTENCES } from '../constants/keywords';
 import { translateToMadurese, translateToJavanese } from '../utils/translator';
+import { formatAutoPunctuation, applyGlossaryCorrections } from '../utils/textProcessor';
 import { supabase, db } from '../services/supabase';
 
 
-// ─── Language Mapping ─────────────────────────────────────────────────────────
-// Maps our internal language codes to BCP-47 tags recognized by Web Speech API & Android STT
+// All 4 translation modes use id-ID input because teacher speaks Indonesian in class!
 const LANG_TO_BCP47: Record<string, string> = {
-  id: 'id-ID',   // Bahasa Indonesia — full support in Chrome, Edge, Android
-  en: 'en-US',   // English
-  jv: 'id-ID',   // Bahasa Jawa — fallback to id-ID for dictionary translation
-  mad: 'id-ID',  // Bahasa Madura — no dedicated STT yet, fallback to id-ID
+  id: 'id-ID',   // Bahasa Indonesia ➔ Indonesia
+  en: 'id-ID',   // Bahasa Indonesia ➔ English
+  jv: 'id-ID',   // Bahasa Indonesia ➔ Jawa
+  mad: 'id-ID',  // Bahasa Indonesia ➔ Madura
 };
 
-function translateText(text: string, lang: string): string {
-  if (lang === 'mad') return translateToMadurese(text);
-  if (lang === 'jv') return translateToJavanese(text);
-  return text;
+function translateText(text: string, lang: string, customGlossary?: Record<string, string>): string {
+  if (!text) return '';
+  let processed = applyGlossaryCorrections(text, customGlossary);
+  processed = formatAutoPunctuation(processed);
+
+  if (lang === 'mad') return translateToMadurese(processed);
+  if (lang === 'jv') return translateToJavanese(processed);
+  return processed;
 }
 
 export interface Participant {
@@ -59,6 +63,9 @@ export interface ActiveSession {
   sessionEndingCountdown?: number;
   sessionEndingMessage?: string;
   shouldRedirectPostSession?: boolean;
+  isPaused?: boolean;
+  isReconnecting?: boolean;
+  reconnectMessage?: string;
 }
 
 interface SessionContextType {
@@ -71,6 +78,8 @@ interface SessionContextType {
   resumeRecording: () => Promise<void>;
   isRecording: boolean;
   toggleRecording: () => Promise<void>;
+  rejoinOngoingTeacherSession: (roomCode: string) => Promise<void>;
+  leaveStudentRoom: () => Promise<void>;
 }
 
 const defaultSession: ActiveSession = {
@@ -98,6 +107,9 @@ const defaultSession: ActiveSession = {
   isSessionEnding: false,
   sessionEndingCountdown: 0,
   sessionEndingMessage: '',
+  isPaused: false,
+  isReconnecting: false,
+  reconnectMessage: '',
 };
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -141,7 +153,12 @@ class WebSpeechEngine {
       this.restartTimeoutId = null;
     }
     if (this.recognition) {
-      try { this.recognition.stop(); } catch (_) {}
+      try {
+        this.recognition.onresult = null;
+        this.recognition.onerror = null;
+        this.recognition.onend = null;
+        this.recognition.stop();
+      } catch (_) {}
       this.recognition = null;
     }
   }
@@ -158,6 +175,7 @@ class WebSpeechEngine {
     this.recognition.maxAlternatives = 1;
 
     this.recognition.onresult = (event: any) => {
+      if (!this.active) return;
       let finalText = '';
       let interimText = '';
 
@@ -216,9 +234,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<ActiveSession>(defaultSession);
   const [isRecording, setIsRecording] = useState(false);
   const [isSttReady, setIsSttReady] = useState(false);
-  const { user, role, isReady: isAuthReady } = useAuth();
+  const { user, role, isReady: isAuthReady, clearStudentRoomCode } = useAuth();
 
   // Refs for side-effect objects
+  const isRecordingRef = useRef<boolean>(false);
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
   const webSpeechRef = useRef<WebSpeechEngine | null>(null);
   const webMockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -226,6 +249,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const accumulatedTranscriptRef = useRef<string>('');
   const customGlossaryRef = useRef<{ keywords: string[]; glossary: Record<string, string> }>({ keywords: [], glossary: {} });
   const teacherChannelRef = useRef<any>(null);
+  const studentChannelRef = useRef<any>(null);
+  const dbSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerLangPause = useCallback((fromLang: string, toLang: string, labelStr: string) => {
     if (langCountdownTimerRef.current) {
@@ -237,13 +262,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       language: toLang,
       isLangSwitching: true,
-      langPauseCountdown: 10,
+      langPauseCountdown: 5,
       langSwitchFrom: fromLang,
       langSwitchTo: toLang,
       langSwitchLabel: labelStr,
     }));
 
-    let count = 10;
+    let count = 5;
     langCountdownTimerRef.current = setInterval(() => {
       count -= 1;
       if (count <= 0) {
@@ -288,12 +313,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           clearInterval(endingTimerRef.current);
           endingTimerRef.current = null;
         }
+        accumulatedTranscriptRef.current = '';
         setSession(prev => ({
           ...prev,
           isActive: false,
           isSessionEnding: false,
           sessionEndingCountdown: 0,
           shouldRedirectPostSession: true,
+          transcript: '',
+          interimTranscript: '',
         }));
       } else {
         setSession(prev => ({
@@ -318,8 +346,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           }
 
           setSession(prev => {
-            const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language);
-            const finalInterim = translateText(interimText, prev.language);
+            const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language, prev.customGlossary);
+            const finalInterim = translateText(interimText, prev.language, prev.customGlossary);
 
             return {
               ...prev,
@@ -404,18 +432,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               transcript: data.transcript || '',
               interimTranscript: data.interim_transcript || '',
               errorMessage: null,
-              startTime: new Date(data.started_at).getTime(),
+              startTime: data.started_at ? new Date(data.started_at).getTime() : Date.now(),
               participants: [],
               customKeywords: [],
               customGlossary: {},
             });
           } else {
-            setSession(prev => ({
-              ...prev,
-              isActive: false,
-              roomCode: roomCode,
-              errorMessage: null,
-            }));
+            // Preserve active state if Realtime channel is currently active
+            setSession(prev => {
+              if (prev.isActive && prev.transcript) return prev;
+              return {
+                ...prev,
+                isActive: false,
+                roomCode: roomCode,
+                errorMessage: null,
+              };
+            });
           }
         } catch (err) {
           console.warn('Failed fetchInitial for session:', err);
@@ -517,8 +549,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }
           }
         )
+        .on(
+          'broadcast',
+          { event: 'sync_session_pause' },
+          (payload) => {
+            const data = payload.payload;
+            if (data) {
+              setSession(prev => ({
+                ...prev,
+                isPaused: !!data.isPaused,
+              }));
+            }
+          }
+        )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
+            setSession(prev => ({ ...prev, isReconnecting: false }));
             // Broadcast initial presence
             channel.send({
               type: 'broadcast',
@@ -544,6 +590,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                 }
               });
             }, 15000);
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setSession(prev => ({
+              ...prev,
+              isReconnecting: true,
+              reconnectMessage: 'Koneksi terputus. Menghubungkan kembali...'
+            }));
           }
         });
     }
@@ -553,6 +605,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (channel) {
         supabase.removeChannel(channel);
       }
+      studentChannelRef.current = null;
     };
   }, [isAuthReady, role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
 
@@ -575,7 +628,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 2. Debounce DB save
-      const timer = setTimeout(() => {
+      if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
+      dbSyncTimerRef.current = setTimeout(() => {
         db.from('live_sessions').update({
           transcript: session.transcript,
           interim_transcript: session.interimTranscript,
@@ -583,7 +637,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           if (error) console.error('[Supabase] Failed to sync transcript', error);
         });
       }, 1000); // Debounce interval
-      return () => clearTimeout(timer);
+      return () => {
+        if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
+      };
     }
   }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript, user?.name, user?.school]);
 
@@ -646,6 +702,30 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                   glossary: customGlossaryRef.current.glossary,
                 }
               });
+            }
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'student_left' },
+          (payload) => {
+            const student = payload.payload;
+            if (student?.name) {
+              addNotification({
+                title: 'Siswa Keluar Kelas',
+                body: `Siswa ${student.name} (No. Absen: ${student.absen || '-'}) telah keluar dari ruangan kelas.`,
+                type: 'student_left',
+              });
+
+              setSession(prev => ({
+                ...prev,
+                participants: (prev.participants || []).map(p => {
+                  if (p.name === student.name && p.absen === student.absen) {
+                    return { ...p, status: 'offline' as const };
+                  }
+                  return p;
+                })
+              }));
             }
           }
         )
@@ -725,9 +805,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Start Recording ──────────────────────────────────────────────────────────
-  const startRecording = async (lang: string) => {
+  const startRecording = async (lang: string, initialText?: string) => {
     const bcp47 = LANG_TO_BCP47[lang] || 'id-ID';
-    accumulatedTranscriptRef.current = session.transcript;
+    if (initialText !== undefined) {
+      accumulatedTranscriptRef.current = initialText;
+    }
 
     if (Platform.OS === 'web') {
       // Try real Web Speech API first
@@ -799,7 +881,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         accumulatedTranscriptRef.current = baseText;
 
         setSession(prev => {
-          const finalTranscript = translateText(baseText, prev.language);
+          const finalTranscript = translateText(baseText, prev.language, prev.customGlossary);
 
           return {
             ...prev,
@@ -841,11 +923,109 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsRecording(false);
-    setSession(prev => ({ ...prev, interimTranscript: '' }));
+    setSession(prev => ({ ...prev, isPaused: true, interimTranscript: '' }));
 
     if (autoPauseTimerRef.current) {
       clearTimeout(autoPauseTimerRef.current);
     }
+
+    // Broadcast pause status to all students
+    if (role === 'teacher' && teacherChannelRef.current) {
+      try {
+        teacherChannelRef.current.send({
+          type: 'broadcast',
+          event: 'sync_session_pause',
+          payload: { isPaused: true }
+        });
+      } catch (e) {
+        console.warn('Failed to broadcast pause:', e);
+      }
+    }
+  };
+
+  const resumeRecording = async () => {
+    setSession(prev => ({ ...prev, isPaused: false }));
+
+    // Broadcast resume status to all students
+    if (role === 'teacher' && teacherChannelRef.current) {
+      try {
+        teacherChannelRef.current.send({
+          type: 'broadcast',
+          event: 'sync_session_pause',
+          payload: { isPaused: false }
+        });
+      } catch (e) {
+        console.warn('Failed to broadcast resume:', e);
+      }
+    }
+
+    await startRecording(session.language, '');
+  };
+
+  // ── Rejoin Ongoing Active Session for Teacher ────────────────────────────────
+  const rejoinOngoingTeacherSession = async (roomCode: string) => {
+    try {
+      const { data } = await db.from('live_sessions')
+        .select('*')
+        .eq('room_code', roomCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (data) {
+        accumulatedTranscriptRef.current = data.transcript || '';
+        setSession({
+          isActive: true,
+          roomCode: data.room_code,
+          subject: 'Sesi Pembelajaran Berlangsung',
+          teacherName: data.teacher_name || user?.name || 'Guru',
+          teacherSchool: data.teacher_school || user?.school || null,
+          subjectId: data.subject_id,
+          classId: data.class_id,
+          language: data.language || 'id',
+          transcript: data.transcript || '',
+          interimTranscript: data.interim_transcript || '',
+          errorMessage: null,
+          startTime: data.started_at ? new Date(data.started_at).getTime() : Date.now(),
+          participants: [],
+          customKeywords: [],
+          customGlossary: {},
+          isPaused: false,
+          isReconnecting: false,
+        });
+        await startRecording(data.language || 'id', data.transcript || '');
+      }
+    } catch (e) {
+      console.error('Failed to rejoin ongoing session:', e);
+    }
+  };
+
+  // ── AppState Listener: Auto-pause recording when teacher backgrounds app ──
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if ((nextAppState === 'background' || nextAppState === 'inactive') && role === 'teacher' && isRecordingRef.current) {
+        pauseRecording();
+      }
+    });
+    return () => subscription.remove();
+  }, [role]);
+
+  // ── Leave Student Room Cleanly ──────────────────────────────────────────────
+  const leaveStudentRoom = async () => {
+    if (studentChannelRef.current) {
+      try {
+        studentChannelRef.current.send({
+          type: 'broadcast',
+          event: 'student_left',
+          payload: {
+            name: user?.name || 'Siswa',
+            absen: user?.absen || '0'
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to send student_left broadcast:', e);
+      }
+    }
+    await clearStudentRoomCode();
   };
 
   // ── Session Lifecycle ────────────────────────────────────────────────────────
@@ -862,7 +1042,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (dbSyncTimerRef.current) {
+      clearTimeout(dbSyncTimerRef.current);
+      dbSyncTimerRef.current = null;
+    }
     accumulatedTranscriptRef.current = '';
+    
+    // Deactivate any previous active sessions for this room code or teacher and reset transcript to prevent stale transcripts
+    try {
+      if (user?.teacher_id) {
+        await db.from('live_sessions')
+          .update({ is_active: false, transcript: '', interim_transcript: '' })
+          .eq('teacher_id', user.teacher_id);
+      }
+      await db.from('live_sessions')
+        .update({ is_active: false, transcript: '', interim_transcript: '' })
+        .eq('room_code', roomCode);
+    } catch (e) {
+      console.warn('[Supabase] Warning deactivating previous sessions:', e);
+    }
     
     // Parse custom glossary list to active state
     const keywords: string[] = [];
@@ -952,20 +1150,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    await startRecording(language);
+    await startRecording(language, '');
   };
 
   const endSession = async () => {
     await pauseRecording();
+
+    if (dbSyncTimerRef.current) {
+      clearTimeout(dbSyncTimerRef.current);
+      dbSyncTimerRef.current = null;
+    }
 
     if (session.isActive && accumulatedTranscriptRef.current.length > 0 && role === 'teacher') {
       const duration = Math.floor((Date.now() - (session.startTime || Date.now())) / 1000);
       const text = translateText(accumulatedTranscriptRef.current, session.language);
       const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
 
-      // End session in live_sessions
+      // End session in live_sessions and reset transcript to prevent carryover
       if (session.roomCode) {
-        await db.from('live_sessions').update({ is_active: false }).eq('room_code', session.roomCode);
+        await db.from('live_sessions').update({ is_active: false, transcript: '', interim_transcript: '' }).eq('room_code', session.roomCode);
         
         if (teacherChannelRef.current) {
           teacherChannelRef.current.send({
@@ -1035,6 +1238,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    if (dbSyncTimerRef.current) {
+      clearTimeout(dbSyncTimerRef.current);
+      dbSyncTimerRef.current = null;
+    }
     accumulatedTranscriptRef.current = '';
     customGlossaryRef.current = { keywords: [], glossary: {} };
     setSession(defaultSession);
@@ -1094,10 +1301,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const resumeRecording = async () => {
-    await startRecording(session.language);
-  };
-
   const toggleRecording = async () => {
     if (isRecording) {
       await pauseRecording();
@@ -1113,6 +1316,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!hook) return null;
 
     hook('result', (event: any) => {
+      if (!isRecordingRef.current) return;
       let finalStr = '';
       let interimStr = '';
 
@@ -1132,8 +1336,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSession(prev => {
-        const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language);
-        const finalInterim = translateText(interimStr.trim(), prev.language);
+        const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language, prev.customGlossary);
+        const finalInterim = translateText(interimStr.trim(), prev.language, prev.customGlossary);
 
         return {
           ...prev,
@@ -1168,6 +1372,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       resumeRecording,
       isRecording,
       toggleRecording,
+      rejoinOngoingTeacherSession,
+      leaveStudentRoom,
     }}>
       {children}
       {Platform.OS !== 'web' && isSttReady && <NativeEventBridge />}

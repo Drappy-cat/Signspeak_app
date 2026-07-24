@@ -6,7 +6,7 @@ import {
   getSession,
   pingSupabase,
 } from '../services/authService';
-import { supabase } from '../services/supabase';
+import { supabase, db } from '../services/supabase';
 import { getTeacherFullProfile, createTeacherProfile } from '../services/teacherService';
 import { saveStudentCache } from '../utils/studentCache';
 import type { TeacherProfile } from '../types/database';
@@ -161,8 +161,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     if (activeRole === 'student') {
-      if (!roomCode) {
+      if (!roomCode || !roomCode.trim()) {
         throw new Error('Kode ruangan wajib diisi');
+      }
+
+      const formattedCode = roomCode.trim();
+      
+      // Validate room code against live_sessions or classes
+      try {
+        const { data: liveSession } = await db.from('live_sessions')
+          .select('room_code')
+          .eq('room_code', formattedCode)
+          .maybeSingle();
+
+        let isValidCode = !!liveSession;
+        if (!isValidCode) {
+          const { data: classData } = await db.from('classes')
+            .select('room_code')
+            .eq('room_code', formattedCode)
+            .maybeSingle();
+          isValidCode = !!classData;
+        }
+
+        if (!isValidCode) {
+          throw new Error('Kode kelas tidak ditemukan. Mohon periksa kembali kode dari Guru.');
+        }
+      } catch (e: any) {
+        if (e.message?.includes('tidak ditemukan')) throw e;
+        console.warn('Room validation check bypassed offline:', e);
       }
 
       const mockUser: User = {
@@ -170,7 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: name || 'Siswa Tanpa Nama',
         role: 'student',
         className: className || 'Kelas Umum',
-        joinedRoomCode: roomCode,
+        joinedRoomCode: formattedCode,
         absen: absen || '0',
       };
       
@@ -305,7 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 1. Cek apakah email terdaftar di database via fungsi RPC
     const { data: isRegistered, error: rpcError } = await supabase.rpc('check_teacher_email', {
       teacher_email: email.trim(),
-    });
+    } as any);
 
     if (rpcError) {
       console.error('RPC Error:', rpcError);

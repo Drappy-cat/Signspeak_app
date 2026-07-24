@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { View, Text, TouchableOpacity, Platform, Modal, SafeAreaView } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SystemUI from 'expo-system-ui';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -342,15 +343,17 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <AuthProvider>
-      <SettingsProvider>
-        <SessionProvider>
-          <StatusBar style="auto" />
-          <AppWrapper>
-            <RootNavigator />
-          </AppWrapper>
-        </SessionProvider>
-      </SettingsProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <SettingsProvider>
+          <SessionProvider>
+            <StatusBar style="auto" />
+            <AppWrapper>
+              <RootNavigator />
+            </AppWrapper>
+          </SessionProvider>
+        </SettingsProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

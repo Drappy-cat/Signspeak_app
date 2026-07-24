@@ -7,8 +7,78 @@ const dictionaryJv: Record<string, string> = dictDataJv;
 let cachedRegexMad: RegExp | null = null;
 let cachedRegexJv: RegExp | null = null;
 
+const madureseKeys = Object.keys(dictionaryMad);
+
 /**
- * Menerjemahkan kalimat Bahasa Indonesia ke Bahasa Madura secara real-time kata demi kata & frasa demi frasa.
+ * Fast Levenshtein distance implementation for string similarity
+ */
+export function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+const fuzzyCache = new Map<string, string | null>();
+
+/**
+ * Perform fast fuzzy matching on Madurese dictionary keys with memoization
+ */
+function findFuzzyMatchMadurese(word: string): string | null {
+  const lower = word.toLowerCase();
+  if (lower.length < 4) return null; // Skip short words to avoid false positives
+
+  if (fuzzyCache.has(lower)) {
+    return fuzzyCache.get(lower)!;
+  }
+
+  let bestMatch: string | null = null;
+  let minDistance = 3; // Maximum allowed edit distance is 2
+
+  for (const key of madureseKeys) {
+    if (Math.abs(key.length - lower.length) > 2) continue;
+
+    const dist = levenshteinDistance(lower, key);
+    if (dist < minDistance) {
+      minDistance = dist;
+      bestMatch = key;
+      if (dist === 1) break; // Found close match
+    }
+  }
+
+  if (fuzzyCache.size > 2000) {
+    fuzzyCache.clear();
+  }
+  fuzzyCache.set(lower, bestMatch);
+  return bestMatch;
+}
+
+/**
+ * Menerjemahkan kalimat Bahasa Indonesia ke Bahasa Madura secara real-time kata demi kata & frasa demi frasa (dengan Fuzzy Matching).
  */
 export function translateToMadurese(text: string): string {
   if (!text) return '';
@@ -19,7 +89,8 @@ export function translateToMadurese(text: string): string {
     cachedRegexMad = new RegExp(`\\b(${escapedKeys.join('|')})\\b`, 'gi');
   }
 
-  return text.replace(cachedRegexMad, (match) => {
+  // 1. First pass: Replace exact dictionary key matches
+  const translated = text.replace(cachedRegexMad, (match) => {
     const lowerMatch = match.toLowerCase();
     const translation = dictionaryMad[lowerMatch];
     
@@ -30,6 +101,31 @@ export function translateToMadurese(text: string): string {
     }
     return match;
   });
+
+  // 2. Second pass: Fuzzy match for remaining un-translated Indonesian words (if length >= 4)
+  const words = translated.split(/(\s+)/);
+  const resultWords = words.map(word => {
+    if (!word || /^\s+$/.test(word)) return word;
+
+    const cleanWord = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
+    if (!cleanWord || cleanWord.length < 4) return word;
+
+    const fuzzyKey = findFuzzyMatchMadurese(cleanWord);
+    if (fuzzyKey && dictionaryMad[fuzzyKey]) {
+      const translation = dictionaryMad[fuzzyKey];
+      let formattedTranslation = translation;
+      if (cleanWord === cleanWord.toUpperCase()) {
+        formattedTranslation = translation.toUpperCase();
+      } else if (cleanWord[0] === cleanWord[0].toUpperCase()) {
+        formattedTranslation = translation[0].toUpperCase() + translation.slice(1);
+      }
+      return word.replace(cleanWord, formattedTranslation);
+    }
+
+    return word;
+  });
+
+  return resultWords.join('');
 }
 
 /**

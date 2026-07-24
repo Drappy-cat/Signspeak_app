@@ -17,31 +17,25 @@ export function formatAutoPunctuation(text: string): string {
   if (!text || !text.trim()) return '';
 
   let cleaned = text.trim();
-
-  // Normalize multiple spaces
   cleaned = cleaned.replace(/\s+/g, ' ');
 
-  // Split into sentences by existing punctuation (. ! ?)
-  const sentences = cleaned.split(/(?<=[.!?])\s+/);
-
-  const processedSentences = sentences.map(sentence => {
-    let s = sentence.trim();
-    if (!s) return '';
-
-    // Capitalize first letter of each sentence
-    s = s.charAt(0).toUpperCase() + s.slice(1);
-
-    return s;
-  });
-
-  let result = processedSentences.filter(Boolean).join(' ');
-
-  // Ensure trailing sentence ending punctuation if length > 3 and doesn't end with punctuation
-  if (result.length > 3 && !/[.!?]$/.test(result)) {
-    result += '.';
+  // Split into sentences backwards-compatibly without regex lookbehinds for legacy Android engines
+  const parts = cleaned.split(/([.!?])\s+/);
+  let result = '';
+  for (let i = 0; i < parts.length; i += 2) {
+    let sentence = parts[i]?.trim();
+    if (!sentence) continue;
+    sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+    const punc = parts[i + 1] || '';
+    result += (result ? ' ' : '') + sentence + punc;
   }
 
-  return result;
+  let finalRes = result.trim();
+  if (finalRes.length > 3 && !/[.!?]$/.test(finalRes)) {
+    finalRes += '.';
+  }
+
+  return finalRes;
 }
 
 /**

@@ -430,6 +430,10 @@ export default function HistoryScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: scrollPaddingBottom, gap: 10 }}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListHeaderComponent={
           <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', color: mutedColor, marginBottom: 2 }}>
             {sectionHeader}

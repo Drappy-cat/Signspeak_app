@@ -40,6 +40,7 @@ export interface Teacher {
   full_name: string;
   email: string;
   nip: string | null;
+  photo_url?: string | null;
   is_verified: boolean;
   created_at: string;
 }

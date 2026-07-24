@@ -23,6 +23,7 @@ export interface TeacherRow {
   full_name: string;
   email: string;
   nip: string | null;
+  photo_url?: string | null;
   is_verified: boolean;
   role: string;
   created_at: string;

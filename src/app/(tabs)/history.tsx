@@ -516,11 +516,12 @@ export default function HistoryScreen() {
       >
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
           <View style={{
-            height: '85%',
+            maxHeight: '92%',
             backgroundColor: hc ? '#0f172a' : '#f0f7ff',
             borderTopLeftRadius: 24,
             borderTopRightRadius: 24,
             paddingTop: 16,
+            paddingBottom: Math.max(insets.bottom + 8, 16),
             ...getCardShadow(hc, 'lg')
           }}>
             {/* Modal Drag Indicator */}
@@ -570,8 +571,8 @@ export default function HistoryScreen() {
                     <Text style={{ fontSize: 10, fontWeight: '700', color: mutedColor, textTransform: 'uppercase' }}>
                       {appLang === 'en' ? 'Language' : 'Bahasa'}
                     </Text>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: textColor, marginTop: 2 }}>
-                      {selectedSession.language === 'en' ? 'English' : selectedSession.language === 'jv' ? 'Jawa' : 'Madura'}
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: textColor, marginTop: 2 }} numberOfLines={1}>
+                      {selectedSession.language === 'en' ? 'Inggris' : selectedSession.language === 'jv' ? 'Jawa' : selectedSession.language === 'mad' ? 'Madura' : 'Indonesia'}
                     </Text>
                   </View>
                 </View>
@@ -614,7 +615,7 @@ export default function HistoryScreen() {
                 </View>
 
                 {/* Actions Buttons Row */}
-                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 8 }}>
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => handleCopyTranscript(selectedSession)}

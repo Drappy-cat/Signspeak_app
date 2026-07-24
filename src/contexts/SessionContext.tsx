@@ -3,7 +3,7 @@ import { saveSession } from '../services/db';
 import { addNotification } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import { DEMO_SENTENCES } from '../constants/keywords';
 import { translateToMadurese, translateToJavanese } from '../utils/translator';
 import { formatAutoPunctuation, applyGlossaryCorrections } from '../utils/textProcessor';
@@ -79,6 +79,7 @@ interface SessionContextType {
   isRecording: boolean;
   toggleRecording: () => Promise<void>;
   rejoinOngoingTeacherSession: (roomCode: string) => Promise<void>;
+  leaveStudentRoom: () => Promise<void>;
 }
 
 const defaultSession: ActiveSession = {
@@ -233,7 +234,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<ActiveSession>(defaultSession);
   const [isRecording, setIsRecording] = useState(false);
   const [isSttReady, setIsSttReady] = useState(false);
-  const { user, role, isReady: isAuthReady } = useAuth();
+  const { user, role, isReady: isAuthReady, clearStudentRoomCode } = useAuth();
 
   // Refs for side-effect objects
   const isRecordingRef = useRef<boolean>(false);
@@ -248,6 +249,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const accumulatedTranscriptRef = useRef<string>('');
   const customGlossaryRef = useRef<{ keywords: string[]; glossary: Record<string, string> }>({ keywords: [], glossary: {} });
   const teacherChannelRef = useRef<any>(null);
+  const studentChannelRef = useRef<any>(null);
   const dbSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerLangPause = useCallback((fromLang: string, toLang: string, labelStr: string) => {
@@ -603,6 +605,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (channel) {
         supabase.removeChannel(channel);
       }
+      studentChannelRef.current = null;
     };
   }, [isAuthReady, role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
 
@@ -996,6 +999,35 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ── AppState Listener: Auto-pause recording when teacher backgrounds app ──
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if ((nextAppState === 'background' || nextAppState === 'inactive') && role === 'teacher' && isRecordingRef.current) {
+        pauseRecording();
+      }
+    });
+    return () => subscription.remove();
+  }, [role]);
+
+  // ── Leave Student Room Cleanly ──────────────────────────────────────────────
+  const leaveStudentRoom = async () => {
+    if (studentChannelRef.current) {
+      try {
+        studentChannelRef.current.send({
+          type: 'broadcast',
+          event: 'student_left',
+          payload: {
+            name: user?.name || 'Siswa',
+            absen: user?.absen || '0'
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to send student_left broadcast:', e);
+      }
+    }
+    await clearStudentRoomCode();
+  };
+
   // ── Session Lifecycle ────────────────────────────────────────────────────────
   const startSession = async (
     roomCode: string, 
@@ -1341,6 +1373,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       isRecording,
       toggleRecording,
       rejoinOngoingTeacherSession,
+      leaveStudentRoom,
     }}>
       {children}
       {Platform.OS !== 'web' && isSttReady && <NativeEventBridge />}

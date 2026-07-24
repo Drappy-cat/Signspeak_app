@@ -1110,12 +1110,13 @@ export default function HomeScreen() {
             <View style={{
               width: '100%',
               maxWidth: 500,
-              height: '82%',
+              maxHeight: '92%',
               backgroundColor: hc ? '#0f172a' : '#f0f7ff',
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               paddingTop: 16,
               paddingHorizontal: 20,
+              paddingBottom: Math.max(insets.bottom + 8, 16),
               ...getCardShadow(hc, 'lg')
             }}>
               {/* Drag Handle */}

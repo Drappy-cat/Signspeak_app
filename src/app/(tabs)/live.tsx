@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image, KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mic, Square, Play, Pause, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut, RotateCw } from 'lucide-react-native';
@@ -138,7 +138,7 @@ function HighlightText({
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveScreen() {
   const { role, user, logout, clearStudentRoomCode } = useAuth();
-  const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript, pauseRecording, resumeRecording } = useSession();
+  const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript, pauseRecording, resumeRecording, leaveStudentRoom } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
   const appLang = settings.appLang || 'id';
@@ -483,18 +483,7 @@ export default function LiveScreen() {
                       text: appLang === 'en' ? 'Leave' : 'Keluar',
                       style: 'destructive',
                       onPress: async () => {
-                        try {
-                          const { supabase } = await import('../../services/supabase');
-                          if (session.roomCode) {
-                            const ch = supabase.channel(`room_${session.roomCode}`);
-                            ch.send({
-                              type: 'broadcast',
-                              event: 'student_left',
-                              payload: { name: user?.name, absen: user?.absen }
-                            });
-                          }
-                        } catch (_) {}
-                        await clearStudentRoomCode();
+                        await leaveStudentRoom();
                         router.replace('/(tabs)/home');
                       }
                     }
@@ -757,52 +746,60 @@ export default function LiveScreen() {
 
 
         {/* Fitur Tanya Balik (Text-to-Speech) */}
-        <View style={{ 
-          paddingHorizontal: 16, 
-          paddingVertical: 12, 
-          borderTopWidth: 1, 
-          borderTopColor: hc ? '#334155' : '#e2e8f0', 
-          backgroundColor: hc ? '#1e293b' : '#f8fafc',
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          gap: 10 
-        }}>
-          <TextInput
-            placeholder={appLang === 'en' ? 'Type a question to speak out loud...' : 'Ketik untuk menyuarakan pertanyaan...'}
-            placeholderTextColor={mutedColor}
-            value={studentQuestion}
-            onChangeText={setStudentQuestion}
-            style={{
-              flex: 1,
-              backgroundColor: hc ? '#0f172a' : '#ffffff',
-              borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              fontSize: 14,
-              color: textColor,
-              borderWidth: 1,
-              borderColor: hc ? '#334155' : '#cbd5e1',
-            }}
-          />
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleSpeakQuestion}
-            style={{
-              backgroundColor: '#1e3a8a',
-              borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <Volume2 size={16} color="#ffffff" />
-            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
-              {appLang === 'en' ? 'Speak' : 'Tanya'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+          <View style={{ 
+            paddingHorizontal: 16, 
+            paddingTop: 10,
+            paddingBottom: Math.max(insets.bottom, 12), 
+            borderTopWidth: 1, 
+            borderTopColor: hc ? '#334155' : '#e2e8f0', 
+            backgroundColor: hc ? '#1e293b' : '#f8fafc',
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            gap: 10 
+          }}>
+            <TextInput
+              placeholder={appLang === 'en' ? 'Type a question to speak out loud...' : 'Ketik untuk menyuarakan pertanyaan...'}
+              placeholderTextColor={mutedColor}
+              value={studentQuestion}
+              onChangeText={setStudentQuestion}
+              returnKeyType="send"
+              onSubmitEditing={handleSpeakQuestion}
+              style={{
+                flex: 1,
+                backgroundColor: hc ? '#0f172a' : '#ffffff',
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                fontSize: 14,
+                color: textColor,
+                borderWidth: 1,
+                borderColor: hc ? '#334155' : '#cbd5e1',
+              }}
+            />
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleSpeakQuestion}
+              style={{
+                backgroundColor: '#1e3a8a',
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <Volume2 size={16} color="#ffffff" />
+              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+                {appLang === 'en' ? 'Speak' : 'Tanya'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </View>
     );
   };
@@ -1326,7 +1323,10 @@ export default function LiveScreen() {
 
       {/* Teacher Live Transcript Corrector Modal */}
       <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
+        >
           <View style={{
             width: '100%', maxWidth: 440, backgroundColor: hc ? '#1e293b' : '#ffffff',
             borderRadius: 20, padding: 20, ...getCardShadow(hc, 'lg'),
@@ -1390,7 +1390,7 @@ export default function LiveScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* 10-Second Language Switch Pause Pop-Up Modal */}

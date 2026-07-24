@@ -204,6 +204,7 @@ export default function AdminDashboard() {
       setTimeout(() => setSuccessModalVisible(false), 2000);
     } catch (e) {
       console.error('Delete failed:', e);
+      Alert.alert('Gagal', 'Terjadi kesalahan jaringan.');
     }
   };
 
@@ -220,6 +221,7 @@ export default function AdminDashboard() {
       setTeachers(prev => prev.map(t => t.id === teacherId ? { ...t, is_verified: !currentStatus } : t));
     } catch (e) {
       console.error('Verify failed:', e);
+      Alert.alert('Gagal', 'Terjadi kesalahan jaringan.');
     }
   };
 

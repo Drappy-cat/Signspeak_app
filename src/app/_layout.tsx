@@ -321,7 +321,7 @@ function RootNavigator() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
+        animation: 'fade',
         contentStyle: { backgroundColor: hc ? '#0f172a' : '#F0F7FF' },
       }}
     >
@@ -329,6 +329,7 @@ function RootNavigator() {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="session-ended" />
       <Stack.Screen name="admin" />
       <Stack.Screen name="splash" />
       <Stack.Screen name="about" />

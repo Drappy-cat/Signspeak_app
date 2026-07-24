@@ -607,11 +607,7 @@ export default function HistoryScreen() {
         </View>
 
         {/* Modern Time Filter Bar */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
-        >
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 2 }}>
           {TIME_FILTER_OPTIONS.map(opt => {
             const isSelected = timeFilter === opt.key;
             return (
@@ -626,7 +622,7 @@ export default function HistoryScreen() {
                 }}
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 6,
-                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+                  paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
                   ...getCardShadow(hc, isSelected ? 'md' : 'sm'),
                   backgroundColor: isSelected ? '#1e3a8a' : (hc ? '#1e293b' : '#ffffff'),
                   borderWidth: 1,
@@ -635,7 +631,7 @@ export default function HistoryScreen() {
               >
                 <Text style={{ fontSize: 13 }}>{opt.icon}</Text>
                 <Text style={{
-                  fontSize: 12, fontWeight: isSelected ? '800' : '600',
+                  fontSize: 11, fontWeight: isSelected ? '800' : '600',
                   color: isSelected ? '#ffffff' : (hc ? '#cbd5e1' : '#475569'),
                 }}>
                   {opt.label}
@@ -643,7 +639,7 @@ export default function HistoryScreen() {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
       </View>
 
       <FlatList

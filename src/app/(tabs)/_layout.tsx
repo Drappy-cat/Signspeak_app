@@ -30,8 +30,8 @@ export default function TabLayout() {
       sceneContainerStyle={{ backgroundColor: hc ? '#0f172a' : '#F0F7FF' }}
       screenOptions={{
         headerShown: false,
-        animation: 'shift',
-        tabBarStyle: {
+        animation: 'fade',
+        tabBarStyle: role === 'student' ? { display: 'none' } : {
           backgroundColor: navBg,
           borderTopColor: border,
           borderTopWidth: 1,
@@ -59,7 +59,7 @@ export default function TabLayout() {
         options={{
           title: d.home,
           tabBarIcon: ({ color }) => <Home size={22} color={color} />,
-          href: '/(tabs)/home',
+          href: isTeacher ? '/(tabs)/home' : null,
         }}
       />
       <Tabs.Screen
@@ -67,7 +67,6 @@ export default function TabLayout() {
         options={{
           title: isTeacher ? d.session : d.live,
           tabBarIcon: ({ color }) => isTeacher ? <Mic size={22} color={color} /> : <Radio size={22} color={color} />,
-          href: '/(tabs)/live',
         }}
       />
       <Tabs.Screen
@@ -83,7 +82,7 @@ export default function TabLayout() {
         options={{
           title: isTeacher ? d.settingsTitle : d.settings,
           tabBarIcon: ({ color }) => <Settings size={22} color={color} />,
-          href: '/(tabs)/settings',
+          href: isTeacher ? '/(tabs)/settings' : null,
         }}
       />
     </Tabs>

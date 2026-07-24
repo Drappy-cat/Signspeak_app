@@ -304,7 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resetPassword = async (email: string) => {
     // 1. Cek apakah email terdaftar di database via fungsi RPC
     const { data: isRegistered, error: rpcError } = await supabase.rpc('check_teacher_email', {
-      p_email: email.trim(),
+      teacher_email: email.trim(),
     });
 
     if (rpcError) {

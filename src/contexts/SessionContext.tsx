@@ -1208,10 +1208,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const resumeRecording = async () => {
-    await startRecording(session.language);
-  };
-
   const toggleRecording = async () => {
     if (isRecording) {
       await pauseRecording();

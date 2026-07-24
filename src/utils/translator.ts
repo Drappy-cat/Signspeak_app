@@ -43,12 +43,18 @@ export function levenshteinDistance(a: string, b: string): number {
   return matrix[b.length][a.length];
 }
 
+const fuzzyCache = new Map<string, string | null>();
+
 /**
- * Perform fast fuzzy matching on Madurese dictionary keys
+ * Perform fast fuzzy matching on Madurese dictionary keys with memoization
  */
 function findFuzzyMatchMadurese(word: string): string | null {
   const lower = word.toLowerCase();
   if (lower.length < 4) return null; // Skip short words to avoid false positives
+
+  if (fuzzyCache.has(lower)) {
+    return fuzzyCache.get(lower)!;
+  }
 
   let bestMatch: string | null = null;
   let minDistance = 3; // Maximum allowed edit distance is 2
@@ -64,6 +70,7 @@ function findFuzzyMatchMadurese(word: string): string | null {
     }
   }
 
+  fuzzyCache.set(lower, bestMatch);
   return bestMatch;
 }
 

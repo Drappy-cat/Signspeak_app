@@ -33,11 +33,11 @@ function PulseDot({ color = 'bg-red-500' }: { color?: string }) {
 function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
   const ratios = [0.45, 0.75, 1.0, 0.85, 0.55, 0.9, 0.65, 0.8, 0.45];
   const color = hc ? "#34d399" : "#10b981";
-  const anims = React.useMemo(() => ratios.map(() => new RNAnimated.Value(3)), []);
+  const anims = React.useMemo(() => ratios.map(() => new RNAnimated.Value(0.15)), []);
 
   React.useEffect(() => {
     if (!active) {
-      anims.forEach(a => RNAnimated.timing(a, { toValue: 3, duration: 300, useNativeDriver: false }).start());
+      anims.forEach(a => RNAnimated.timing(a, { toValue: 0.15, duration: 300, useNativeDriver: true }).start());
       return;
     }
     const animations = anims.map((anim, i) => {
@@ -46,10 +46,10 @@ function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
         RNAnimated.delay(i * 110),
         RNAnimated.loop(
           RNAnimated.sequence([
-            RNAnimated.timing(anim, { toValue: r * 36, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-            RNAnimated.timing(anim, { toValue: r * 10, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-            RNAnimated.timing(anim, { toValue: r * 30, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-            RNAnimated.timing(anim, { toValue: r * 6, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false })
+            RNAnimated.timing(anim, { toValue: r * 1.0, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            RNAnimated.timing(anim, { toValue: r * 0.3, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            RNAnimated.timing(anim, { toValue: r * 0.8, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            RNAnimated.timing(anim, { toValue: r * 0.2, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
           ])
         )
       ]);
@@ -59,9 +59,18 @@ function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
   }, [active]);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 36, gap: 3 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 28, gap: 3 }}>
       {ratios.map((_, i) => (
-        <RNAnimated.View key={i} style={{ backgroundColor: color, width: 3, borderRadius: 99, height: anims[i] }} />
+        <RNAnimated.View
+          key={i}
+          style={{
+            backgroundColor: color,
+            width: 3,
+            height: 28,
+            borderRadius: 99,
+            transform: [{ scaleY: anims[i] }],
+          }}
+        />
       ))}
     </View>
   );
@@ -962,7 +971,6 @@ export default function LiveScreen() {
             <View style={{
               padding: 24, borderRadius: 20, backgroundColor: hc ? '#1e293b' : '#ffffff',
               alignItems: 'center', gap: 12, width: '100%', maxWidth: 320,
-              borderWidth: 1, borderColor: hc ? '#334155' : '#e2e8f0',
               ...getCardShadow(hc, 'lg')
             }}>
               <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: hc ? '#d97706' : '#fef3c7', alignItems: 'center', justifyContent: 'center' }}>

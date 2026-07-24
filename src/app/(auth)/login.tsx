@@ -8,6 +8,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
 import { supabase, db } from '../../services/supabase';
 import { getActiveSessionByRoomCode, upsertStudent, addSessionParticipant } from '../../services/teacherService';
+import { getClassByRoomCode } from '../../services/schoolService';
 import { loadStudentCache } from '../../utils/studentCache';
 import { DICT } from '../../constants/i18n';
 
@@ -153,25 +154,37 @@ export default function LoginScreen() {
           activeSession = await getActiveSessionByRoomCode(roomCodeUpper);
         } catch (_) {}
         
-        // If no DB session found, check if it's demo/testing mode
+        // Check active session in DB
         if (!activeSession) {
-          activeSession = {
-            id: 'demo-session-id',
-            class_id: 'demo-class-id',
-            room_code: roomCodeUpper,
-            is_active: true,
-          };
+          let existingClass: any = null;
+          try {
+            existingClass = await getClassByRoomCode(roomCodeUpper);
+          } catch (_) {}
+
+          if (!existingClass) {
+            setLoading(false);
+            setModalTitle(appLang === 'en' ? 'Class Not Found' : 'Kode Tidak Ditemukan');
+            setModalMsg(
+              appLang === 'en'
+                ? `Room code "${roomCodeUpper}" was not found. Please check the code or ask your teacher.`
+                : `Kode ruangan "${roomCodeUpper}" tidak ditemukan atau sedang tidak aktif. Pastikan kode benar atau tanyakan kepada guru.`
+            );
+            setShowModal(true);
+            return;
+          }
         }
 
         // Try upserting student in DB if online
         try {
-          const student = await upsertStudent({
-            class_id: activeSession.class_id,
-            name: studentName.trim(),
-            absen: studentAbsen.trim(),
-          });
-          if (student && activeSession.id !== 'demo-session-id') {
-            await addSessionParticipant(activeSession.id, student.id);
+          if (activeSession?.class_id) {
+            const student = await upsertStudent({
+              class_id: activeSession.class_id,
+              name: studentName.trim(),
+              absen: studentAbsen.trim(),
+            });
+            if (student && activeSession.id !== 'demo-session-id') {
+              await addSessionParticipant(activeSession.id, student.id);
+            }
           }
         } catch (dbErr: any) {
           if (dbErr?.message?.includes('sudah digunakan')) {
@@ -181,14 +194,14 @@ export default function LoginScreen() {
             setShowModal(true);
             return;
           }
-          console.log('[Demo] Running in offline demo mode for student:', dbErr?.message);
+          console.log('[Demo] Running in offline mode for student:', dbErr?.message);
         }
 
         // Format class and school identity
-        const gradeStr = activeSession.class?.grade?.grade_name ? `Kelas ${activeSession.class.grade.grade_name}` : '';
-        const classStr = activeSession.class?.class_name || '';
+        const gradeStr = activeSession?.class?.grade?.grade_name ? `Kelas ${activeSession.class.grade.grade_name}` : '';
+        const classStr = activeSession?.class?.class_name || '';
         const fullClassName = `${gradeStr} ${classStr}`.trim() || 'Kelas Umum';
-        const schoolName = activeSession.class?.school?.school_name || '';
+        const schoolName = activeSession?.class?.school?.school_name || '';
         const identityStr = schoolName ? `${fullClassName} • ${schoolName}` : fullClassName;
 
         // Store into AuthContext
@@ -197,10 +210,10 @@ export default function LoginScreen() {
         setLoading(false);
         router.replace('/(tabs)/live');
       } catch (err: any) {
-        // Safe fallback to enter demo session directly
-        await login('', undefined, classCode.trim().toUpperCase(), 'student', studentName.trim(), 'Kelas Umum', studentAbsen.trim());
         setLoading(false);
-        router.replace('/(tabs)/live');
+        setModalTitle(appLang === 'en' ? 'Failed to Join' : 'Gagal Masuk Kelas');
+        setModalMsg(err?.message || (appLang === 'en' ? 'Failed to verify room code. Please check your network connection.' : 'Gagal memverifikasi kode ruangan. Periksa koneksi internet Anda.'));
+        setShowModal(true);
         return;
       }
     } else {

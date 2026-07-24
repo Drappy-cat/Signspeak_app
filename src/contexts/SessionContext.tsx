@@ -140,7 +140,12 @@ class WebSpeechEngine {
       this.restartTimeoutId = null;
     }
     if (this.recognition) {
-      try { this.recognition.stop(); } catch (_) {}
+      try {
+        this.recognition.onresult = null;
+        this.recognition.onerror = null;
+        this.recognition.onend = null;
+        this.recognition.stop();
+      } catch (_) {}
       this.recognition = null;
     }
   }
@@ -157,6 +162,7 @@ class WebSpeechEngine {
     this.recognition.maxAlternatives = 1;
 
     this.recognition.onresult = (event: any) => {
+      if (!this.active) return;
       let finalText = '';
       let interimText = '';
 
@@ -218,6 +224,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const { user, role, isReady: isAuthReady } = useAuth();
 
   // Refs for side-effect objects
+  const isRecordingRef = useRef<boolean>(false);
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
   const webSpeechRef = useRef<WebSpeechEngine | null>(null);
   const webMockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -236,13 +247,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       language: toLang,
       isLangSwitching: true,
-      langPauseCountdown: 10,
+      langPauseCountdown: 5,
       langSwitchFrom: fromLang,
       langSwitchTo: toLang,
       langSwitchLabel: labelStr,
     }));
 
-    let count = 10;
+    let count = 5;
     langCountdownTimerRef.current = setInterval(() => {
       count -= 1;
       if (count <= 0) {
@@ -1111,6 +1122,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!hook) return null;
 
     hook('result', (event: any) => {
+      if (!isRecordingRef.current) return;
       let finalStr = '';
       let interimStr = '';
 

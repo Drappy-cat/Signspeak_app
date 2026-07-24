@@ -7,6 +7,8 @@ import { useSettings } from '../contexts/SettingsContext';
 import { loadStudentCache, StudentCacheData } from '../utils/studentCache';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BubbleBackground } from '../components/BubbleBackground';
+import { getActiveSessionByRoomCode } from '../services/teacherService';
+import { getClassByRoomCode } from '../services/schoolService';
 
 export default function SessionEndedScreen() {
   const router = useRouter();
@@ -22,21 +24,22 @@ export default function SessionEndedScreen() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const init = async () => {
-      const data = await loadStudentCache();
-      if (!data) {
+    async function init() {
+      const cache = await loadStudentCache();
+      if (!cache) {
         // Cache expired or doesn't exist, force re-login
         router.replace('/(auth)/login');
         return;
       }
-      setCachedData(data);
+      setCachedData(cache);
       setLoading(false);
-    };
+    }
     init();
   }, []);
 
   const handleJoin = async () => {
-    if (!roomCode.trim()) {
+    const upperCode = roomCode.trim().toUpperCase();
+    if (!upperCode) {
       setErrorMsg(appLang === 'en' ? 'Please enter a room code' : 'Harap masukkan kode kelas');
       return;
     }
@@ -45,11 +48,34 @@ export default function SessionEndedScreen() {
     setErrorMsg('');
     setJoining(true);
     try {
+      // Check room code in Supabase
+      let activeSession: any = null;
+      try {
+        activeSession = await getActiveSessionByRoomCode(upperCode);
+      } catch (_) {}
+
+      if (!activeSession) {
+        let existingClass: any = null;
+        try {
+          existingClass = await getClassByRoomCode(upperCode);
+        } catch (_) {}
+
+        if (!existingClass) {
+          setErrorMsg(
+            appLang === 'en'
+              ? `Room code "${upperCode}" is invalid or inactive.`
+              : `Kode ruangan "${upperCode}" tidak ditemukan atau sedang tidak aktif.`
+          );
+          setJoining(false);
+          return;
+        }
+      }
+
       // Re-login using cached identity
       await login(
         '', 
         undefined, 
-        roomCode.trim().toUpperCase(), 
+        upperCode, 
         'student', 
         cachedData.name, 
         cachedData.className || 'Kelas Umum', 

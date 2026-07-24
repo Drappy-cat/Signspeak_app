@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut, RotateCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { db } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -126,7 +127,7 @@ function HighlightText({
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveScreen() {
-  const { role, logout, clearStudentRoomCode } = useAuth();
+  const { role, user, logout, clearStudentRoomCode } = useAuth();
   const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
@@ -179,6 +180,8 @@ export default function LiveScreen() {
   const [paused, setPaused] = useState(false);
   const [studentQuestion, setStudentQuestion] = useState('');
   const [copiedLiveText, setCopiedLiveText] = useState(false);
+  const [copiedRoomCode, setCopiedRoomCode] = useState(false);
+  const [refreshingSession, setRefreshingSession] = useState(false);
 
   const handleCopyLiveTranscript = async () => {
     const textToCopy = (session.transcript + ' ' + session.interimTranscript).trim();
@@ -196,6 +199,50 @@ export default function LiveScreen() {
       }
       setTimeout(() => setCopiedLiveText(false), 2000);
     } catch (_) {}
+  };
+
+  const handleCopyRoomCode = async () => {
+    if (!session.roomCode) return;
+    const codeToCopy = session.roomCode.trim();
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(codeToCopy);
+      } else {
+        const { Share } = require('react-native');
+        await Share.share({ message: `Kode Kelas SignSpeak: ${codeToCopy}` });
+      }
+      setCopiedRoomCode(true);
+      if (settings.vibrate) {
+        try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
+      }
+      setTimeout(() => setCopiedRoomCode(false), 2000);
+    } catch (_) {}
+  };
+
+  const handleManualRefreshSession = async () => {
+    setRefreshingSession(true);
+    try {
+      if (settings.vibrate) {
+        try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (_) {}
+      }
+      if (user?.joinedRoomCode) {
+        const { data } = await db.from('live_sessions')
+          .select('transcript')
+          .eq('room_code', user.joinedRoomCode)
+          .eq('is_active', true)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data && data.transcript !== undefined) {
+          await updateTranscript(data.transcript || '');
+        }
+      }
+    } catch (e) {
+      console.warn('Manual refresh failed:', e);
+    } finally {
+      setTimeout(() => setRefreshingSession(false), 800);
+    }
   };
   const scrollViewRef = useRef<ScrollView>(null);
   const pulseAnim = React.useMemo(() => new RNAnimated.Value(1), []);
@@ -366,13 +413,26 @@ export default function LiveScreen() {
 
             {/* Accessibility Buttons */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {/* Refresh Button */}
+              <TouchableOpacity
+                onPress={handleManualRefreshSession}
+                activeOpacity={0.7}
+                style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <RotateCw size={13} color={textColor} />
+              </TouchableOpacity>
+
               {/* Copy Live Text Button */}
               {((session.transcript || '') + (session.interimTranscript || '')).trim().length > 0 && (
                 <TouchableOpacity
                   onPress={handleCopyLiveTranscript}
-                  style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: copiedLiveText ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#334155' : '#e2e8f0'), alignItems: 'center', justifyContent: 'center' }}
+                  activeOpacity={0.7}
+                  style={{ height: 28, paddingHorizontal: 8, borderRadius: 14, backgroundColor: copiedLiveText ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#334155' : '#e2e8f0'), flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' }}
                 >
-                  {copiedLiveText ? <Check size={14} color={hc ? '#34d399' : '#059669'} /> : <Copy size={13} color={textColor} />}
+                  {copiedLiveText ? <Check size={13} color={hc ? '#34d399' : '#059669'} /> : <Copy size={13} color={textColor} />}
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: copiedLiveText ? (hc ? '#34d399' : '#059669') : textColor }}>
+                    {copiedLiveText ? (appLang === 'en' ? 'Copied' : 'Tersalin') : (appLang === 'en' ? 'Copy Text' : 'Salin Transkrip')}
+                  </Text>
                 </TouchableOpacity>
               )}
               
@@ -514,16 +574,27 @@ export default function LiveScreen() {
             )}
           </View>
           {session.roomCode && (
-            <View style={{
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 6,
-              backgroundColor: hc ? '#334155' : '#f1f5f9',
-            }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: hc ? '#38bdf8' : '#0284c7' }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleCopyRoomCode}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 6,
+                backgroundColor: copiedRoomCode ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#334155' : '#f1f5f9'),
+              }}>
+              {copiedRoomCode ? (
+                <Check size={12} color={hc ? '#34d399' : '#059669'} />
+              ) : (
+                <Copy size={12} color={hc ? '#38bdf8' : '#0284c7'} />
+              )}
+              <Text style={{ fontSize: 11, fontWeight: '800', color: copiedRoomCode ? (hc ? '#34d399' : '#059669') : (hc ? '#38bdf8' : '#0284c7') }}>
                 {session.roomCode}
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -686,8 +757,27 @@ export default function LiveScreen() {
         </Text>
         {session.isActive && session.roomCode && (
           <View style={{ marginTop: 12, padding: 16, backgroundColor: hc ? '#1e3a8a' : '#eff6ff', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...getCardShadow(hc, 'sm') }}>
-             <Text style={{ fontSize: 13, color: hc ? '#93c5fd' : '#1e40af', fontWeight: '800' }}>Kode Ruangan</Text>
-             <Text style={{ fontSize: 24, fontWeight: '900', color: hc ? '#ffffff' : '#1e3a8a', letterSpacing: 4 }}>{session.roomCode}</Text>
+             <View>
+               <Text style={{ fontSize: 13, color: hc ? '#93c5fd' : '#1e40af', fontWeight: '800' }}>Kode Ruangan</Text>
+               <Text style={{ fontSize: 24, fontWeight: '900', color: hc ? '#ffffff' : '#1e3a8a', letterSpacing: 4 }}>{session.roomCode}</Text>
+             </View>
+             <TouchableOpacity
+               activeOpacity={0.8}
+               onPress={handleCopyRoomCode}
+               style={{
+                 flexDirection: 'row',
+                 alignItems: 'center',
+                 gap: 6,
+                 backgroundColor: copiedRoomCode ? (hc ? '#059669' : '#10b981') : (hc ? '#1d4ed8' : '#2563eb'),
+                 paddingHorizontal: 12,
+                 paddingVertical: 8,
+                 borderRadius: 8,
+               }}>
+               {copiedRoomCode ? <Check size={14} color="#ffffff" /> : <Copy size={14} color="#ffffff" />}
+               <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
+                 {copiedRoomCode ? (appLang === 'en' ? 'Copied' : 'Tersalin!') : (appLang === 'en' ? 'Copy Code' : 'Salin Kode')}
+               </Text>
+             </TouchableOpacity>
           </View>
         )}
       </View>

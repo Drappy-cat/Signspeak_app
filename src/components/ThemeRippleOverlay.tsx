@@ -74,7 +74,7 @@ export function ThemeRippleOverlay({ children }: { children: React.ReactNode }) 
   return (
     <Animated.View style={{ flex: 1, backgroundColor: animatedBgColor, position: 'relative' }}>
       {/* Background Ambient Soft Ripple (BEHIND children so text is NEVER covered) */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
         <Animated.View
           style={{
             position: 'absolute',

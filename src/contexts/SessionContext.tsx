@@ -1251,9 +1251,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const updateLanguage = (newLanguage: string) => {
     const prevLang = session.language || 'id';
     const getLangLabel = (code: string) => {
-      if (code === 'en') return 'Inggris';
       if (code === 'jv') return 'Jawa';
       if (code === 'mad') return 'Madura';
+      if (code === 'en') return 'Inggris';
       return 'Indonesia';
     };
 

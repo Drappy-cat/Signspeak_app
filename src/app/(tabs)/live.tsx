@@ -235,11 +235,17 @@ export default function LiveScreen() {
   const d = DICT[appLang];
   const alertedRef = useRef(false);
 
+  const hasRedirectedRef = useRef(false);
+
   const handleStudentRedirectPostSession = React.useCallback(async () => {
+    if (hasRedirectedRef.current) return;
+    hasRedirectedRef.current = true;
     try {
       await clearStudentRoomCode();
     } catch (_) {}
-    router.replace('/session-ended');
+    if (router && router.replace) {
+      router.replace('/session-ended');
+    }
   }, [clearStudentRoomCode, router]);
 
   useEffect(() => {

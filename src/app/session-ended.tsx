@@ -88,6 +88,18 @@ export default function SessionEndedScreen() {
     }
   };
 
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardScale = useRef(new Animated.Value(0.93)).current;
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(cardOpacity, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(cardScale, { toValue: 1, useNativeDriver: true, tension: 160, friction: 9 }),
+      ]).start();
+    }
+  }, [loading, cardOpacity, cardScale]);
+
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: hc ? '#0f172a' : '#F0F7FF', justifyContent: 'center', alignItems: 'center' }}>
@@ -99,18 +111,6 @@ export default function SessionEndedScreen() {
   const textColor = hc ? '#f8fafc' : '#0f172a';
   const mutedColor = hc ? '#94a3b8' : '#64748b';
   const cardColor = hc ? '#1e293b' : '#ffffff';
-
-  const cardOpacity = useRef(new Animated.Value(0)).current;
-  const cardScale = useRef(new Animated.Value(0.93)).current;
-
-  useEffect(() => {
-    if (!loading) {
-      Animated.parallel([
-        Animated.timing(cardOpacity, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.spring(cardScale, { toValue: 1, useNativeDriver: true, tension: 160, friction: 9 }),
-      ]).start();
-    }
-  }, [loading]);
 
   return (
     <KeyboardAvoidingView 

@@ -13,6 +13,7 @@ import { supabase, db } from '../services/supabase';
 // Maps our internal language codes to BCP-47 tags recognized by Web Speech API & Android STT
 const LANG_TO_BCP47: Record<string, string> = {
   id: 'id-ID',   // Bahasa Indonesia — full support in Chrome, Edge, Android
+  en: 'en-US',   // English
   jv: 'id-ID',   // Bahasa Jawa — fallback to id-ID for dictionary translation
   mad: 'id-ID',  // Bahasa Madura — no dedicated STT yet, fallback to id-ID
 };

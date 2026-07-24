@@ -45,11 +45,21 @@ export const DEMO_SENTENCES: Record<string, string[]> = {
     'Oksigen se eedhing yaiku asel dhari proses fotosintesis reya.',
     "Badha se terro atanya'a? Tore ngacong.",
   ],
+  en: [
+    'Alright students, today we are going to learn about photosynthesis.',
+    'This process is very important for all life on earth.',
+    'Photosynthesis happens inside chloroplasts in plant cells.',
+    'Chlorophyll is a pigment that absorbs sunlight to produce energy.',
+    'The photosynthesis reaction converts carbon dioxide and water into glucose.',
+    'The oxygen we breathe is the result of this photosynthesis process.',
+    'Any questions? Please raise your hand.',
+  ],
 };
 
 // Language labels for UI
 export const LANGUAGE_LABELS: Record<string, string> = {
   id: 'Indonesia',
+  en: 'Inggris',
   jv: 'Jawa',
   mad: 'Madura',
 };

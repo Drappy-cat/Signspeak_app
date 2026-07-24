@@ -113,6 +113,7 @@ export async function getTeacherFullProfile(authUserId: string): Promise<Teacher
       full_name: teacher.full_name,
       email: teacher.email,
       nip: teacher.nip,
+      photo_url: teacher.photo_url,
       is_verified: teacher.is_verified,
       created_at: teacher.created_at,
     },
@@ -125,7 +126,7 @@ export async function getTeacherFullProfile(authUserId: string): Promise<Teacher
 /** Update teacher profile */
 export async function updateTeacherProfile(
   teacherId: string,
-  updates: Partial<Pick<Teacher, 'full_name' | 'nip' | 'school_id'>>
+  updates: Partial<Pick<Teacher, 'full_name' | 'nip' | 'school_id' | 'photo_url'>>
 ): Promise<void> {
   const { error } = await db
     .from('teachers')

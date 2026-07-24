@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, LogOut } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -418,8 +418,13 @@ export default function LiveScreen() {
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
+            overflow: 'hidden'
           }}>
-            <Users size={18} color={hc ? '#93c5fd' : '#1d4ed8'} />
+            {session.teacherPhotoUrl ? (
+              <Image source={{ uri: session.teacherPhotoUrl }} style={{ width: 36, height: 36 }} />
+            ) : (
+              <Users size={18} color={hc ? '#93c5fd' : '#1d4ed8'} />
+            )}
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 10, fontWeight: '700', color: mutedColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>

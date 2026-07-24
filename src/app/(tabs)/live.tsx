@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut, RotateCw } from 'lucide-react-native';
+import { Mic, Square, Play, Pause, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut, RotateCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { db } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -129,7 +129,7 @@ function HighlightText({
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveScreen() {
   const { role, user, logout, clearStudentRoomCode } = useAuth();
-  const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript } = useSession();
+  const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript, pauseRecording, resumeRecording } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
   const appLang = settings.appLang || 'id';
@@ -475,8 +475,20 @@ export default function LiveScreen() {
           </View>
         </View>
 
-        {/* Error / Status Banner */}
-        {session.errorMessage ? (
+        {/* Error / Status / Reconnection Banner */}
+        {session.isReconnecting ? (
+          <View style={{ marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 10, backgroundColor: hc ? '#451a03' : '#fff7ed', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderWidth: 1, borderColor: '#f97316' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+              <AlertCircle size={14} color="#f97316" />
+              <Text style={{ fontSize: 12, color: '#f97316', fontWeight: '700', flex: 1 }}>
+                {appLang === 'en' ? 'Connection Interrupted · Reconnecting to class...' : 'Koneksi Terputus · Menghubungkan kembali ke kelas...'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleManualRefreshSession} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: '#f97316' }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>Re-sync</Text>
+            </TouchableOpacity>
+          </View>
+        ) : session.errorMessage ? (
           <View style={{ marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 10, backgroundColor: hc ? '#1c1917' : '#fffbeb', flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
             <AlertCircle size={14} color="#d97706" />
             <Text style={{ fontSize: 12, color: '#d97706', flex: 1, lineHeight: 18 }}>{session.errorMessage}</Text>
@@ -831,14 +843,49 @@ export default function LiveScreen() {
           </TouchableOpacity>
         </RNAnimated.View>
 
+        {/* Dedicated Pause / Resume Button for Teacher */}
+        {session.isActive && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={async () => {
+              try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (_) {}
+              if (session.isPaused) {
+                await resumeRecording();
+              } else {
+                await pauseRecording();
+              }
+            }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: session.isPaused ? (hc ? '#059669' : '#10b981') : (hc ? '#d97706' : '#f59e0b'),
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderRadius: 10,
+              marginTop: 4,
+              elevation: 4,
+            }}
+          >
+            {session.isPaused ? <Play size={16} color="#ffffff" fill="#ffffff" /> : <Pause size={16} color="#ffffff" fill="#ffffff" />}
+            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13 }}>
+              {session.isPaused 
+                ? (appLang === 'en' ? '▶ Resume Voice' : '▶ Lanjutkan Suara') 
+                : (appLang === 'en' ? '⏸ Pause Voice' : '⏸ Jeda Suara')}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {isRecording ? (
           <View style={{ alignItems: 'center', gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <PulseDot color="bg-red-500" />
+              <PulseDot color={session.isPaused ? 'bg-amber-500' : 'bg-red-500'} />
               <Text style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: 22, color: textColor }}>{formatDuration(elapsed)}</Text>
             </View>
-            <Text style={{ fontSize: 12, color: mutedColor }}>
-              {appLang === 'en' ? 'Session in progress · Recording' : 'Sesi sedang berjalan · Merekam audio'}
+            <Text style={{ fontSize: 12, color: session.isPaused ? '#d97706' : mutedColor, fontWeight: session.isPaused ? '700' : '400' }}>
+              {session.isPaused 
+                ? (appLang === 'en' ? '⏸ Session Paused' : '⏸ Sesi Dijeda (Voice Off)') 
+                : (appLang === 'en' ? 'Session in progress · Recording' : 'Sesi sedang berjalan · Merekam audio')}
             </Text>
           </View>
         ) : (
@@ -904,6 +951,34 @@ export default function LiveScreen() {
             </ScrollView>
           </View>
         </View>
+
+        {/* Teacher Pause Modal Overlay for Students */}
+        {session.isActive && session.isPaused && (
+          <View style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99,
+            backgroundColor: hc ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.92)',
+            alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}>
+            <View style={{
+              padding: 24, borderRadius: 20, backgroundColor: hc ? '#1e293b' : '#ffffff',
+              alignItems: 'center', gap: 12, width: '100%', maxWidth: 320,
+              borderWidth: 1, borderColor: hc ? '#334155' : '#e2e8f0',
+              ...getCardShadow(hc, 'lg')
+            }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: hc ? '#d97706' : '#fef3c7', alignItems: 'center', justifyContent: 'center' }}>
+                <Pause size={28} color={hc ? '#fbbf24' : '#d97706'} />
+              </View>
+              <Text style={{ fontSize: 16, fontWeight: '900', color: textColor, textAlign: 'center' }}>
+                {appLang === 'en' ? 'Teacher Paused Session' : 'Guru Sedang Menjeda Sesi'}
+              </Text>
+              <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', lineHeight: 18 }}>
+                {appLang === 'en'
+                  ? 'Transcribing is temporarily paused. Please wait for teacher to resume.'
+                  : 'Transkripsi otomatis dihentikan sementara. Mohon tunggu guru melanjutkan kembali.'}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Language Switcher */}
@@ -1073,16 +1148,14 @@ export default function LiveScreen() {
         </View>
 
         {/* End Session */}
-        {!isRecording && (
-          <TouchableOpacity
-            onPress={() => { endSession(); router.replace('/(tabs)/home'); }}
-            style={{ marginTop: 4, paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: hc ? '#7f1d1d' : '#fecaca', backgroundColor: hc ? 'rgba(127,29,29,0.2)' : '#fef2f2' }}
-          >
-            <Text style={{ fontWeight: '800', fontSize: 14, color: hc ? '#f87171' : '#dc2626' }}>
-              {appLang === 'en' ? 'End Session' : 'Akhiri Sesi'}
-            </Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={() => { endSession(); router.replace('/(tabs)/home'); }}
+          style={{ marginTop: 4, paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: hc ? '#7f1d1d' : '#fecaca', backgroundColor: hc ? 'rgba(127,29,29,0.2)' : '#fef2f2' }}
+        >
+          <Text style={{ fontWeight: '800', fontSize: 14, color: hc ? '#f87171' : '#dc2626' }}>
+            {appLang === 'en' ? 'End Session' : 'Akhiri Sesi'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );

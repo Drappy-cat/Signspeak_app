@@ -64,6 +64,9 @@ export interface ActiveSession {
   sessionEndingCountdown?: number;
   sessionEndingMessage?: string;
   shouldRedirectPostSession?: boolean;
+  isPaused?: boolean;
+  isReconnecting?: boolean;
+  reconnectMessage?: string;
 }
 
 interface SessionContextType {
@@ -103,6 +106,9 @@ const defaultSession: ActiveSession = {
   isSessionEnding: false,
   sessionEndingCountdown: 0,
   sessionEndingMessage: '',
+  isPaused: false,
+  isReconnecting: false,
+  reconnectMessage: '',
 };
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -424,18 +430,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               transcript: data.transcript || '',
               interimTranscript: data.interim_transcript || '',
               errorMessage: null,
-              startTime: new Date(data.started_at).getTime(),
+              startTime: data.started_at ? new Date(data.started_at).getTime() : Date.now(),
               participants: [],
               customKeywords: [],
               customGlossary: {},
             });
           } else {
-            setSession(prev => ({
-              ...prev,
-              isActive: false,
-              roomCode: roomCode,
-              errorMessage: null,
-            }));
+            // Preserve active state if Realtime channel is currently active
+            setSession(prev => {
+              if (prev.isActive && prev.transcript) return prev;
+              return {
+                ...prev,
+                isActive: false,
+                roomCode: roomCode,
+                errorMessage: null,
+              };
+            });
           }
         } catch (err) {
           console.warn('Failed fetchInitial for session:', err);
@@ -537,8 +547,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }
           }
         )
+        .on(
+          'broadcast',
+          { event: 'sync_session_pause' },
+          (payload) => {
+            const data = payload.payload;
+            if (data) {
+              setSession(prev => ({
+                ...prev,
+                isPaused: !!data.isPaused,
+              }));
+            }
+          }
+        )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
+            setSession(prev => ({ ...prev, isReconnecting: false }));
             // Broadcast initial presence
             channel.send({
               type: 'broadcast',
@@ -564,6 +588,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                 }
               });
             }, 15000);
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setSession(prev => ({
+              ...prev,
+              isReconnecting: true,
+              reconnectMessage: 'Koneksi terputus. Menghubungkan kembali...'
+            }));
           }
         });
     }
@@ -866,11 +896,43 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsRecording(false);
-    setSession(prev => ({ ...prev, interimTranscript: '' }));
+    setSession(prev => ({ ...prev, isPaused: true, interimTranscript: '' }));
 
     if (autoPauseTimerRef.current) {
       clearTimeout(autoPauseTimerRef.current);
     }
+
+    // Broadcast pause status to all students
+    if (role === 'teacher' && teacherChannelRef.current) {
+      try {
+        teacherChannelRef.current.send({
+          type: 'broadcast',
+          event: 'sync_session_pause',
+          payload: { isPaused: true }
+        });
+      } catch (e) {
+        console.warn('Failed to broadcast pause:', e);
+      }
+    }
+  };
+
+  const resumeRecording = async () => {
+    setSession(prev => ({ ...prev, isPaused: false }));
+
+    // Broadcast resume status to all students
+    if (role === 'teacher' && teacherChannelRef.current) {
+      try {
+        teacherChannelRef.current.send({
+          type: 'broadcast',
+          event: 'sync_session_pause',
+          payload: { isPaused: false }
+        });
+      } catch (e) {
+        console.warn('Failed to broadcast resume:', e);
+      }
+    }
+
+    await startRecording(session.language, '');
   };
 
   // ── Session Lifecycle ────────────────────────────────────────────────────────
@@ -1099,8 +1161,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (code === 'en') return 'Bahasa Inggris';
       if (code === 'jv') return 'Bahasa Jawa';
       if (code === 'mad') return 'Bahasa Madura';
-      return 'Indonesia';
-    };
       return 'Indonesia';
     };
 

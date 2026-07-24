@@ -140,6 +140,7 @@ export default function HomeScreen() {
   const [selectedSessionHistory, setSelectedSessionHistory] = React.useState<any | null>(null);
   const [newWord, setNewWord] = React.useState('');
   const [newDefinition, setNewDefinition] = React.useState('');
+  const hasGlossaryChangedRef = React.useRef(false);
 
   const [addClassModalVisible, setAddClassModalVisible] = React.useState(false);
   
@@ -272,9 +273,9 @@ export default function HomeScreen() {
     loadHomeData();
   }, [role, user?.teacher_id]);
 
-  // Save custom glossary to database when it changes
+  // Save custom glossary to database only when explicitly modified by user
   React.useEffect(() => {
-    if (!isGlossaryLoaded) return;
+    if (!isGlossaryLoaded || !hasGlossaryChangedRef.current) return;
     
     if (user?.teacher_id) {
       saveTeacherGlossary(user.teacher_id, customGlossaryList).catch(console.error);
@@ -915,6 +916,7 @@ export default function HomeScreen() {
                     activeOpacity={0.8}
                     onPress={() => {
                       if (newWord.trim() && newDefinition.trim()) {
+                        hasGlossaryChangedRef.current = true;
                         setCustomGlossaryList(prev => [...prev, { word: newWord.trim(), definition: newDefinition.trim() }]);
                         setNewWord('');
                         setNewDefinition('');
@@ -961,7 +963,10 @@ export default function HomeScreen() {
                         </View>
                         <TouchableOpacity
                           activeOpacity={0.7}
-                          onPress={() => setCustomGlossaryList(prev => prev.filter((_, i) => i !== index))}
+                          onPress={() => {
+                            hasGlossaryChangedRef.current = true;
+                            setCustomGlossaryList(prev => prev.filter((_, i) => i !== index));
+                          }}
                           style={{ padding: 4 }}
                         >
                           <Trash2 size={14} color="#ef4444" />

@@ -6,7 +6,7 @@ import {
   getSession,
   pingSupabase,
 } from '../services/authService';
-import { supabase } from '../services/supabase';
+import { supabase, db } from '../services/supabase';
 import { getTeacherFullProfile, createTeacherProfile } from '../services/teacherService';
 import { saveStudentCache } from '../utils/studentCache';
 import type { TeacherProfile } from '../types/database';

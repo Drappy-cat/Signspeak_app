@@ -839,11 +839,21 @@ export default function LiveScreen() {
             })}
           </View>
           <Text style={{ fontSize: 11, color: mutedColor, marginTop: 8, textAlign: 'center' }}>
-            {session.language === 'mad'
+            {session.language === 'en'
               ? (appLang === 'en' 
-                ? `⚠️ Madurese uses Indonesian engine` 
-                : `⚠️ Bahasa Madura menggunakan engine Indonesia`) 
-              : `${appLang === 'en' ? 'Engine:' : 'Engine:'} Bahasa ${LANGUAGE_LABELS[session.language || 'id']}`}
+                ? `🎙️ Listening & displaying in English` 
+                : `🎙️ Mendengar & menampilkan dalam Bahasa Inggris`)
+              : session.language === 'jv'
+                ? (appLang === 'en'
+                  ? `🎙️ Listening in Indonesian → Displaying in Javanese`
+                  : `🎙️ Mendengar Indonesia → Menampilkan Bahasa Jawa`)
+                : session.language === 'mad'
+                  ? (appLang === 'en'
+                    ? `🎙️ Listening in Indonesian → Displaying in Madurese`
+                    : `🎙️ Mendengar Indonesia → Menampilkan Bahasa Madura`)
+                  : (appLang === 'en'
+                    ? `🎙️ Listening & displaying in Indonesian`
+                    : `🎙️ Mendengar & menampilkan dalam Bahasa Indonesia`)}
           </Text>
         </View>
       </View>
@@ -1207,7 +1217,7 @@ export default function LiveScreen() {
             </View>
 
             <Text style={{ fontSize: 18, fontWeight: '900', color: textColor, textAlign: 'center', marginBottom: 6 }}>
-              {appLang === 'en' ? 'Changing Transcript Language...' : 'Mengubah Bahasa Transkrip...'}
+              {appLang === 'en' ? 'Switching Output Language...' : 'Mengganti Bahasa Keluaran...'}
             </Text>
 
             {/* Language Transition Badge */}
@@ -1221,14 +1231,14 @@ export default function LiveScreen() {
               marginVertical: 10,
             }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: hc ? '#93c5fd' : '#1d4ed8' }}>
-                🔄 {session.langSwitchLabel || 'Indonesia ➔ Indonesia'}
+                🔄 {session.langSwitchLabel || 'Transkripsi → Bahasa Indonesia'}
               </Text>
             </View>
 
             <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', lineHeight: 20, marginVertical: 8 }}>
               {appLang === 'en'
-                ? 'Transcript paused for 10 seconds to adjust translation modules.'
-                : 'Transkrip di-pause sejenak selama 10 detik untuk menyesuaikan modul penerjemahan.'}
+                ? 'Pausing briefly to adjust the speech recognition engine for the new language.'
+                : 'Jeda sejenak untuk menyesuaikan mesin pengenalan suara ke bahasa baru.'}
             </Text>
 
             {/* Live 10s Countdown Badge */}

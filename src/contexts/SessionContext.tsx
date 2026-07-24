@@ -735,9 +735,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Start Recording ──────────────────────────────────────────────────────────
-  const startRecording = async (lang: string) => {
+  const startRecording = async (lang: string, initialText?: string) => {
     const bcp47 = LANG_TO_BCP47[lang] || 'id-ID';
-    accumulatedTranscriptRef.current = session.transcript;
+    if (initialText !== undefined) {
+      accumulatedTranscriptRef.current = initialText;
+    }
 
     if (Platform.OS === 'web') {
       // Try real Web Speech API first
@@ -874,6 +876,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     accumulatedTranscriptRef.current = '';
     
+    // Deactivate any previous active sessions for this room code or teacher to prevent stale transcripts
+    try {
+      if (user?.teacher_id) {
+        await db.from('live_sessions')
+          .update({ is_active: false })
+          .eq('teacher_id', user.teacher_id);
+      }
+      await db.from('live_sessions')
+        .update({ is_active: false })
+        .eq('room_code', roomCode);
+    } catch (e) {
+      console.warn('[Supabase] Warning deactivating previous sessions:', e);
+    }
+    
     // Parse custom glossary list to active state
     const keywords: string[] = [];
     const glossary: Record<string, string> = {};
@@ -962,7 +978,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    await startRecording(language);
+    await startRecording(language, '');
   };
 
   const endSession = async () => {

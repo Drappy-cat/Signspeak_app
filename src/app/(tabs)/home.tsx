@@ -12,7 +12,8 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { getTeacherClasses, getTeacherSubjects, getTeacherGlossary, saveTeacherGlossary, getTeacherSessionHistory, generateUniqueRoomCode, assignTeacherToClass, createAndAssignClassForTeacher, removeTeacherFromClass, updateTeacherProfile } from '../../services/teacherService';
 import { getClassesBySchool, getAllGrades, getSchoolById, getGradesBySchoolType } from '../../services/schoolService';
 import type { ClassWithDetails, Subject, Grade } from '../../types/database';
-import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2, User, LogOut } from 'lucide-react-native';
+import { db } from '../../services/supabase';
+import { Bell, ArrowRight, BookOpen, Mic, GraduationCap, ChevronRight, Globe, X, Check, Plus, Trash2, Clock, Share2, User, LogOut, Play } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Easing } from 'react-native';
 import { LANGUAGE_LABELS } from '../../constants/keywords';
@@ -86,7 +87,7 @@ function PulseDot() {
 
 export default function HomeScreen() {
   const { role, user, logout, refreshUser } = useAuth();
-  const { session, startSession } = useSession();
+  const { session, startSession, rejoinOngoingTeacherSession } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
   
@@ -140,8 +141,9 @@ export default function HomeScreen() {
   const [selectedSessionHistory, setSelectedSessionHistory] = React.useState<any | null>(null);
   const [newWord, setNewWord] = React.useState('');
   const [newDefinition, setNewDefinition] = React.useState('');
-  const hasGlossaryChangedRef = React.useRef(false);
+  const [hasGlossaryChangedRef] = React.useState({ current: false });
   const [isStartingSession, setIsStartingSession] = React.useState(false);
+  const [activeOngoingSession, setActiveOngoingSession] = React.useState<any | null>(null);
 
   const [addClassModalVisible, setAddClassModalVisible] = React.useState(false);
   
@@ -256,6 +258,13 @@ export default function HomeScreen() {
         if (glossary && glossary.length > 0) {
           setCustomGlossaryList(glossary);
         }
+
+        const { data: ongoing } = await db.from('live_sessions')
+          .select('*, subject_rel:subjects(subject_name), class_rel:classes(class_name)')
+          .eq('teacher_id', user.teacher_id)
+          .eq('is_active', true)
+          .maybeSingle();
+        setActiveOngoingSession(ongoing || null);
       } catch (err) {
         console.error('Error loading home data:', err);
       } finally {
@@ -529,6 +538,46 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Active Ongoing Session Recovery Card for Teacher */}
+      {activeOngoingSession && (
+        <View style={{
+          marginHorizontal: 20, marginTop: 12, marginBottom: 8, padding: 16, borderRadius: 16,
+          backgroundColor: hc ? '#1e3a8a' : '#eff6ff',
+          ...getCardShadow(hc, 'md')
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <PulseDot />
+            <Text style={{ fontSize: 11, fontWeight: '900', color: '#ef4444', textTransform: 'uppercase', letterSpacing: 1 }}>
+              {appLang === 'en' ? 'Active Session Ongoing' : 'Sesi Kelas Masih Berjalan'}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 16, fontWeight: '900', color: textColorVal }}>
+            {activeOngoingSession.subject_rel?.subject_name || 'Sesi Pembelajaran'}
+          </Text>
+          <Text style={{ fontSize: 12, color: mutedColorVal, marginTop: 2 }}>
+            {appLang === 'en' ? 'Room Code:' : 'Kode Ruangan:'} <Text style={{ fontWeight: '800', color: '#2563eb', letterSpacing: 1.5 }}>{activeOngoingSession.room_code}</Text>
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={async () => {
+              await rejoinOngoingTeacherSession(activeOngoingSession.room_code);
+              router.replace('/(tabs)/live');
+            }}
+            style={{
+              marginTop: 14, backgroundColor: '#2563eb', paddingVertical: 12, borderRadius: 12,
+              alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8,
+              shadowColor: '#2563eb', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4
+            }}
+          >
+            <Play size={16} color="#ffffff" fill="#ffffff" />
+            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>
+              {appLang === 'en' ? 'Re-join Live Session' : 'Kembali Ke Sesi Kelas Live'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Language Selector */}
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>

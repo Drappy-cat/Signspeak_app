@@ -6,6 +6,7 @@ import { getTime } from '../utils/formatters';
 import { Platform } from 'react-native';
 import { DEMO_SENTENCES } from '../constants/keywords';
 import { translateToMadurese, translateToJavanese } from '../utils/translator';
+import { formatAutoPunctuation, applyGlossaryCorrections } from '../utils/textProcessor';
 import { supabase, db } from '../services/supabase';
 
 
@@ -18,10 +19,14 @@ const LANG_TO_BCP47: Record<string, string> = {
   mad: 'id-ID',  // Bahasa Madura — no dedicated STT yet, fallback to id-ID
 };
 
-function translateText(text: string, lang: string): string {
-  if (lang === 'mad') return translateToMadurese(text);
-  if (lang === 'jv') return translateToJavanese(text);
-  return text;
+function translateText(text: string, lang: string, customGlossary?: Record<string, string>): string {
+  if (!text) return '';
+  let processed = applyGlossaryCorrections(text, customGlossary);
+  processed = formatAutoPunctuation(processed);
+
+  if (lang === 'mad') return translateToMadurese(processed);
+  if (lang === 'jv') return translateToJavanese(processed);
+  return processed;
 }
 
 export interface Participant {
@@ -237,6 +242,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const accumulatedTranscriptRef = useRef<string>('');
   const customGlossaryRef = useRef<{ keywords: string[]; glossary: Record<string, string> }>({ keywords: [], glossary: {} });
   const teacherChannelRef = useRef<any>(null);
+  const dbSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerLangPause = useCallback((fromLang: string, toLang: string, labelStr: string) => {
     if (langCountdownTimerRef.current) {
@@ -299,12 +305,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           clearInterval(endingTimerRef.current);
           endingTimerRef.current = null;
         }
+        accumulatedTranscriptRef.current = '';
         setSession(prev => ({
           ...prev,
           isActive: false,
           isSessionEnding: false,
           sessionEndingCountdown: 0,
           shouldRedirectPostSession: true,
+          transcript: '',
+          interimTranscript: '',
         }));
       } else {
         setSession(prev => ({
@@ -329,8 +338,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           }
 
           setSession(prev => {
-            const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language);
-            const finalInterim = translateText(interimText, prev.language);
+            const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language, prev.customGlossary);
+            const finalInterim = translateText(interimText, prev.language, prev.customGlossary);
 
             return {
               ...prev,
@@ -586,7 +595,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 2. Debounce DB save
-      const timer = setTimeout(() => {
+      if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
+      dbSyncTimerRef.current = setTimeout(() => {
         db.from('live_sessions').update({
           transcript: session.transcript,
           interim_transcript: session.interimTranscript,
@@ -594,7 +604,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           if (error) console.error('[Supabase] Failed to sync transcript', error);
         });
       }, 1000); // Debounce interval
-      return () => clearTimeout(timer);
+      return () => {
+        if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
+      };
     }
   }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript, user?.name, user?.school]);
 
@@ -812,7 +824,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         accumulatedTranscriptRef.current = baseText;
 
         setSession(prev => {
-          const finalTranscript = translateText(baseText, prev.language);
+          const finalTranscript = translateText(baseText, prev.language, prev.customGlossary);
 
           return {
             ...prev,
@@ -875,17 +887,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (dbSyncTimerRef.current) {
+      clearTimeout(dbSyncTimerRef.current);
+      dbSyncTimerRef.current = null;
+    }
     accumulatedTranscriptRef.current = '';
     
-    // Deactivate any previous active sessions for this room code or teacher to prevent stale transcripts
+    // Deactivate any previous active sessions for this room code or teacher and reset transcript to prevent stale transcripts
     try {
       if (user?.teacher_id) {
         await db.from('live_sessions')
-          .update({ is_active: false })
+          .update({ is_active: false, transcript: '', interim_transcript: '' })
           .eq('teacher_id', user.teacher_id);
       }
       await db.from('live_sessions')
-        .update({ is_active: false })
+        .update({ is_active: false, transcript: '', interim_transcript: '' })
         .eq('room_code', roomCode);
     } catch (e) {
       console.warn('[Supabase] Warning deactivating previous sessions:', e);
@@ -985,14 +1001,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const endSession = async () => {
     await pauseRecording();
 
+    if (dbSyncTimerRef.current) {
+      clearTimeout(dbSyncTimerRef.current);
+      dbSyncTimerRef.current = null;
+    }
+
     if (session.isActive && accumulatedTranscriptRef.current.length > 0 && role === 'teacher') {
       const duration = Math.floor((Date.now() - (session.startTime || Date.now())) / 1000);
       const text = translateText(accumulatedTranscriptRef.current, session.language);
       const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
 
-      // End session in live_sessions
+      // End session in live_sessions and reset transcript to prevent carryover
       if (session.roomCode) {
-        await db.from('live_sessions').update({ is_active: false }).eq('room_code', session.roomCode);
+        await db.from('live_sessions').update({ is_active: false, transcript: '', interim_transcript: '' }).eq('room_code', session.roomCode);
         
         if (teacherChannelRef.current) {
           teacherChannelRef.current.send({
@@ -1062,6 +1083,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    if (dbSyncTimerRef.current) {
+      clearTimeout(dbSyncTimerRef.current);
+      dbSyncTimerRef.current = null;
+    }
     accumulatedTranscriptRef.current = '';
     customGlossaryRef.current = { keywords: [], glossary: {} };
     setSession(defaultSession);
@@ -1071,8 +1096,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const updateLanguage = (newLanguage: string) => {
     const prevLang = session.language || 'id';
     const getLangLabel = (code: string) => {
+      if (code === 'en') return 'Bahasa Inggris';
       if (code === 'jv') return 'Bahasa Jawa';
       if (code === 'mad') return 'Bahasa Madura';
+      return 'Indonesia';
+    };
       return 'Indonesia';
     };
 
@@ -1159,8 +1187,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSession(prev => {
-        const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language);
-        const finalInterim = translateText(interimStr.trim(), prev.language);
+        const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language, prev.customGlossary);
+        const finalInterim = translateText(interimStr.trim(), prev.language, prev.customGlossary);
 
         return {
           ...prev,

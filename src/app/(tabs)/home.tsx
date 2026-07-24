@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StatusBar as RNStatusBar, Modal, TextInput, Share, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { saveProfilePhotoLocally, uploadProfilePhoto } from '../../services/storageService';
@@ -92,6 +93,11 @@ export default function HomeScreen() {
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';
   const d = DICT[appLang];
+  
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : (insets.bottom || 8);
+  const tabBarHeight = role === 'teacher' ? (58 + bottomPadding) : insets.bottom;
+  const scrollPaddingBottom = tabBarHeight + 36;
 
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textMain = hc ? "text-white" : "text-slate-900";
@@ -717,7 +723,7 @@ export default function HomeScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: scrollPaddingBottom }}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 

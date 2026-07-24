@@ -8,6 +8,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { BubbleBackground } from '../../components/BubbleBackground';
 import { supabase, db } from '../../services/supabase';
 import { getActiveSessionByRoomCode, upsertStudent, addSessionParticipant } from '../../services/teacherService';
+import { loadStudentCache } from '../../utils/studentCache';
 import { DICT } from '../../constants/i18n';
 
 import { getCardShadow } from '../../utils/formatters';
@@ -35,6 +36,17 @@ export default function LoginScreen() {
   // Modal Animation
   const [modalScale] = useState(() => new Animated.Value(0.8));
   const [modalOpacity] = useState(() => new Animated.Value(0));
+
+  React.useEffect(() => {
+    const checkCache = async () => {
+      const cached = await loadStudentCache();
+      if (cached) {
+        setStudentName(cached.name);
+        setStudentAbsen(cached.absen);
+      }
+    };
+    checkCache();
+  }, []);
 
   React.useEffect(() => {
     if (showModal) {

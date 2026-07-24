@@ -184,7 +184,7 @@ export async function getCitiesByProvince(province?: string | null): Promise<str
   if (error || !data) return [];
 
   const citiesSet = new Set<string>();
-  data.forEach(row => {
+  data.forEach((row: any) => {
     if (!row.address) return;
     const match = row.address.match(/(?:Kab\.|Kota)\s+([^,]+)/i);
     if (match && match[1]) {
@@ -207,7 +207,7 @@ export async function getDistrictsByCity(city?: string | null, province?: string
   if (error || !data) return [];
 
   const districtSet = new Set<string>();
-  data.forEach(row => {
+  data.forEach((row: any) => {
     if (!row.address) return;
     const match = row.address.match(/Kec\.\s+([^,]+)/i);
     if (match && match[1]) {

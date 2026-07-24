@@ -8,6 +8,7 @@ import {
 } from '../services/authService';
 import { supabase } from '../services/supabase';
 import { getTeacherFullProfile, createTeacherProfile } from '../services/teacherService';
+import { saveStudentCache } from '../utils/studentCache';
 import type { TeacherProfile } from '../types/database';
 
 export type Role = 'student' | 'teacher' | null;
@@ -172,6 +173,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         joinedRoomCode: roomCode,
         absen: absen || '0',
       };
+      
+      // Save student identity to short-term cache for quick re-join
+      await saveStudentCache(mockUser.name, mockUser.absen || '0', mockUser.className);
+      
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
       await AsyncStorage.setItem(STUDENT_CACHE_KEY, JSON.stringify({
         name: mockUser.name,

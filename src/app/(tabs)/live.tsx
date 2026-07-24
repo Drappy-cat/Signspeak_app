@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2 } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -239,7 +239,7 @@ export default function LiveScreen() {
     try {
       await clearStudentRoomCode();
     } catch (_) {}
-    router.replace('/(auth)/login');
+    router.replace('/session-ended');
   }, [clearStudentRoomCode, router]);
 
   useEffect(() => {
@@ -250,6 +250,10 @@ export default function LiveScreen() {
 
   useEffect(() => {
     if (role === 'student' && !session.isActive && !session.isSessionEnding) {
+      if (session.errorMessage === 'Sesi telah diakhiri oleh guru.') {
+        handleStudentRedirectPostSession();
+        return;
+      }
       if (!alertedRef.current) {
         Alert.alert(
           appLang === 'en' ? 'Waiting for Teacher' : 'Menunggu Sesi Guru',
@@ -263,7 +267,7 @@ export default function LiveScreen() {
     } else if (session.isActive) {
       alertedRef.current = false;
     }
-  }, [session.isActive]);
+  }, [session.isActive, session.errorMessage, role, appLang, handleStudentRedirectPostSession]);
   // Elapsed timer for teacher
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
@@ -391,15 +395,16 @@ export default function LiveScreen() {
                 {settings.highContrast ? <Sun size={14} color="#f8fafc" /> : <Moon size={14} color="#0f172a" />}
               </TouchableOpacity>
             </View>
+
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={async () => {
                 await logout();
                 router.replace('/(auth)/role-select');
               }}
-              style={{ backgroundColor: hc ? '#ef4444' : '#fee2e2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hc ? '#ef4444' : '#fee2e2', alignItems: 'center', justifyContent: 'center' }}
             >
-              <Text style={{ color: hc ? '#ffffff' : '#ef4444', fontSize: 11, fontWeight: '800' }}>{appLang === 'en' ? 'Logout' : 'Keluar'}</Text>
+              <LogOut size={14} color={hc ? '#ffffff' : '#ef4444'} />
             </TouchableOpacity>
           </View>
         </View>
@@ -487,8 +492,13 @@ export default function LiveScreen() {
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
+            overflow: 'hidden'
           }}>
-            <Users size={18} color={hc ? '#93c5fd' : '#1d4ed8'} />
+            {session.teacherPhotoUrl ? (
+              <Image source={{ uri: session.teacherPhotoUrl }} style={{ width: 36, height: 36 }} />
+            ) : (
+              <Users size={18} color={hc ? '#93c5fd' : '#1d4ed8'} />
+            )}
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 10, fontWeight: '700', color: mutedColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>

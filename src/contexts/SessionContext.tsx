@@ -38,6 +38,7 @@ export interface ActiveSession {
   teacherName: string | null;
   teacherSchool?: string | null;
   teacherNip?: string | null;
+  teacherPhotoUrl?: string | null;
   subjectId: string | null;
   classId: string | null;
   language: string;
@@ -355,7 +356,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const fetchInitial = async () => {
         try {
           const { data } = await db.from('live_sessions')
-            .select('*, teacher:teachers(full_name, nip, school:schools(school_name)), subject_rel:subjects(subject_name)')
+            .select('*, teacher:teachers(full_name, nip, photo_url, school:schools(school_name)), subject_rel:subjects(subject_name)')
             .eq('room_code', roomCode)
             .eq('is_active', true)
             .order('started_at', { ascending: false })
@@ -372,16 +373,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             let resolvedTeacherName = teacherObj?.full_name || data.teacher_name;
             let resolvedSchool = teacherObj?.school?.school_name || data.teacher_school;
             let resolvedNip = teacherObj?.nip;
+            let resolvedPhotoUrl = teacherObj?.photo_url;
 
             // Direct fallback lookup if relation returned null
             if (!resolvedTeacherName && data.teacher_id) {
               const { data: directTeacher } = await db.from('teachers')
-                .select('full_name, nip, school:schools(school_name)')
+                .select('full_name, nip, photo_url, school:schools(school_name)')
                 .eq('id', data.teacher_id)
                 .maybeSingle();
               if (directTeacher) {
                 resolvedTeacherName = directTeacher.full_name;
                 resolvedNip = directTeacher.nip;
+                resolvedPhotoUrl = directTeacher.photo_url;
                 resolvedSchool = (directTeacher.school as any)?.school_name || resolvedSchool;
               }
             }
@@ -392,6 +395,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               subject: data.subject_rel?.subject_name || 'Sesi Pembelajaran', 
               teacherName: resolvedTeacherName || 'Guru Pengampu',
               teacherNip: resolvedNip || null,
+              teacherPhotoUrl: resolvedPhotoUrl || null,
               teacherSchool: resolvedSchool || null,
               subjectId: data.subject_id,
               classId: data.class_id,
@@ -454,6 +458,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               interimTranscript: data.interimTranscript,
               teacherName: data.teacherName || prev.teacherName,
               teacherSchool: data.teacherSchool || prev.teacherSchool,
+              teacherPhotoUrl: data.teacherPhotoUrl || prev.teacherPhotoUrl,
             }));
           }
         )
@@ -477,6 +482,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                 isActive: true, // Activate if teacher info is received (meaning teacher is there)
                 teacherName: data.teacherName,
                 teacherSchool: data.teacherSchool || prev.teacherSchool,
+                teacherPhotoUrl: data.teacherPhotoUrl || prev.teacherPhotoUrl,
               }));
             }
           }
@@ -562,6 +568,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             interimTranscript: session.interimTranscript,
             teacherName: user?.name || session.teacherName || 'Guru',
             teacherSchool: user?.school || session.teacherSchool || null,
+            teacherPhotoUrl: user?.photoUri || session.teacherPhotoUrl || null,
           }
         });
       }
@@ -598,6 +605,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               payload: {
                 teacherName: user?.name || 'Guru',
                 teacherSchool: user?.school || null,
+                teacherPhotoUrl: user?.photoUri || null,
               }
             });
 
@@ -648,6 +656,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               payload: {
                 teacherName: user?.name || 'Guru',
                 teacherSchool: user?.school || null,
+                teacherPhotoUrl: user?.photoUri || null,
               }
             });
           }

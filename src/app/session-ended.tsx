@@ -14,7 +14,7 @@ export default function SessionEndedScreen() {
   const router = useRouter();
   const { login } = useAuth();
   const { settings } = useSettings();
-  const appLang = settings.language;
+  const appLang = settings.appLang || 'id';
   const hc = settings.highContrast;
 
   const [loading, setLoading] = useState(true);

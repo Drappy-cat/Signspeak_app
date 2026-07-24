@@ -244,7 +244,7 @@ export default function HomeScreen() {
       setAllGradesList(grades);
       if (grades.length > 0) setSelectedGradeId(grades[0].id);
     } catch (e) {
-      console.error(e);
+      console.error('[Home] openAddClassModal - failed to load grades:', e);
     }
   };
 
@@ -277,7 +277,7 @@ export default function HomeScreen() {
         : `Berhasil! Kelas "${classNameCreated}" telah berhasil ditambahkan.`
       );
     } catch (e: any) {
-      console.error(e);
+      console.error('[Home] handleCreateNewClass - failed to create class:', e);
       alert(e.message || (appLang === 'en' ? 'Failed to create new class.' : 'Gagal membuat kelas baru.'));
     } finally {
       setIsAddingClass(false);
@@ -295,7 +295,7 @@ export default function HomeScreen() {
         : `Kelas ${classNameDisplay || ''} telah berhasil dihapus.`
       );
     } catch (e) {
-      console.error(e);
+      console.error('[Home] handleRemoveClass - failed to remove class relation:', e);
       alert(appLang === 'en' ? 'Failed to remove class.' : 'Gagal menghapus relasi kelas.');
     }
   };
@@ -758,7 +758,7 @@ export default function HomeScreen() {
                     const updated = await getTeacherClasses(user.teacher_id);
                     setTeacherClasses(updated);
                   } catch (e) {
-                    console.error(e);
+                    console.error('[Home] inline removeTeacherFromClass - failed:', e);
                   }
                 }}
                 style={{ padding: 6, marginLeft: 4 }}

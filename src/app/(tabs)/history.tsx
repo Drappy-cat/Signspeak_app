@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, SafeAreaView, Platform, StatusBar as RNStatusBar, Modal, Share, Animated, Easing } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, SafeAreaView, Platform, StatusBar as RNStatusBar, Modal, Share, Animated, Easing, PanResponder, RefreshControl, Alert } from 'react-native';
 import { Search, BookOpen, Clock, HelpCircle, X, Copy, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
@@ -111,6 +111,131 @@ function AnimatedHistoryCard({ children, index }: { children: React.ReactNode; i
   );
 }
 
+// ── Skeleton shimmer card (shown while loading) ────────────────────────
+function SkeletonCard({ hc }: { hc: boolean }) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+    return () => shimmer.stopAnimation();
+  }, []);
+
+  const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] });
+  const baseBg = hc ? '#1e293b' : '#e2e8f0';
+  const shimBg = hc ? '#334155' : '#f1f5f9';
+
+  return (
+    <Animated.View style={[
+      { borderRadius: 12, padding: 16, flexDirection: 'row', gap: 12, opacity },
+      { backgroundColor: hc ? '#1e293b' : '#ffffff' },
+    ]}>
+      {/* Icon placeholder */}
+      <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: baseBg }} />
+      <View style={{ flex: 1, gap: 8 }}>
+        {/* Subject line */}
+        <View style={{ height: 14, borderRadius: 6, backgroundColor: baseBg, width: '65%' }} />
+        {/* Teacher + class */}
+        <View style={{ height: 11, borderRadius: 6, backgroundColor: baseBg, width: '80%' }} />
+        {/* Date */}
+        <View style={{ height: 11, borderRadius: 6, backgroundColor: baseBg, width: '55%' }} />
+        {/* Excerpt */}
+        <View style={{ height: 11, borderRadius: 6, backgroundColor: baseBg, width: '90%' }} />
+      </View>
+    </Animated.View>
+  );
+}
+
+// ── Swipeable History Card: swipe left to reveal delete button ────────────
+const SWIPE_THRESHOLD = -72;
+const DELETE_BTN_WIDTH = 80;
+
+function SwipeableHistoryCard({
+  children, onDelete, hc,
+}: { children: React.ReactNode; onDelete: () => void; hc: boolean }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const deleteScale = useRef(new Animated.Value(0.8)).current;
+  const isOpen = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > 6 && Math.abs(gs.dy) < Math.abs(gs.dx),
+      onPanResponderMove: (_, gs) => {
+        const dx = Math.max(gs.dx, -DELETE_BTN_WIDTH);
+        if (dx <= 0) translateX.setValue(dx);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < SWIPE_THRESHOLD) {
+          // Snap open
+          Animated.parallel([
+            Animated.spring(translateX, { toValue: -DELETE_BTN_WIDTH, useNativeDriver: true, tension: 180, friction: 9 }),
+            Animated.spring(deleteScale, { toValue: 1, useNativeDriver: true, tension: 180, friction: 9 }),
+          ]).start();
+          isOpen.current = true;
+        } else {
+          // Snap close
+          Animated.parallel([
+            Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 180, friction: 9 }),
+            Animated.timing(deleteScale, { toValue: 0.8, duration: 150, useNativeDriver: true }),
+          ]).start();
+          isOpen.current = false;
+        }
+      },
+    })
+  ).current;
+
+  const handleDelete = () => {
+    Animated.timing(translateX, { toValue: -400, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(() => {
+      onDelete();
+    });
+  };
+
+  const closeSwipe = () => {
+    if (isOpen.current) {
+      Animated.parallel([
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 180, friction: 9 }),
+        Animated.timing(deleteScale, { toValue: 0.8, duration: 150, useNativeDriver: true }),
+      ]).start();
+      isOpen.current = false;
+    }
+  };
+
+  return (
+    <View style={{ overflow: 'hidden', borderRadius: 12 }}>
+      {/* Delete button revealed behind */}
+      <Animated.View style={[
+        {
+          position: 'absolute', right: 0, top: 0, bottom: 0, width: DELETE_BTN_WIDTH,
+          backgroundColor: '#dc2626', borderRadius: 12,
+          alignItems: 'center', justifyContent: 'center',
+          transform: [{ scale: deleteScale }],
+        }
+      ]}>
+        <TouchableOpacity onPress={handleDelete} style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22 }}>🗑️</Text>
+          <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800', marginTop: 2 }}>Hapus</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Card content — swipeable */}
+      <Animated.View
+        style={{ transform: [{ translateX }] }}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity activeOpacity={1} onPress={closeSwipe}>
+          {children}
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+}
+
+
 export type TimeFilterKey = 'all' | 'today' | 'yesterday' | 'this_month' | 'last_month';
 
 const TIME_FILTER_OPTIONS: { key: TimeFilterKey; label: string; icon: string }[] = [
@@ -196,6 +321,9 @@ export default function HistoryScreen() {
 
   const [historyList, setHistoryList] = React.useState<SessionRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [refreshSuccess, setRefreshSuccess] = React.useState(false);
+  const refreshSuccessOpacity = useRef(new Animated.Value(0)).current;
   const [searchQuery, setSearchQuery] = React.useState('');
   const [timeFilter, setTimeFilter] = React.useState<TimeFilterKey>('all');
   const [selectedSession, setSelectedSession] = React.useState<SessionRecord | null>(null);
@@ -305,6 +433,69 @@ export default function HistoryScreen() {
       };
     }, [user?.teacher_id, role])
   );
+
+  // ── Pull-to-Refresh handler ───────────────────────────────────────────
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    let isMounted = true;
+    try {
+      if (role === 'teacher' && user?.teacher_id) {
+        const dbData = await getTeacherSessionHistory(user.teacher_id, 50);
+        if (isMounted) {
+          const formattedRecords: SessionRecord[] = dbData.map((item, idx) => ({
+            id: item.id || idx + 1,
+            subject: item.subject_display || 'Sesi',
+            className: item.class_display || 'Kelas',
+            teacherName: item.teacher_name || user.name || 'Guru',
+            date: formatSessionDateTime(item.created_at || item.session_date),
+            duration: item.duration || 0,
+            wordCount: item.word_count || 0,
+            language: item.language || 'id',
+            excerpt: item.excerpt || 'Tidak ada ringkasan',
+            transcriptFull: item.transcript_full || item.excerpt || '',
+          }));
+          setHistoryList(formattedRecords);
+        }
+      } else {
+        const localData = await getHistory();
+        if (isMounted) setHistoryList(localData);
+      }
+      // Show success toast
+      if (isMounted) {
+        refreshSuccessOpacity.setValue(0);
+        Animated.sequence([
+          Animated.timing(refreshSuccessOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+          Animated.delay(1200),
+          Animated.timing(refreshSuccessOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]).start();
+      }
+    } catch (e) {
+      console.error('[History] onRefresh error:', e);
+    } finally {
+      if (isMounted) setRefreshing(false);
+    }
+    return () => { isMounted = false; };
+  }, [role, user?.teacher_id]);
+
+  // ── Delete handler ───────────────────────────────────────────────
+  const handleDeleteSession = (sessionId: number | string) => {
+    Alert.alert(
+      appLang === 'en' ? 'Delete Record?' : 'Hapus Riwayat?',
+      appLang === 'en'
+        ? 'This transcript record will be permanently removed from local history.'
+        : 'Riwayat transkrip ini akan dihapus secara permanen dari penyimpanan lokal.',
+      [
+        { text: appLang === 'en' ? 'Cancel' : 'Batal', style: 'cancel' },
+        {
+          text: appLang === 'en' ? 'Delete' : 'Hapus',
+          style: 'destructive',
+          onPress: () => {
+            setHistoryList(prev => prev.filter(s => s.id !== sessionId));
+          },
+        },
+      ]
+    );
+  };
 
   const bgColor = hc ? "#0f172a" : "#F0F7FF";
   const textColor = hc ? '#f8fafc' : '#0f172a';
@@ -465,17 +656,46 @@ export default function HistoryScreen() {
         maxToRenderPerBatch={6}
         windowSize={5}
         removeClippedSubviews={Platform.OS === 'android'}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#2563eb']}
+            tintColor={hc ? '#60a5fa' : '#2563eb'}
+            progressBackgroundColor={hc ? '#1e293b' : '#ffffff'}
+          />
+        }
         ListHeaderComponent={
-          <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', color: mutedColor, marginBottom: 2 }}>
-            {sectionHeader}
-          </Text>
+          <>
+            <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', color: mutedColor, marginBottom: 2 }}>
+              {sectionHeader}
+            </Text>
+            {/* Refresh success toast */}
+            <Animated.View style={[
+              {
+                position: 'absolute', top: -8, left: 0, right: 0,
+                alignItems: 'center', zIndex: 99,
+                opacity: refreshSuccessOpacity,
+              }
+            ]}>
+              <View style={{
+                backgroundColor: '#059669', paddingHorizontal: 16, paddingVertical: 6,
+                borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6,
+              }}>
+                <Text style={{ fontSize: 12 }}>✅</Text>
+                <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '700' }}>
+                  {appLang === 'en' ? 'History updated' : 'Riwayat diperbarui'}
+                </Text>
+              </View>
+            </Animated.View>
+          </>
         }
         ListEmptyComponent={
           loading ? (
-            <View style={{ padding: 40, alignItems: 'center' }}>
-              <Text style={{ color: mutedColor, fontSize: 14 }}>
-                {appLang === 'en' ? 'Loading history...' : 'Memuat riwayat...'}
-              </Text>
+            <View style={{ gap: 10 }}>
+              {[0, 1, 2, 3].map(i => (
+                <SkeletonCard key={i} hc={hc} />
+              ))}
             </View>
           ) : (
             <View style={{ padding: 40, alignItems: 'center' }}>
@@ -486,57 +706,62 @@ export default function HistoryScreen() {
           )
         }
         renderItem={({ item, index }) => (
-          <AnimatedHistoryCard index={index}>
-            <TouchableOpacity 
-              activeOpacity={0.9} 
-              onPress={() => setSelectedSession(item)}
-              style={cardStyle}
-            >
-              {/* Card body */}
-              <View style={{ padding: 16, flexDirection: 'row', gap: 12 }}>
-                <View style={{
-                  width: 40, height: 40, borderRadius: 10,
-                  backgroundColor: iconBgColor,
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
-                }}>
-                  <BookOpen size={17} color={iconColor} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{item.subject}</Text>
-                  <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>{item.teacherName} · {item.className}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                    <Clock size={10} color={mutedColor} />
-                    <Text style={{ fontSize: 12, color: mutedColor }}>
-                      {item.date} · {Math.floor(item.duration / 60)} mnt {item.duration % 60} dtk
+          <SwipeableHistoryCard
+            hc={hc}
+            onDelete={() => handleDeleteSession(item.id)}
+          >
+            <AnimatedHistoryCard index={index}>
+              <TouchableOpacity 
+                activeOpacity={0.9} 
+                onPress={() => setSelectedSession(item)}
+                style={cardStyle}
+              >
+                {/* Card body */}
+                <View style={{ padding: 16, flexDirection: 'row', gap: 12 }}>
+                  <View style={{
+                    width: 40, height: 40, borderRadius: 10,
+                    backgroundColor: iconBgColor,
+                    alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
+                  }}>
+                    <BookOpen size={17} color={iconColor} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: '800', fontSize: 14, color: textColor }}>{item.subject}</Text>
+                    <Text style={{ fontSize: 12, color: mutedColor, marginTop: 2 }}>{item.teacherName} · {item.className}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                      <Clock size={10} color={mutedColor} />
+                      <Text style={{ fontSize: 12, color: mutedColor }}>
+                        {item.date} · {Math.floor(item.duration / 60)} mnt {item.duration % 60} dtk
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: mutedColor, marginTop: 6, fontStyle: 'italic', lineHeight: 18 }} numberOfLines={2}>
+                      {item.excerpt}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 12, color: mutedColor, marginTop: 6, fontStyle: 'italic', lineHeight: 18 }} numberOfLines={2}>
-                    {item.excerpt}
-                  </Text>
                 </View>
-              </View>
 
-              {/* Card footer */}
-              <View style={{
-                marginHorizontal: 16, paddingTop: 10, paddingBottom: 12,
-                borderTopWidth: 1, borderTopColor: dividerColor,
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>
-                    {item.wordCount.toLocaleString('id-ID')} {wordsLabel}
-                  </Text>
-                  <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: hc ? '#475569' : '#cbd5e1' }} />
-                  <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: hc ? '#1e293b' : '#ecfdf5' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#94a3b8' : '#059669' }}>{completedLabel}</Text>
+                {/* Card footer */}
+                <View style={{
+                  marginHorizontal: 16, paddingTop: 10, paddingBottom: 12,
+                  borderTopWidth: 1, borderTopColor: dividerColor,
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: mutedColor }}>
+                      {item.wordCount.toLocaleString('id-ID')} {wordsLabel}
+                    </Text>
+                    <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: hc ? '#475569' : '#cbd5e1' }} />
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: hc ? '#1e293b' : '#ecfdf5' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: hc ? '#94a3b8' : '#059669' }}>{completedLabel}</Text>
+                    </View>
                   </View>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedSession(item)}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: linkColor }}>{openLabel}</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedSession(item)}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: linkColor }}>{openLabel}</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </AnimatedHistoryCard>
+              </TouchableOpacity>
+            </AnimatedHistoryCard>
+          </SwipeableHistoryCard>
         )}
       />
 

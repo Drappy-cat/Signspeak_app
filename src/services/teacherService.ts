@@ -303,16 +303,12 @@ export async function upsertStudent(data: StudentInsert): Promise<Student> {
     .single();
 
   if (existing) {
-    // Update name if different
-    if ((existing as any).name !== data.name) {
-      const { data: updated, error } = await db
-        .from('students')
-        .update({ name: data.name } as any)
-        .eq('id', (existing as any).id)
-        .select()
-        .single();
-      if (error) throw error;
-      return updated as Student;
+    const existingName = ((existing as any).name || '').trim().toLowerCase();
+    const inputName = (data.name || '').trim().toLowerCase();
+
+    // If another student already registered this absen number in the class, throw an error
+    if (existingName !== inputName) {
+      throw new Error(`Nomor Absen ${data.absen} sudah digunakan oleh siswa bernama "${(existing as any).name}". Silakan gunakan nomor absen Anda yang benar.`);
     }
     return existing as Student;
   }

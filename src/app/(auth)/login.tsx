@@ -161,8 +161,15 @@ export default function LoginScreen() {
           if (student && activeSession.id !== 'demo-session-id') {
             await addSessionParticipant(activeSession.id, student.id);
           }
-        } catch (_) {
-          console.log('[Demo] Running in offline demo mode for student');
+        } catch (dbErr: any) {
+          if (dbErr?.message?.includes('sudah digunakan')) {
+            setLoading(false);
+            setModalTitle(appLang === 'en' ? 'Attendance Number Taken' : 'Nomor Absen Terpakai');
+            setModalMsg(dbErr.message);
+            setShowModal(true);
+            return;
+          }
+          console.log('[Demo] Running in offline demo mode for student:', dbErr?.message);
         }
 
         // Format class and school identity

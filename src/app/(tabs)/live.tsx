@@ -243,10 +243,10 @@ export default function LiveScreen() {
   }, [clearStudentRoomCode, router]);
 
   useEffect(() => {
-    if (role === 'student' && session.isSessionEnding && (session.sessionEndingCountdown ?? 0) <= 0) {
+    if (role === 'student' && (session.shouldRedirectPostSession || (session.isSessionEnding && (session.sessionEndingCountdown ?? 0) <= 0))) {
       handleStudentRedirectPostSession();
     }
-  }, [role, session.isSessionEnding, session.sessionEndingCountdown, handleStudentRedirectPostSession]);
+  }, [role, session.shouldRedirectPostSession, session.isSessionEnding, session.sessionEndingCountdown, handleStudentRedirectPostSession]);
 
   useEffect(() => {
     if (role === 'student' && !session.isActive && !session.isSessionEnding) {
@@ -293,17 +293,16 @@ export default function LiveScreen() {
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
   }, [session.transcript, session.interimTranscript]);
 
-  // Auto-logout student when teacher ends session
+  // Auto-redirect student when teacher ends session
   useEffect(() => {
     if (role === 'student' && !session.isActive && session.errorMessage === 'Sesi telah diakhiri oleh guru.') {
       // Small delay to let them read the end message
       const timer = setTimeout(async () => {
-        await logout();
-        router.replace('/');
+        await handleStudentRedirectPostSession();
       }, 2500);
       return () => clearTimeout(timer);
     }
-  }, [role, session.isActive, session.errorMessage]);
+  }, [role, session.isActive, session.errorMessage, handleStudentRedirectPostSession]);
 
   const defaultKeywords = KEYWORDS[session.language] || KEYWORDS['id'];
   const currentKeywords = [...defaultKeywords, ...(session.customKeywords || [])];
@@ -353,56 +352,23 @@ export default function LiveScreen() {
               {session.isActive ? `${session.subject} — ${session.roomCode}` : (appLang === 'en' ? 'Waiting Room' : 'Ruang Tunggu')}
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <PulseDot color={session.isActive ? "bg-red-500" : "bg-amber-500"} />
-              <Text style={{ color: session.isActive ? '#ef4444' : '#f59e0b', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }}>
+              <Text style={{ color: session.isActive ? '#ef4444' : '#f59e0b', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
                 {session.isActive ? 'LIVE' : (appLang === 'en' ? 'WAITING' : 'MENUNGGU')}
               </Text>
             </View>
 
-            {/* Language Mode Badge (Top Right Indicator) */}
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              backgroundColor: session.language === 'jv'
-                ? (hc ? '#713f12' : '#fef9c3')
-                : session.language === 'mad'
-                ? (hc ? '#14532d' : '#dcfce7')
-                : (hc ? '#1e3a8a' : '#dbeafe'),
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: session.language === 'jv'
-                ? (hc ? '#a16207' : '#fde047')
-                : session.language === 'mad'
-                ? (hc ? '#15803d' : '#86efac')
-                : (hc ? '#1d4ed8' : '#bfdbfe'),
-            }}>
-              <Text style={{
-                fontSize: 10,
-                fontWeight: '900',
-                color: session.language === 'jv'
-                  ? (hc ? '#fef08a' : '#854d0e')
-                  : session.language === 'mad'
-                  ? (hc ? '#86efac' : '#14532d')
-                  : (hc ? '#93c5fd' : '#1e40af'),
-              }}>
-                🇮🇩 {session.language === 'jv' ? 'JAWA' : session.language === 'mad' ? 'MADURA' : 'INDO'}
-              </Text>
-            </View>
-
             {/* Accessibility Buttons */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               {/* Copy Live Text Button */}
               {((session.transcript || '') + (session.interimTranscript || '')).trim().length > 0 && (
                 <TouchableOpacity
                   onPress={handleCopyLiveTranscript}
-                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: copiedLiveText ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#334155' : '#e2e8f0'), alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: copiedLiveText ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#334155' : '#e2e8f0'), alignItems: 'center', justifyContent: 'center' }}
                 >
-                  {copiedLiveText ? <Check size={16} color={hc ? '#34d399' : '#059669'} /> : <Copy size={15} color={textColor} />}
+                  {copiedLiveText ? <Check size={14} color={hc ? '#34d399' : '#059669'} /> : <Copy size={13} color={textColor} />}
                 </TouchableOpacity>
               )}
               
@@ -412,17 +378,17 @@ export default function LiveScreen() {
                   const nextSize = settings.fontSize === 'normal' ? 'large' : settings.fontSize === 'large' ? 'xlarge' : 'normal';
                   updateSettings({ fontSize: nextSize });
                 }}
-                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
               >
-                <Text style={{ fontWeight: '900', color: textColor, fontSize: 14 }}>A<Text style={{ fontSize: 10 }}>A</Text></Text>
+                <Text style={{ fontWeight: '900', color: textColor, fontSize: 12 }}>A<Text style={{ fontSize: 9 }}>A</Text></Text>
               </TouchableOpacity>
               
               {/* Theme Button */}
               <TouchableOpacity
                 onPress={() => updateSettings({ highContrast: !settings.highContrast })}
-                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
               >
-                {settings.highContrast ? <Sun size={16} color="#f8fafc" /> : <Moon size={16} color="#0f172a" />}
+                {settings.highContrast ? <Sun size={14} color="#f8fafc" /> : <Moon size={14} color="#0f172a" />}
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -431,7 +397,7 @@ export default function LiveScreen() {
                 await logout();
                 router.replace('/(auth)/role-select');
               }}
-              style={{ backgroundColor: hc ? '#ef4444' : '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+              style={{ backgroundColor: hc ? '#ef4444' : '#fee2e2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
             >
               <Text style={{ color: hc ? '#ffffff' : '#ef4444', fontSize: 11, fontWeight: '800' }}>{appLang === 'en' ? 'Logout' : 'Keluar'}</Text>
             </TouchableOpacity>
@@ -446,21 +412,56 @@ export default function LiveScreen() {
           </View>
         ) : null}
 
-        {/* Speaking Indicator Bar */}
-        <View style={{ paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: hc ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.6)', borderBottomWidth: 1, borderBottomColor: hc ? '#334155' : '#e2e8f0' }}>
-          <SpeakingBars active={isSpeaking && !paused && session.isActive} hc={hc} />
-          <View>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: isSpeaking && !paused && session.isActive ? (hc ? '#34d399' : '#059669') : mutedColor }}>
-              {!session.isActive
-                ? (appLang === 'en' ? 'Waiting for class to start...' : 'Menunggu kelas dimulai...')
-                : isSpeaking && !paused 
-                  ? (appLang === 'en' ? 'Speaking...' : 'Sedang berbicara...') 
-                  : paused 
-                    ? (appLang === 'en' ? '⏸ Paused' : '⏸ Dijeda') 
-                    : (appLang === 'en' ? 'Waiting for teacher...' : 'Menunggu guru berbicara...')}
-            </Text>
-            <Text style={{ fontSize: 10, color: mutedColor }}>
-              {session.isActive ? (session.teacherName || 'Guru') : (appLang === 'en' ? 'LENTERA System' : 'Sistem LENTERA')} • {appLang === 'en' ? 'Teacher' : 'Guru'}
+        {/* Speaking Indicator Bar + Language Mode Badge */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: hc ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.6)', borderBottomWidth: 1, borderBottomColor: hc ? '#334155' : '#e2e8f0' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+            <SpeakingBars active={isSpeaking && !paused && session.isActive} hc={hc} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isSpeaking && !paused && session.isActive ? (hc ? '#34d399' : '#059669') : mutedColor }}>
+                {!session.isActive
+                  ? (appLang === 'en' ? 'Waiting for class to start...' : 'Menunggu kelas dimulai...')
+                  : isSpeaking && !paused 
+                    ? (appLang === 'en' ? 'Speaking...' : 'Sedang berbicara...') 
+                    : paused 
+                      ? (appLang === 'en' ? '⏸ Paused' : '⏸ Dijeda') 
+                      : (appLang === 'en' ? 'Waiting for teacher...' : 'Menunggu guru berbicara...')}
+              </Text>
+              <Text style={{ fontSize: 10, color: mutedColor }}>
+                {session.isActive ? (session.teacherName || 'Guru') : (appLang === 'en' ? 'LENTERA System' : 'Sistem LENTERA')} • {appLang === 'en' ? 'Teacher' : 'Guru'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Language Mode Badge (Positioned Right Side of Speaking Indicator) */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: session.language === 'jv'
+              ? (hc ? '#713f12' : '#fef9c3')
+              : session.language === 'mad'
+              ? (hc ? '#14532d' : '#dcfce7')
+              : (hc ? '#1e3a8a' : '#dbeafe'),
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: session.language === 'jv'
+              ? (hc ? '#a16207' : '#fde047')
+              : session.language === 'mad'
+              ? (hc ? '#15803d' : '#86efac')
+              : (hc ? '#1d4ed8' : '#bfdbfe'),
+          }}>
+            <Text style={{
+              fontSize: 10,
+              fontWeight: '900',
+              color: session.language === 'jv'
+                ? (hc ? '#fef08a' : '#854d0e')
+                : session.language === 'mad'
+                ? (hc ? '#86efac' : '#14532d')
+                : (hc ? '#93c5fd' : '#1e40af'),
+            }}>
+              🇮🇩 {session.language === 'jv' ? 'ID JAWA' : session.language === 'mad' ? 'ID MADURA' : 'ID INDO'}
             </Text>
           </View>
         </View>

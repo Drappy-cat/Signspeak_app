@@ -56,6 +56,7 @@ export interface ActiveSession {
   isSessionEnding?: boolean;
   sessionEndingCountdown?: number;
   sessionEndingMessage?: string;
+  shouldRedirectPostSession?: boolean;
 }
 
 interface SessionContextType {
@@ -290,6 +291,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           isActive: false,
           isSessionEnding: false,
           sessionEndingCountdown: 0,
+          shouldRedirectPostSession: true,
         }));
       } else {
         setSession(prev => ({

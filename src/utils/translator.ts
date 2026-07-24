@@ -70,6 +70,9 @@ function findFuzzyMatchMadurese(word: string): string | null {
     }
   }
 
+  if (fuzzyCache.size > 2000) {
+    fuzzyCache.clear();
+  }
   fuzzyCache.set(lower, bestMatch);
   return bestMatch;
 }

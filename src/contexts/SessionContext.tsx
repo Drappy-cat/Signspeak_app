@@ -1251,13 +1251,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const updateLanguage = (newLanguage: string) => {
     const prevLang = session.language || 'id';
     const getLangLabel = (code: string) => {
-      if (code === 'en') return 'Bahasa Inggris';
-      if (code === 'jv') return 'Bahasa Jawa';
-      if (code === 'mad') return 'Bahasa Madura';
+      if (code === 'en') return 'Inggris';
+      if (code === 'jv') return 'Jawa';
+      if (code === 'mad') return 'Madura';
       return 'Indonesia';
     };
 
-    const labelStr = `${getLangLabel(prevLang)} ➔ ${getLangLabel(newLanguage)}`;
+    const labelStr = `Transkripsi → Bahasa ${getLangLabel(newLanguage)}`;
 
     // 1. Trigger 10s pause locally
     triggerLangPause(prevLang, newLanguage, labelStr);

@@ -173,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       
       // Save student identity to short-term cache for quick re-join
-      await saveStudentCache(mockUser.name, mockUser.absen, mockUser.className);
+      await saveStudentCache(mockUser.name, mockUser.absen || '0', mockUser.className);
       
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
       setUser(mockUser);

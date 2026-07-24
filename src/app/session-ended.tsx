@@ -79,7 +79,7 @@ export default function SessionEndedScreen() {
       style={{ flex: 1, backgroundColor: hc ? '#0f172a' : '#F0F7FF' }} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <BubbleBackground />
+      <BubbleBackground hc={hc} />
       
       <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
         <View style={{

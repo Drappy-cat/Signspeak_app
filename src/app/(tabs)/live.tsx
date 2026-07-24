@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3 } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, LogOut } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -327,16 +327,16 @@ export default function LiveScreen() {
               {session.isActive ? `${session.subject} — ${session.roomCode}` : (appLang === 'en' ? 'Waiting Room' : 'Ruang Tunggu')}
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <PulseDot color={session.isActive ? "bg-red-500" : "bg-amber-500"} />
-              <Text style={{ color: session.isActive ? '#ef4444' : '#f59e0b', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }}>
+              <Text style={{ color: session.isActive ? '#ef4444' : '#f59e0b', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
                 {session.isActive ? 'LIVE' : (appLang === 'en' ? 'WAITING' : 'MENUNGGU')}
               </Text>
             </View>
 
             {/* Accessibility Buttons */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               {/* Size Button */}
               <TouchableOpacity
                 onPress={() => {
@@ -356,15 +356,16 @@ export default function LiveScreen() {
                 {settings.highContrast ? <Sun size={16} color="#f8fafc" /> : <Moon size={16} color="#0f172a" />}
               </TouchableOpacity>
             </View>
+
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={async () => {
                 await logout();
                 router.replace('/(auth)/role-select');
               }}
-              style={{ backgroundColor: hc ? '#ef4444' : '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: hc ? '#ef4444' : '#fee2e2', alignItems: 'center', justifyContent: 'center' }}
             >
-              <Text style={{ color: hc ? '#ffffff' : '#ef4444', fontSize: 11, fontWeight: '800' }}>{appLang === 'en' ? 'Logout' : 'Keluar'}</Text>
+              <LogOut size={16} color={hc ? '#ffffff' : '#ef4444'} />
             </TouchableOpacity>
           </View>
         </View>

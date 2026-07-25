@@ -251,7 +251,86 @@ export async function removeTeacherFromSubject(teacherId: string, subjectId: str
   if (error) throw error;
 }
 
-// ── Subjects ─────────────────────────────────────────────────────────────────
+// ── Subjects & Indonesian Curriculum Mapping ───────────────────────────────
+
+export const CURRICULUM_SUBJECTS_BY_LEVEL: Record<string, string[]> = {
+  SD: [
+    'Bahasa Indonesia',
+    'Matematika',
+    'IPAS (IPA & IPS)',
+    'Pendidikan Pancasila (PPKn)',
+    'Pendidikan Agama & Budi Pekerti',
+    'PJOK (Pendidikan Jasmani)',
+    'Seni Budaya & Prakarya',
+    'Bahasa Daerah',
+    'Bahasa Inggris (Muatan Lokal)',
+  ],
+  SMP: [
+    'Bahasa Indonesia',
+    'Matematika',
+    'IPA (Ilmu Pengetahuan Alam)',
+    'IPS (Ilmu Pengetahuan Sosial)',
+    'Bahasa Inggris',
+    'Pendidikan Pancasila (PPKn)',
+    'Informatika',
+    'Pendidikan Agama & Budi Pekerti',
+    'PJOK (Pendidikan Jasmani)',
+    'Seni Budaya',
+    'Prakarya',
+    'Bahasa Daerah',
+  ],
+  SMA: [
+    'Bahasa Indonesia',
+    'Matematika',
+    'Bahasa Inggris',
+    'Pendidikan Pancasila (PPKn)',
+    'Pendidikan Agama & Budi Pekerti',
+    'Biologi',
+    'Fisika',
+    'Kimia',
+    'Ekonomi',
+    'Sosiologi',
+    'Geografi',
+    'Sejarah',
+    'Informatika',
+    'PJOK (Pendidikan Jasmani)',
+    'Seni Budaya',
+    'Prakarya & Kewirausahaan',
+    'Bahasa Daerah',
+  ],
+  SMK: [
+    'Bahasa Indonesia',
+    'Matematika',
+    'Bahasa Inggris',
+    'Pendidikan Pancasila (PPKn)',
+    'Pendidikan Agama & Budi Pekerti',
+    'Biologi',
+    'Fisika',
+    'Kimia',
+    'Ekonomi',
+    'Sosiologi',
+    'Geografi',
+    'Sejarah',
+    'Informatika',
+    'PJOK (Pendidikan Jasmani)',
+    'Seni Budaya',
+    'Prakarya & Kewirausahaan',
+    'Bahasa Daerah',
+    'Kejuruan / Produktif SMK',
+  ],
+  SLB: [
+    'Bahasa Indonesia (SLB)',
+    'Matematika (SLB)',
+    'IPAS (SLB)',
+    'Pendidikan Pancasila (SLB)',
+    'Bina Diri & Pengembangan Diri',
+    'Keterampilan Vokasional (SLB)',
+    'Pendidikan Agama & Budi Pekerti',
+    'PJOK (SLB)',
+    'Seni Budaya & Keterampilan',
+    'Bahasa Daerah',
+  ],
+};
 
 /** Get all subjects (seed + custom) */
 export async function getAllSubjects(): Promise<Subject[]> {
@@ -263,6 +342,51 @@ export async function getAllSubjects(): Promise<Subject[]> {
 
   if (error) throw error;
   return (data ?? []) as Subject[];
+}
+
+/** Get subjects filtered & structured by school type (SD, SMP, SMA, SMK, SLB) */
+export async function getSubjectsBySchoolType(schoolType?: string | null): Promise<Subject[]> {
+  const allSubjects = await getAllSubjects().catch(() => []);
+  
+  if (!schoolType) return allSubjects;
+
+  const normalizedType = schoolType.trim().toUpperCase();
+  const curriculumNames = CURRICULUM_SUBJECTS_BY_LEVEL[normalizedType] || CURRICULUM_SUBJECTS_BY_LEVEL['SMA'];
+
+  // Map database subjects to curriculum names or fallbacks
+  const matchedSubjects: Subject[] = [];
+  const addedNames = new Set<string>();
+
+  // 1. Add matching database subjects in curriculum order
+  for (const name of curriculumNames) {
+    const dbMatch = allSubjects.find(s => 
+      s.subject_name.toLowerCase() === name.toLowerCase() ||
+      s.subject_name.toLowerCase().includes(name.split(' ')[0].toLowerCase())
+    );
+    if (dbMatch && !addedNames.has(dbMatch.id)) {
+      matchedSubjects.push({ ...dbMatch, description: `[${normalizedType}] Kurikulum Nasional` });
+      addedNames.add(dbMatch.id);
+    } else if (!dbMatch) {
+      // Synthetic subject if not yet seeded in DB
+      matchedSubjects.push({
+        id: `curr-${normalizedType}-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+        subject_name: name,
+        description: `[${normalizedType}] Kurikulum Nasional`,
+        is_custom: false,
+        created_by: null,
+      });
+    }
+  }
+
+  // 2. Add remaining custom or extra DB subjects
+  for (const s of allSubjects) {
+    if (!addedNames.has(s.id) && s.is_custom) {
+      matchedSubjects.push(s);
+      addedNames.add(s.id);
+    }
+  }
+
+  return matchedSubjects;
 }
 
 /** Create a custom subject (when guru's subject is not in the list) */

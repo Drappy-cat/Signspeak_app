@@ -8,7 +8,7 @@ import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { SmartDropdown, DropdownItem } from './SmartDropdown';
 import { Plus } from 'lucide-react-native';
 import { searchSchools, createSchool, getGradesBySchoolType, getClassesBySchoolAndGrade, createClass, SchoolSortBy, INDONESIAN_PROVINCES, getDistrictsByCity } from '../services/schoolService';
-import { getAllSubjects, createCustomSubject } from '../services/teacherService';
+import { getAllSubjects, getSubjectsBySchoolType, createCustomSubject } from '../services/teacherService';
 import { INDONESIA_REGIONS } from '../data/indonesiaRegions';
 import type { School, Grade, Class, Subject, SchoolType } from '../types/database';
 
@@ -492,22 +492,23 @@ interface SubjectPickerProps {
   hc?: boolean;
   appLang?: string;
   authUserId?: string;
+  schoolType?: string | null;
 }
 
 export function SubjectPicker({
   selectedSubjectIds, onSelectSubjects,
-  hc = false, appLang = 'id', authUserId,
+  hc = false, appLang = 'id', authUserId, schoolType,
 }: SubjectPickerProps) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    getAllSubjects()
+    getSubjectsBySchoolType(schoolType)
       .then(setSubjects)
       .catch(e => console.error('[Pickers] Failed to load subjects:', e))
       .finally(() => setLoading(false));
-  }, []);
+  }, [schoolType]);
 
   const items: DropdownItem[] = subjects.map(s => ({
     id: s.id,

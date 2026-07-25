@@ -425,6 +425,7 @@ export default function RegisterScreen() {
                 <SubjectPicker 
                   selectedSubjectIds={selectedSubjects.map(s => s.id)}
                   onSelectSubjects={setSelectedSubjects}
+                  schoolType={selectedSchool?.school_type}
                   hc={hc}
                   appLang={appLang}
                 />

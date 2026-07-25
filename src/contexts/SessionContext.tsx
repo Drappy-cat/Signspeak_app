@@ -346,12 +346,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           }
 
           setSession(prev => {
-            const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language, prev.customGlossary);
+            let nextTranscript = prev.transcript;
+            if (finalText) {
+              const translatedFinal = translateText(finalText, prev.language, prev.customGlossary);
+              nextTranscript = nextTranscript ? nextTranscript + ' ' + translatedFinal : translatedFinal;
+            }
+            
             const finalInterim = translateText(interimText, prev.language, prev.customGlossary);
 
             return {
               ...prev,
-              transcript: finalTranscript,
+              transcript: nextTranscript,
               interimTranscript: finalInterim,
               errorMessage: null,
             };
@@ -1353,12 +1358,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSession(prev => {
-        const finalTranscript = translateText(accumulatedTranscriptRef.current, prev.language, prev.customGlossary);
+        let nextTranscript = prev.transcript;
+        if (finalStr.trim()) {
+          const translatedFinal = translateText(finalStr.trim(), prev.language, prev.customGlossary);
+          nextTranscript = nextTranscript ? nextTranscript + ' ' + translatedFinal : translatedFinal;
+        }
+
         const finalInterim = translateText(interimStr.trim(), prev.language, prev.customGlossary);
 
         return {
           ...prev,
-          transcript: finalTranscript,
+          transcript: nextTranscript,
           interimTranscript: finalInterim,
           errorMessage: null,
         };

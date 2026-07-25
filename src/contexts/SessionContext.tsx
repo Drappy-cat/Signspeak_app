@@ -392,7 +392,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         try {
           const { data } = await db.from('live_sessions')
             .select('*, teacher:teachers(full_name, nip, photo_url, school:schools(school_name)), subject_rel:subjects(subject_name)')
-            .eq('room_code', roomCode)
+            .eq('room_code', roomCode.trim().toUpperCase())
             .eq('is_active', true)
             .order('started_at', { ascending: false })
             .limit(1)
@@ -435,8 +435,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               subjectId: data.subject_id,
               classId: data.class_id,
               language: data.language || 'id',
-              transcript: data.transcript || '',
-              interimTranscript: data.interim_transcript || '',
+              transcript: translateText(data.transcript || '', data.language || 'id'),
+              interimTranscript: translateText(data.interim_transcript || '', data.language || 'id'),
               errorMessage: null,
               startTime: data.started_at ? new Date(data.started_at).getTime() : Date.now(),
               participants: [],
@@ -461,10 +461,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       };
       fetchInitial();
       
-      // Continuous polling fallback every 2.5s to guarantee connection without needing manual page refresh
+      // Continuous polling fallback every 1.5s to guarantee connection without needing manual page refresh
       pollTimer = setInterval(() => {
         fetchInitial();
-      }, 2500);
+      }, 1500);
 
       channel = supabase
         .channel(`room_${roomCode.trim().toUpperCase()}`, {
@@ -487,12 +487,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             if (!updated.is_active) {
               triggerSessionEnding(10, 'Sesi telah diakhiri oleh guru.');
             } else if (updated.transcript !== undefined) {
-              setSession(prev => ({
-                ...prev,
-                isActive: true,
-                transcript: updated.transcript || prev.transcript,
-                interimTranscript: updated.interim_transcript || prev.interimTranscript,
-              }));
+              setSession(prev => {
+                const targetLang = updated.language || prev.language || 'id';
+                return {
+                  ...prev,
+                  isActive: true,
+                  transcript: translateText(updated.transcript || '', targetLang, prev.customGlossary),
+                  interimTranscript: translateText(updated.interim_transcript || '', targetLang, prev.customGlossary),
+                };
+              });
             }
           }
         )
@@ -501,15 +504,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           { event: 'sync_transcript' },
           (payload) => {
             const data = payload.payload;
-            setSession(prev => ({
-              ...prev,
-              isActive: true, // Automatically activate if transcript is received
-              transcript: data.transcript,
-              interimTranscript: data.interimTranscript,
-              teacherName: data.teacherName || prev.teacherName,
-              teacherSchool: data.teacherSchool || prev.teacherSchool,
-              teacherPhotoUrl: data.teacherPhotoUrl || prev.teacherPhotoUrl,
-            }));
+            setSession(prev => {
+              const targetLang = data.language || prev.language || 'id';
+              return {
+                ...prev,
+                isActive: true,
+                transcript: translateText(data.transcript || '', targetLang, prev.customGlossary),
+                interimTranscript: translateText(data.interimTranscript || '', targetLang, prev.customGlossary),
+                teacherName: data.teacherName || prev.teacherName,
+                teacherSchool: data.teacherSchool || prev.teacherSchool,
+                teacherPhotoUrl: data.teacherPhotoUrl || prev.teacherPhotoUrl,
+              };
+            });
           }
         )
         .on(
@@ -629,35 +635,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthReady, role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
 
   // ── Supabase Teacher Sync ───────────────────────────────────────────────────
-  const broadcastThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestTranscriptRef = useRef({ t: '', i: '' });
-  latestTranscriptRef.current = { t: session.transcript, i: session.interimTranscript };
-
   useEffect(() => {
     if (role === 'teacher' && session.isActive && session.roomCode) {
-      // 1. Throttled broadcast to all students (max once per 150ms to ensure real-time)
+      // 1. Instant broadcast to all students on every transcript change
       if (teacherChannelRef.current) {
-        if (!broadcastThrottleRef.current) {
-          broadcastThrottleRef.current = setTimeout(() => {
-            if (teacherChannelRef.current) {
-              teacherChannelRef.current.send({
-                type: 'broadcast',
-                event: 'sync_transcript',
-                payload: {
-                  transcript: latestTranscriptRef.current.t,
-                  interimTranscript: latestTranscriptRef.current.i,
-                  teacherName: user?.name || session.teacherName || 'Guru',
-                  teacherSchool: user?.school || session.teacherSchool || null,
-                  teacherPhotoUrl: user?.photoUri || session.teacherPhotoUrl || null,
-                }
-              });
-            }
-            broadcastThrottleRef.current = null;
-          }, 150);
-        }
+        teacherChannelRef.current.send({
+          type: 'broadcast',
+          event: 'sync_transcript',
+          payload: {
+            transcript: session.transcript,
+            interimTranscript: session.interimTranscript,
+            teacherName: user?.name || session.teacherName || 'Guru',
+            teacherSchool: user?.school || session.teacherSchool || null,
+            teacherPhotoUrl: user?.photoUri || session.teacherPhotoUrl || null,
+          }
+        });
       }
 
-      // 2. Fast DB save (500ms debounce for quick DB updates)
+      // 2. Fast DB save (300ms debounce for quick DB updates)
       if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
       dbSyncTimerRef.current = setTimeout(() => {
         db.from('live_sessions').update({
@@ -666,10 +661,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         }).eq('room_code', session.roomCode?.trim().toUpperCase() || '').then(({ error }: any) => {
           if (error) console.error('[Supabase] Failed to sync transcript', error);
         });
-      }, 500);
+      }, 300);
       return () => {
         if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
-        if (broadcastThrottleRef.current) clearTimeout(broadcastThrottleRef.current);
       };
     }
   }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript, user?.name, user?.school]);
@@ -1002,7 +996,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await db.from('live_sessions')
         .select('*')
-        .eq('room_code', roomCode)
+        .eq('room_code', roomCode.trim().toUpperCase())
         .eq('is_active', true)
         .maybeSingle();
 
@@ -1092,7 +1086,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       await db.from('live_sessions')
         .update({ is_active: false, transcript: '', interim_transcript: '' })
-        .eq('room_code', roomCode);
+        .eq('room_code', roomCode.trim().toUpperCase());
     } catch (e) {
       console.warn('[Supabase] Warning deactivating previous sessions:', e);
     }
@@ -1203,7 +1197,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
       // End session in live_sessions and reset transcript to prevent carryover
       if (session.roomCode) {
-        await db.from('live_sessions').update({ is_active: false, transcript: '', interim_transcript: '' }).eq('room_code', session.roomCode);
+        const cleanRoomCode = session.roomCode.trim().toUpperCase();
+        await db.from('live_sessions').update({ is_active: false, transcript: '', interim_transcript: '' }).eq('room_code', cleanRoomCode);
         
         if (teacherChannelRef.current) {
           teacherChannelRef.current.send({
@@ -1329,7 +1324,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         await (supabase as any)
           .from('live_sessions')
           .update({ transcript: newTranscript })
-          .eq('room_code', session.roomCode);
+          .eq('room_code', session.roomCode.trim().toUpperCase());
       } catch (err) {
         console.error('[Supabase] Failed to update transcript correction:', err);
       }

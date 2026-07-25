@@ -443,6 +443,8 @@ export default function LiveScreen() {
               ? (hc ? '#713f12' : '#fef9c3')
               : session.language === 'mad'
               ? (hc ? '#14532d' : '#dcfce7')
+              : session.language === 'en'
+              ? (hc ? '#312e81' : '#e0e7ff')
               : (hc ? '#1e3a8a' : '#dbeafe'),
             paddingHorizontal: 10,
             paddingVertical: 5,
@@ -452,6 +454,8 @@ export default function LiveScreen() {
               ? (hc ? '#a16207' : '#fde047')
               : session.language === 'mad'
               ? (hc ? '#15803d' : '#86efac')
+              : session.language === 'en'
+              ? (hc ? '#4338ca' : '#a5b4fc')
               : (hc ? '#1d4ed8' : '#bfdbfe'),
           }}>
             <Text style={{
@@ -461,9 +465,11 @@ export default function LiveScreen() {
                 ? (hc ? '#fef08a' : '#854d0e')
                 : session.language === 'mad'
                 ? (hc ? '#86efac' : '#14532d')
+                : session.language === 'en'
+                ? (hc ? '#c7d2fe' : '#3730a3')
                 : (hc ? '#93c5fd' : '#1e40af'),
             }}>
-              🇮🇩 {session.language === 'jv' ? 'ID JAWA' : session.language === 'mad' ? 'ID MADURA' : 'ID INDO'}
+              {session.language === 'jv' ? '🇮🇩 ➔ 🇮🇩 JAWA' : session.language === 'mad' ? '🇮🇩 ➔ 🇮🇩 MADURA' : session.language === 'en' ? '🇮🇩 ➔ 🇬🇧 ENGLISH' : '🇮🇩 INDONESIA'}
             </Text>
           </View>
         </View>

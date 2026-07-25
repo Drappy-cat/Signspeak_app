@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut, PauseCircle, PlayCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -127,7 +127,7 @@ function HighlightText({
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveScreen() {
   const { role, logout, clearStudentRoomCode } = useAuth();
-  const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript } = useSession();
+  const { session, endSession, isRecording, toggleRecording, pauseRecording, resumeRecording, updateLanguage, updateTranscript } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
   const appLang = settings.appLang || 'id';
@@ -176,7 +176,7 @@ export default function LiveScreen() {
   };
 
   const [elapsed, setElapsed] = useState(0);
-  const [paused, setPaused] = useState(false);
+  // isPaused is driven by session.isPaused from SessionContext (broadcasted to students)
   const [studentQuestion, setStudentQuestion] = useState('');
   const [copiedLiveText, setCopiedLiveText] = useState(false);
 
@@ -277,11 +277,12 @@ export default function LiveScreen() {
   // Elapsed timer for teacher
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
-    if (isRecording && role === 'teacher') {
+    // Timer only ticks when recording AND not paused
+    if (isRecording && role === 'teacher' && !session.isPaused) {
       timer = setInterval(() => setElapsed(e => e + 1), 1000);
     }
     return () => clearInterval(timer);
-  }, [isRecording, role]);
+  }, [isRecording, role, session.isPaused]);
 
   // Mic pulse animation for teacher
   useEffect(() => {
@@ -417,15 +418,15 @@ export default function LiveScreen() {
         {/* Speaking Indicator Bar + Language Mode Badge */}
         <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: hc ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.6)', borderBottomWidth: 1, borderBottomColor: hc ? '#334155' : '#e2e8f0' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-            <SpeakingBars active={isSpeaking && !paused && session.isActive} hc={hc} />
+            <SpeakingBars active={isSpeaking && !session.isPaused && session.isActive} hc={hc} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: isSpeaking && !paused && session.isActive ? (hc ? '#34d399' : '#059669') : mutedColor }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isSpeaking && !session.isPaused && session.isActive ? (hc ? '#34d399' : '#059669') : mutedColor }}>
                 {!session.isActive
                   ? (appLang === 'en' ? 'Waiting for class to start...' : 'Menunggu kelas dimulai...')
-                  : isSpeaking && !paused 
-                    ? (appLang === 'en' ? 'Speaking...' : 'Sedang berbicara...') 
-                    : paused 
-                      ? (appLang === 'en' ? '⏸ Paused' : '⏸ Dijeda') 
+                  : isSpeaking && !session.isPaused
+                    ? (appLang === 'en' ? 'Speaking...' : 'Sedang berbicara...')
+                    : session.isPaused
+                      ? (appLang === 'en' ? '⏸ Paused' : '⏸ Dijeda')
                       : (appLang === 'en' ? 'Waiting for teacher...' : 'Menunggu guru berbicara...')}
               </Text>
               <Text style={{ fontSize: 10, color: mutedColor }}>
@@ -728,49 +729,110 @@ export default function LiveScreen() {
         </View>
       ) : null}
 
-      {/* Mic Button */}
+      {/* Mic Button + Pause/Resume */}
       <View style={{ alignItems: 'center', paddingVertical: 24, gap: 16 }}>
-        <RNAnimated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={async () => {
-              try {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              } catch (_) {}
-              toggleRecording();
-              if (!isRecording) setElapsed(0);
-            }}
-            style={{
-              width: 112, height: 112, borderRadius: 56, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: isRecording ? '#ef4444' : '#1e3a8a',
-              shadowColor: isRecording ? '#ef4444' : '#1e3a8a',
-              shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 10,
-            }}
-          >
-            {isRecording
-              ? <Square size={32} color="white" fill="white" />
-              : <Mic size={32} color="white" />
-            }
-            <Text style={{ color: 'white', fontSize: 11, fontWeight: '900', marginTop: 4 }}>
-              {isRecording ? 'STOP' : (appLang === 'en' ? 'START' : 'MULAI')}
-            </Text>
-          </TouchableOpacity>
-        </RNAnimated.View>
+        {/* Main mic / stop button */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
+          {/* Pause / Resume — only visible while recording */}
+          {isRecording && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={async () => {
+                try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (_) {}
+                if (session.isPaused) {
+                  await resumeRecording();
+                } else {
+                  await pauseRecording();
+                }
+              }}
+              style={{
+                width: 72, height: 72, borderRadius: 36,
+                alignItems: 'center', justifyContent: 'center',
+                backgroundColor: session.isPaused
+                  ? (hc ? '#064e3b' : '#d1fae5')
+                  : (hc ? '#422006' : '#fff7ed'),
+                borderWidth: 2,
+                borderColor: session.isPaused
+                  ? (hc ? '#10b981' : '#059669')
+                  : (hc ? '#f97316' : '#ea580c'),
+                shadowColor: session.isPaused ? '#10b981' : '#ea580c',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 10,
+                elevation: 6,
+              }}
+            >
+              {session.isPaused
+                ? <PlayCircle size={28} color={hc ? '#34d399' : '#059669'} />
+                : <PauseCircle size={28} color={hc ? '#fb923c' : '#ea580c'} />
+              }
+              <Text style={{
+                fontSize: 9, fontWeight: '900', marginTop: 3,
+                color: session.isPaused
+                  ? (hc ? '#34d399' : '#059669')
+                  : (hc ? '#fb923c' : '#ea580c'),
+              }}>
+                {session.isPaused
+                  ? (appLang === 'en' ? 'RESUME' : 'LANJUT')
+                  : (appLang === 'en' ? 'PAUSE' : 'JEDA')}
+              </Text>
+            </TouchableOpacity>
+          )}
 
+          {/* Main Mic / Stop button */}
+          <RNAnimated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={async () => {
+                try {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                } catch (_) {}
+                toggleRecording();
+                if (!isRecording) setElapsed(0);
+              }}
+              style={{
+                width: 112, height: 112, borderRadius: 56, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: isRecording
+                  ? (session.isPaused ? (hc ? '#92400e' : '#dc2626') : '#ef4444')
+                  : '#1e3a8a',
+                shadowColor: isRecording ? '#ef4444' : '#1e3a8a',
+                shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 10,
+                opacity: isRecording && session.isPaused ? 0.7 : 1,
+              }}
+            >
+              {isRecording
+                ? <Square size={32} color="white" fill="white" />
+                : <Mic size={32} color="white" />
+              }
+              <Text style={{ color: 'white', fontSize: 11, fontWeight: '900', marginTop: 4 }}>
+                {isRecording ? 'STOP' : (appLang === 'en' ? 'START' : 'MULAI')}
+              </Text>
+            </TouchableOpacity>
+          </RNAnimated.View>
+
+          {/* Spacer to mirror the pause button width when not recording */}
+          {!isRecording && <View style={{ width: 72 }} />}
+        </View>
+
+        {/* Status row */}
         {isRecording ? (
           <View style={{ alignItems: 'center', gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <PulseDot color="bg-red-500" />
-              <Text style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: 22, color: textColor }}>{formatDuration(elapsed)}</Text>
+              <PulseDot color={session.isPaused ? 'bg-orange-400' : 'bg-red-500'} />
+              <Text style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: 22, color: textColor }}>
+                {formatDuration(elapsed)}
+              </Text>
             </View>
-            <Text style={{ fontSize: 12, color: mutedColor }}>
-              {appLang === 'en' ? 'Session in progress · Recording' : 'Sesi sedang berjalan · Merekam audio'}
+            <Text style={{ fontSize: 12, color: session.isPaused ? (hc ? '#fb923c' : '#ea580c') : mutedColor }}>
+              {session.isPaused
+                ? (appLang === 'en' ? '⏸ Session paused · Tap RESUME to continue' : '⏸ Sesi dijeda · Tap LANJUT untuk melanjutkan')
+                : (appLang === 'en' ? 'Session in progress · Recording' : 'Sesi sedang berjalan · Merekam audio')}
             </Text>
           </View>
         ) : (
           <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', maxWidth: 200, lineHeight: 20 }}>
-            {appLang === 'en' 
-              ? 'Press START to record\nand transcribe your voice' 
+            {appLang === 'en'
+              ? 'Press START to record\nand transcribe your voice'
               : 'Tekan MULAI untuk merekam\ndan mentranskripsi suara Anda'}
           </Text>
         )}

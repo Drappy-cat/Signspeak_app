@@ -126,7 +126,7 @@ export function SchoolPicker({ selectedSchool, onSelectSchool, hc = false, appLa
       setNewAddress('');
       loadSchools();
     } catch (e: any) {
-      console.error('Failed to create school:', e);
+      console.error('[Pickers] Failed to create school:', e);
     } finally {
       setCreating(false);
     }
@@ -337,7 +337,7 @@ export function GradePicker({ schoolType, selectedGrade, onSelectGrade, hc = fal
     setLoading(true);
     getGradesBySchoolType(schoolType)
       .then(setGrades)
-      .catch(e => console.error('Failed to load grades:', e))
+      .catch(e => console.error('[Pickers] Failed to load grades:', e))
       .finally(() => setLoading(false));
   }, [schoolType]);
 
@@ -395,7 +395,7 @@ export function ClassPicker({
     setLoading(true);
     getClassesBySchoolAndGrade(schoolId, gradeId)
       .then(result => setClasses(result as Class[]))
-      .catch(e => console.error('Failed to load classes:', e))
+      .catch(e => console.error('[Pickers] Failed to load classes:', e))
       .finally(() => setLoading(false));
   }, [schoolId, gradeId]);
 
@@ -418,7 +418,7 @@ export function ClassPicker({
       const allSelected = [...classes.filter(c => selectedClassIds.includes(c.id)), newClass];
       onSelectClasses(allSelected);
     } catch (e: any) {
-      console.error('Failed to create class:', e);
+      console.error('[Pickers] Failed to create class:', e);
     }
   };
 
@@ -505,14 +505,14 @@ export function SubjectPicker({
     setLoading(true);
     getAllSubjects()
       .then(setSubjects)
-      .catch(e => console.error('Failed to load subjects:', e))
+      .catch(e => console.error('[Pickers] Failed to load subjects:', e))
       .finally(() => setLoading(false));
   }, []);
 
   const items: DropdownItem[] = subjects.map(s => ({
     id: s.id,
     label: s.subject_name,
-    sublabel: s.is_custom ? 'Custom' : undefined,
+    sublabel: s.description || (s.is_custom ? 'Custom' : undefined),
   }));
 
   const handleCreateCustomSubject = async (name: string) => {
@@ -544,7 +544,7 @@ export function SubjectPicker({
       const allSelected = [...subjects.filter(s => selectedSubjectIds.includes(s.id)), newSubject];
       onSelectSubjects(allSelected);
     } catch (e: any) {
-      console.error('Failed to create subject:', e);
+      console.error('[Pickers] Failed to create subject:', e);
     }
   };
 

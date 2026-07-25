@@ -959,7 +959,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    await startRecording(session.language, '');
+    await startRecording(session.language, accumulatedTranscriptRef.current);
   };
 
   // ── Rejoin Ongoing Active Session for Teacher ────────────────────────────────

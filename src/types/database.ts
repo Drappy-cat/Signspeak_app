@@ -48,6 +48,7 @@ export interface Teacher {
 export interface Subject {
   id: string;
   subject_name: string;
+  description?: string | null;
   is_custom: boolean;
   created_by: string | null;
 }

@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated as RNAnimated, Easing, SafeAreaView, Platform, StatusBar as RNStatusBar, Alert, TextInput, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Mic, Square, Play, Pause, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut, RotateCw } from 'lucide-react-native';
+import { Mic, Square, Play, Users, Globe, AlertCircle, Volume2, HelpCircle, Moon, Sun, X, Edit3, Copy, Check, CheckCircle2, LogOut } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { db } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -33,11 +31,11 @@ function PulseDot({ color = 'bg-red-500' }: { color?: string }) {
 function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
   const ratios = [0.45, 0.75, 1.0, 0.85, 0.55, 0.9, 0.65, 0.8, 0.45];
   const color = hc ? "#34d399" : "#10b981";
-  const anims = React.useMemo(() => ratios.map(() => new RNAnimated.Value(0.15)), []);
+  const anims = React.useMemo(() => ratios.map(() => new RNAnimated.Value(3)), []);
 
   React.useEffect(() => {
     if (!active) {
-      anims.forEach(a => RNAnimated.timing(a, { toValue: 0.15, duration: 300, useNativeDriver: true }).start());
+      anims.forEach(a => RNAnimated.timing(a, { toValue: 3, duration: 300, useNativeDriver: false }).start());
       return;
     }
     const animations = anims.map((anim, i) => {
@@ -46,10 +44,10 @@ function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
         RNAnimated.delay(i * 110),
         RNAnimated.loop(
           RNAnimated.sequence([
-            RNAnimated.timing(anim, { toValue: r * 1.0, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-            RNAnimated.timing(anim, { toValue: r * 0.3, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-            RNAnimated.timing(anim, { toValue: r * 0.8, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-            RNAnimated.timing(anim, { toValue: r * 0.2, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+            RNAnimated.timing(anim, { toValue: r * 36, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+            RNAnimated.timing(anim, { toValue: r * 10, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+            RNAnimated.timing(anim, { toValue: r * 30, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+            RNAnimated.timing(anim, { toValue: r * 6, duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false })
           ])
         )
       ]);
@@ -59,18 +57,9 @@ function SpeakingBars({ active, hc }: { active: boolean; hc: boolean }) {
   }, [active]);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 28, gap: 3 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 36, gap: 3 }}>
       {ratios.map((_, i) => (
-        <RNAnimated.View
-          key={i}
-          style={{
-            backgroundColor: color,
-            width: 3,
-            height: 28,
-            borderRadius: 99,
-            transform: [{ scaleY: anims[i] }],
-          }}
-        />
+        <RNAnimated.View key={i} style={{ backgroundColor: color, width: 3, borderRadius: 99, height: anims[i] }} />
       ))}
     </View>
   );
@@ -137,16 +126,11 @@ function HighlightText({
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveScreen() {
-  const { role, user, logout, clearStudentRoomCode } = useAuth();
-  const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript, pauseRecording, resumeRecording, leaveStudentRoom } = useSession();
+  const { role, logout, clearStudentRoomCode } = useAuth();
+  const { session, endSession, isRecording, toggleRecording, updateLanguage, updateTranscript } = useSession();
   const { settings, updateSettings } = useSettings();
   const router = useRouter();
   const appLang = settings.appLang || 'id';
-
-  const insets = useSafeAreaInsets();
-  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : (insets.bottom || 8);
-  const teacherScrollBottomPadding = (58 + bottomPadding) + 32;
-  const studentScrollBottomPadding = Math.max(insets.bottom, 16) + 32;
 
   // Glossary and Word Info Modal states
   const [glossaryVisible, setGlossaryVisible] = useState(false);
@@ -195,8 +179,6 @@ export default function LiveScreen() {
   const [paused, setPaused] = useState(false);
   const [studentQuestion, setStudentQuestion] = useState('');
   const [copiedLiveText, setCopiedLiveText] = useState(false);
-  const [copiedRoomCode, setCopiedRoomCode] = useState(false);
-  const [refreshingSession, setRefreshingSession] = useState(false);
 
   const handleCopyLiveTranscript = async () => {
     const textToCopy = (session.transcript + ' ' + session.interimTranscript).trim();
@@ -214,50 +196,6 @@ export default function LiveScreen() {
       }
       setTimeout(() => setCopiedLiveText(false), 2000);
     } catch (_) {}
-  };
-
-  const handleCopyRoomCode = async () => {
-    if (!session.roomCode) return;
-    const codeToCopy = session.roomCode.trim();
-    try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(codeToCopy);
-      } else {
-        const { Share } = require('react-native');
-        await Share.share({ message: `Kode Kelas SignSpeak: ${codeToCopy}` });
-      }
-      setCopiedRoomCode(true);
-      if (settings.vibrate) {
-        try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
-      }
-      setTimeout(() => setCopiedRoomCode(false), 2000);
-    } catch (_) {}
-  };
-
-  const handleManualRefreshSession = async () => {
-    setRefreshingSession(true);
-    try {
-      if (settings.vibrate) {
-        try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (_) {}
-      }
-      if (user?.joinedRoomCode) {
-        const { data } = await db.from('live_sessions')
-          .select('transcript')
-          .eq('room_code', user.joinedRoomCode)
-          .eq('is_active', true)
-          .order('started_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (data && data.transcript !== undefined) {
-          await updateTranscript(data.transcript || '');
-        }
-      }
-    } catch (e) {
-      console.warn('Manual refresh failed:', e);
-    } finally {
-      setTimeout(() => setRefreshingSession(false), 800);
-    }
   };
   const scrollViewRef = useRef<ScrollView>(null);
   const pulseAnim = React.useMemo(() => new RNAnimated.Value(1), []);
@@ -297,11 +235,17 @@ export default function LiveScreen() {
   const d = DICT[appLang];
   const alertedRef = useRef(false);
 
+  const hasRedirectedRef = useRef(false);
+
   const handleStudentRedirectPostSession = React.useCallback(async () => {
+    if (hasRedirectedRef.current) return;
+    hasRedirectedRef.current = true;
     try {
       await clearStudentRoomCode();
     } catch (_) {}
-    router.replace('/session-ended');
+    if (router && router.replace) {
+      router.replace('/session-ended');
+    }
   }, [clearStudentRoomCode, router]);
 
   useEffect(() => {
@@ -428,29 +372,7 @@ export default function LiveScreen() {
 
             {/* Accessibility Buttons */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              {/* Refresh Button */}
-              <TouchableOpacity
-                onPress={handleManualRefreshSession}
-                activeOpacity={0.7}
-                style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hc ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <RotateCw size={13} color={textColor} />
-              </TouchableOpacity>
 
-              {/* Copy Live Text Button */}
-              {((session.transcript || '') + (session.interimTranscript || '')).trim().length > 0 && (
-                <TouchableOpacity
-                  onPress={handleCopyLiveTranscript}
-                  activeOpacity={0.7}
-                  style={{ height: 28, paddingHorizontal: 8, borderRadius: 14, backgroundColor: copiedLiveText ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#334155' : '#e2e8f0'), flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' }}
-                >
-                  {copiedLiveText ? <Check size={13} color={hc ? '#34d399' : '#059669'} /> : <Copy size={13} color={textColor} />}
-                  <Text style={{ fontSize: 10, fontWeight: '800', color: copiedLiveText ? (hc ? '#34d399' : '#059669') : textColor }}>
-                    {copiedLiveText ? (appLang === 'en' ? 'Copied' : 'Tersalin') : (appLang === 'en' ? 'Copy Text' : 'Salin Transkrip')}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              
               {/* Size Button */}
               <TouchableOpacity
                 onPress={() => {
@@ -472,53 +394,20 @@ export default function LiveScreen() {
             </View>
 
             <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                Alert.alert(
-                  appLang === 'en' ? 'Leave Room' : 'Keluar Ruangan Kelas',
-                  appLang === 'en' ? 'Are you sure you want to leave this class session?' : 'Apakah Anda yakin ingin keluar dari kelas ini?',
-                  [
-                    { text: appLang === 'en' ? 'Cancel' : 'Batal', style: 'cancel' },
-                    {
-                      text: appLang === 'en' ? 'Leave' : 'Keluar',
-                      style: 'destructive',
-                      onPress: async () => {
-                        await leaveStudentRoom();
-                        router.replace('/(tabs)/home');
-                      }
-                    }
-                  ]
-                );
+              activeOpacity={0.7}
+              onPress={async () => {
+                await logout();
+                router.replace('/(auth)/role-select');
               }}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 4,
-                backgroundColor: hc ? '#7f1d1d' : '#fee2e2',
-                paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
-                borderWidth: 1, borderColor: hc ? '#ef4444' : '#fca5a5',
-              }}
+              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hc ? '#ef4444' : '#fee2e2', alignItems: 'center', justifyContent: 'center' }}
             >
-              <LogOut size={13} color={hc ? '#f87171' : '#dc2626'} />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: hc ? '#f87171' : '#dc2626' }}>
-                {appLang === 'en' ? 'Exit' : 'Keluar'}
-              </Text>
+              <LogOut size={14} color={hc ? '#ffffff' : '#ef4444'} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Error / Status / Reconnection Banner */}
-        {session.isReconnecting ? (
-          <View style={{ marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 10, backgroundColor: hc ? '#451a03' : '#fff7ed', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderWidth: 1, borderColor: '#f97316' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-              <AlertCircle size={14} color="#f97316" />
-              <Text style={{ fontSize: 12, color: '#f97316', fontWeight: '700', flex: 1 }}>
-                {appLang === 'en' ? 'Connection Interrupted · Reconnecting to class...' : 'Koneksi Terputus · Menghubungkan kembali ke kelas...'}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={handleManualRefreshSession} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: '#f97316' }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>Re-sync</Text>
-            </TouchableOpacity>
-          </View>
-        ) : session.errorMessage ? (
+        {/* Error / Status Banner */}
+        {session.errorMessage ? (
           <View style={{ marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 10, backgroundColor: hc ? '#1c1917' : '#fffbeb', flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
             <AlertCircle size={14} color="#d97706" />
             <Text style={{ fontSize: 12, color: '#d97706', flex: 1, lineHeight: 18 }}>{session.errorMessage}</Text>
@@ -550,9 +439,7 @@ export default function LiveScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 4,
-            backgroundColor: session.language === 'en'
-              ? (hc ? '#4c1d95' : '#f3e8ff')
-              : session.language === 'jv'
+            backgroundColor: session.language === 'jv'
               ? (hc ? '#713f12' : '#fef9c3')
               : session.language === 'mad'
               ? (hc ? '#14532d' : '#dcfce7')
@@ -561,9 +448,7 @@ export default function LiveScreen() {
             paddingVertical: 5,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: session.language === 'en'
-              ? (hc ? '#7c3aed' : '#d8b4fe')
-              : session.language === 'jv'
+            borderColor: session.language === 'jv'
               ? (hc ? '#a16207' : '#fde047')
               : session.language === 'mad'
               ? (hc ? '#15803d' : '#86efac')
@@ -572,15 +457,13 @@ export default function LiveScreen() {
             <Text style={{
               fontSize: 10,
               fontWeight: '900',
-              color: session.language === 'en'
-                ? (hc ? '#e9d5ff' : '#6b21a8')
-                : session.language === 'jv'
+              color: session.language === 'jv'
                 ? (hc ? '#fef08a' : '#854d0e')
                 : session.language === 'mad'
                 ? (hc ? '#86efac' : '#14532d')
                 : (hc ? '#93c5fd' : '#1e40af'),
             }}>
-              {session.language === 'en' ? '🇬🇧 EN ENGLISH' : session.language === 'jv' ? '🇮🇩 ID JAWA' : session.language === 'mad' ? '🇮🇩 ID MADURA' : '🇮🇩 ID INDO'}
+              🇮🇩 {session.language === 'jv' ? 'ID JAWA' : session.language === 'mad' ? 'ID MADURA' : 'ID INDO'}
             </Text>
           </View>
         </View>
@@ -628,27 +511,16 @@ export default function LiveScreen() {
             )}
           </View>
           {session.roomCode && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleCopyRoomCode}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 4,
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: 6,
-                backgroundColor: copiedRoomCode ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#334155' : '#f1f5f9'),
-              }}>
-              {copiedRoomCode ? (
-                <Check size={12} color={hc ? '#34d399' : '#059669'} />
-              ) : (
-                <Copy size={12} color={hc ? '#38bdf8' : '#0284c7'} />
-              )}
-              <Text style={{ fontSize: 11, fontWeight: '800', color: copiedRoomCode ? (hc ? '#34d399' : '#059669') : (hc ? '#38bdf8' : '#0284c7') }}>
+            <View style={{
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 6,
+              backgroundColor: hc ? '#334155' : '#f1f5f9',
+            }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: hc ? '#38bdf8' : '#0284c7' }}>
                 {session.roomCode}
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -656,7 +528,7 @@ export default function LiveScreen() {
         <ScrollView
           ref={scrollViewRef}
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: studentScrollBottomPadding }}
+          contentContainerStyle={{ padding: 20, gap: 12 }}
           showsVerticalScrollIndicator={false}
         >
           {!session.isActive ? (
@@ -745,61 +617,80 @@ export default function LiveScreen() {
 
 
 
-        {/* Fitur Tanya Balik (Text-to-Speech) */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
-          <View style={{ 
-            paddingHorizontal: 16, 
-            paddingTop: 10,
-            paddingBottom: Math.max(insets.bottom, 12), 
-            borderTopWidth: 1, 
-            borderTopColor: hc ? '#334155' : '#e2e8f0', 
-            backgroundColor: hc ? '#1e293b' : '#f8fafc',
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            gap: 10 
-          }}>
-            <TextInput
-              placeholder={appLang === 'en' ? 'Type a question to speak out loud...' : 'Ketik untuk menyuarakan pertanyaan...'}
-              placeholderTextColor={mutedColor}
-              value={studentQuestion}
-              onChangeText={setStudentQuestion}
-              returnKeyType="send"
-              onSubmitEditing={handleSpeakQuestion}
-              style={{
-                flex: 1,
-                backgroundColor: hc ? '#0f172a' : '#ffffff',
-                borderRadius: 12,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                fontSize: 14,
-                color: textColor,
-                borderWidth: 1,
-                borderColor: hc ? '#334155' : '#cbd5e1',
-              }}
-            />
+        {/* Floating Copy Transcript Button */}
+        {((session.transcript || '') + (session.interimTranscript || '')).trim().length > 0 && (
+          <View style={{ position: 'absolute', bottom: 85, right: 16, zIndex: 10 }}>
             <TouchableOpacity
+              onPress={handleCopyLiveTranscript}
               activeOpacity={0.8}
-              onPress={handleSpeakQuestion}
               style={{
-                backgroundColor: '#1e3a8a',
-                borderRadius: 12,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 8,
+                gap: 6,
+                backgroundColor: copiedLiveText ? (hc ? '#065f46' : '#dcfce7') : (hc ? '#1e293b' : '#ffffff'),
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 24,
+                borderWidth: 1,
+                borderColor: hc ? '#334155' : '#e2e8f0',
+                ...getCardShadow(hc, 'sm'),
               }}
             >
-              <Volume2 size={16} color="#ffffff" />
-              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
-                {appLang === 'en' ? 'Speak' : 'Tanya'}
+              {copiedLiveText ? <Check size={16} color={hc ? '#34d399' : '#059669'} /> : <Copy size={16} color={hc ? '#94a3b8' : '#475569'} />}
+              <Text style={{ fontSize: 13, fontWeight: '800', color: copiedLiveText ? (hc ? '#34d399' : '#059669') : (hc ? '#f8fafc' : '#0f172a') }}>
+                {copiedLiveText ? (appLang === 'en' ? 'Copied!' : 'Tersalin!') : (appLang === 'en' ? 'Copy Transcript' : 'Salin Transkrip')}
               </Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        )}
+
+        {/* Fitur Tanya Balik (Text-to-Speech) */}
+        <View style={{ 
+          paddingHorizontal: 16, 
+          paddingVertical: 12, 
+          borderTopWidth: 1, 
+          borderTopColor: hc ? '#334155' : '#e2e8f0', 
+          backgroundColor: hc ? '#1e293b' : '#f8fafc',
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          gap: 10 
+        }}>
+          <TextInput
+            placeholder={appLang === 'en' ? 'Type a question to speak out loud...' : 'Ketik untuk menyuarakan pertanyaan...'}
+            placeholderTextColor={mutedColor}
+            value={studentQuestion}
+            onChangeText={setStudentQuestion}
+            style={{
+              flex: 1,
+              backgroundColor: hc ? '#0f172a' : '#ffffff',
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              fontSize: 14,
+              color: textColor,
+              borderWidth: 1,
+              borderColor: hc ? '#334155' : '#cbd5e1',
+            }}
+          />
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleSpeakQuestion}
+            style={{
+              backgroundColor: '#1e3a8a',
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Volume2 size={16} color="#ffffff" />
+            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+              {appLang === 'en' ? 'Speak' : 'Tanya'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -819,27 +710,8 @@ export default function LiveScreen() {
         </Text>
         {session.isActive && session.roomCode && (
           <View style={{ marginTop: 12, padding: 16, backgroundColor: hc ? '#1e3a8a' : '#eff6ff', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...getCardShadow(hc, 'sm') }}>
-             <View>
-               <Text style={{ fontSize: 13, color: hc ? '#93c5fd' : '#1e40af', fontWeight: '800' }}>Kode Ruangan</Text>
-               <Text style={{ fontSize: 24, fontWeight: '900', color: hc ? '#ffffff' : '#1e3a8a', letterSpacing: 4 }}>{session.roomCode}</Text>
-             </View>
-             <TouchableOpacity
-               activeOpacity={0.8}
-               onPress={handleCopyRoomCode}
-               style={{
-                 flexDirection: 'row',
-                 alignItems: 'center',
-                 gap: 6,
-                 backgroundColor: copiedRoomCode ? (hc ? '#059669' : '#10b981') : (hc ? '#1d4ed8' : '#2563eb'),
-                 paddingHorizontal: 12,
-                 paddingVertical: 8,
-                 borderRadius: 8,
-               }}>
-               {copiedRoomCode ? <Check size={14} color="#ffffff" /> : <Copy size={14} color="#ffffff" />}
-               <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
-                 {copiedRoomCode ? (appLang === 'en' ? 'Copied' : 'Tersalin!') : (appLang === 'en' ? 'Copy Code' : 'Salin Kode')}
-               </Text>
-             </TouchableOpacity>
+             <Text style={{ fontSize: 13, color: hc ? '#93c5fd' : '#1e40af', fontWeight: '800' }}>Kode Ruangan</Text>
+             <Text style={{ fontSize: 24, fontWeight: '900', color: hc ? '#ffffff' : '#1e3a8a', letterSpacing: 4 }}>{session.roomCode}</Text>
           </View>
         )}
       </View>
@@ -881,49 +753,14 @@ export default function LiveScreen() {
           </TouchableOpacity>
         </RNAnimated.View>
 
-        {/* Dedicated Pause / Resume Button for Teacher */}
-        {session.isActive && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={async () => {
-              try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (_) {}
-              if (session.isPaused) {
-                await resumeRecording();
-              } else {
-                await pauseRecording();
-              }
-            }}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              backgroundColor: session.isPaused ? (hc ? '#059669' : '#10b981') : (hc ? '#d97706' : '#f59e0b'),
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              borderRadius: 10,
-              marginTop: 4,
-              elevation: 4,
-            }}
-          >
-            {session.isPaused ? <Play size={16} color="#ffffff" fill="#ffffff" /> : <Pause size={16} color="#ffffff" fill="#ffffff" />}
-            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13 }}>
-              {session.isPaused 
-                ? (appLang === 'en' ? '▶ Resume Voice' : '▶ Lanjutkan Suara') 
-                : (appLang === 'en' ? '⏸ Pause Voice' : '⏸ Jeda Suara')}
-            </Text>
-          </TouchableOpacity>
-        )}
-
         {isRecording ? (
           <View style={{ alignItems: 'center', gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <PulseDot color={session.isPaused ? 'bg-amber-500' : 'bg-red-500'} />
+              <PulseDot color="bg-red-500" />
               <Text style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: 22, color: textColor }}>{formatDuration(elapsed)}</Text>
             </View>
-            <Text style={{ fontSize: 12, color: session.isPaused ? '#d97706' : mutedColor, fontWeight: session.isPaused ? '700' : '400' }}>
-              {session.isPaused 
-                ? (appLang === 'en' ? '⏸ Session Paused' : '⏸ Sesi Dijeda (Voice Off)') 
-                : (appLang === 'en' ? 'Session in progress · Recording' : 'Sesi sedang berjalan · Merekam audio')}
+            <Text style={{ fontSize: 12, color: mutedColor }}>
+              {appLang === 'en' ? 'Session in progress · Recording' : 'Sesi sedang berjalan · Merekam audio'}
             </Text>
           </View>
         ) : (
@@ -989,33 +826,6 @@ export default function LiveScreen() {
             </ScrollView>
           </View>
         </View>
-
-        {/* Teacher Pause Modal Overlay for Students */}
-        {session.isActive && session.isPaused && (
-          <View style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99,
-            backgroundColor: hc ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.92)',
-            alignItems: 'center', justifyContent: 'center', padding: 24,
-          }}>
-            <View style={{
-              padding: 24, borderRadius: 20, backgroundColor: hc ? '#1e293b' : '#ffffff',
-              alignItems: 'center', gap: 12, width: '100%', maxWidth: 320,
-              ...getCardShadow(hc, 'lg')
-            }}>
-              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: hc ? '#d97706' : '#fef3c7', alignItems: 'center', justifyContent: 'center' }}>
-                <Pause size={28} color={hc ? '#fbbf24' : '#d97706'} />
-              </View>
-              <Text style={{ fontSize: 16, fontWeight: '900', color: textColor, textAlign: 'center' }}>
-                {appLang === 'en' ? 'Teacher Paused Session' : 'Guru Sedang Menjeda Sesi'}
-              </Text>
-              <Text style={{ fontSize: 13, color: mutedColor, textAlign: 'center', lineHeight: 18 }}>
-                {appLang === 'en'
-                  ? 'Transcribing is temporarily paused. Please wait for teacher to resume.'
-                  : 'Transkripsi otomatis dihentikan sementara. Mohon tunggu guru melanjutkan kembali.'}
-              </Text>
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Language Switcher */}
@@ -1195,14 +1005,16 @@ export default function LiveScreen() {
         </View>
 
         {/* End Session */}
-        <TouchableOpacity
-          onPress={() => { endSession(); router.replace('/(tabs)/home'); }}
-          style={{ marginTop: 4, paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: hc ? '#7f1d1d' : '#fecaca', backgroundColor: hc ? 'rgba(127,29,29,0.2)' : '#fef2f2' }}
-        >
-          <Text style={{ fontWeight: '800', fontSize: 14, color: hc ? '#f87171' : '#dc2626' }}>
-            {appLang === 'en' ? 'End Session' : 'Akhiri Sesi'}
-          </Text>
-        </TouchableOpacity>
+        {!isRecording && (
+          <TouchableOpacity
+            onPress={() => { endSession(); router.replace('/(tabs)/home'); }}
+            style={{ marginTop: 4, paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: hc ? '#7f1d1d' : '#fecaca', backgroundColor: hc ? 'rgba(127,29,29,0.2)' : '#fef2f2' }}
+          >
+            <Text style={{ fontWeight: '800', fontSize: 14, color: hc ? '#f87171' : '#dc2626' }}>
+              {appLang === 'en' ? 'End Session' : 'Akhiri Sesi'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </ScrollView>
   );
@@ -1333,10 +1145,7 @@ export default function LiveScreen() {
 
       {/* Teacher Live Transcript Corrector Modal */}
       <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
-        >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{
             width: '100%', maxWidth: 440, backgroundColor: hc ? '#1e293b' : '#ffffff',
             borderRadius: 20, padding: 20, ...getCardShadow(hc, 'lg'),
@@ -1400,7 +1209,7 @@ export default function LiveScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* 10-Second Language Switch Pause Pop-Up Modal */}

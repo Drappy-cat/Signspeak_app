@@ -1089,7 +1089,7 @@ export default function HomeScreen() {
                 setStartModalVisible(false);
                 const selectedSubjObj = teacherSubjects.find(s => s.id === selectedSubjectId);
                 const selectedClassObj = teacherClasses.find(c => c.id === selectedClassId);
-                const roomCode = selectedClassObj?.room_code || await generateUniqueRoomCode();
+                const roomCode = await generateUniqueRoomCode();
                 const sessionSubject = `${selectedSubjObj?.subject_name} (${selectedClassObj?.class_name})`;
                 
                 router.replace('/(tabs)/live');

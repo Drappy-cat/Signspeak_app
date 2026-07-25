@@ -1,11 +1,14 @@
 import dictDataMad from '../assets/dictionary_id_mad.json';
 import dictDataJv from '../assets/dictionary_id_jv.json';
+import dictDataEn from '../assets/dictionary_id_en.json';
 
 const dictionaryMad: Record<string, string> = dictDataMad;
 const dictionaryJv: Record<string, string> = dictDataJv;
+const dictionaryEn: Record<string, string> = dictDataEn;
 
 let cachedRegexMad: RegExp | null = null;
 let cachedRegexJv: RegExp | null = null;
+let cachedRegexEn: RegExp | null = null;
 
 const madureseKeys = Object.keys(dictionaryMad);
 
@@ -133,9 +136,35 @@ export function translateToJavanese(text: string): string {
 
 let cachedReverseDictMad: Record<string, string> | null = null;
 let cachedReverseDictJv: Record<string, string> | null = null;
+let cachedReverseDictEn: Record<string, string> | null = null;
 
 /**
- * Mencari kata asli Bahasa Indonesia dari kata terjemahan Bahasa Madura/Jawa (Reverse Lookup)
+ * Menerjemahkan kalimat Bahasa Indonesia ke Bahasa Inggris secara real-time kata demi kata & frasa demi frasa.
+ */
+export function translateToEnglish(text: string): string {
+  if (!text) return '';
+
+  if (!cachedRegexEn) {
+    const sortedKeys = Object.keys(dictionaryEn).sort((a, b) => b.length - a.length);
+    const escapedKeys = sortedKeys.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+    cachedRegexEn = new RegExp(`\\b(${escapedKeys.join('|')})\\b`, 'gi');
+  }
+
+  return text.replace(cachedRegexEn, (match) => {
+    const lowerMatch = match.toLowerCase();
+    const translation = dictionaryEn[lowerMatch];
+    
+    if (translation) {
+      if (match === match.toUpperCase()) return translation.toUpperCase();
+      if (match[0] === match[0].toUpperCase()) return translation[0].toUpperCase() + translation.slice(1);
+      return translation;
+    }
+    return match;
+  });
+}
+
+/**
+ * Mencari kata asli Bahasa Indonesia dari kata terjemahan Bahasa Madura/Jawa/Inggris (Reverse Lookup)
  */
 export function getOriginalIndonesianWord(translatedWord: string, lang: string): string | null {
   if (!translatedWord) return null;
@@ -158,6 +187,16 @@ export function getOriginalIndonesianWord(translatedWord: string, lang: string):
       }
     }
     return cachedReverseDictJv[translatedWord.toLowerCase()] || null;
+  }
+
+  if (lang === 'en') {
+    if (!cachedReverseDictEn) {
+      cachedReverseDictEn = {};
+      for (const [indo, en] of Object.entries(dictionaryEn)) {
+        cachedReverseDictEn[en.toLowerCase()] = indo;
+      }
+    }
+    return cachedReverseDictEn[translatedWord.toLowerCase()] || null;
   }
   
   return null;

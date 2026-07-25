@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext';
 import { getTime } from '../utils/formatters';
 import { Platform, AppState } from 'react-native';
 import { DEMO_SENTENCES } from '../constants/keywords';
-import { translateToMadurese, translateToJavanese } from '../utils/translator';
+import { translateToMadurese, translateToJavanese, translateToEnglish } from '../utils/translator';
 import { formatAutoPunctuation, applyGlossaryCorrections } from '../utils/textProcessor';
 import { supabase, db } from '../services/supabase';
 
@@ -25,6 +25,7 @@ function translateText(text: string, lang: string, customGlossary?: Record<strin
 
   if (lang === 'mad') return translateToMadurese(processed);
   if (lang === 'jv') return translateToJavanese(processed);
+  if (lang === 'en') return translateToEnglish(processed);
   return processed;
 }
 
@@ -460,28 +461,38 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       };
       fetchInitial();
       
-      // Polling fallback every 3s to guarantee initial connection without needing page refresh
-      // Will be cleared once Realtime channel SUBSCRIBED to avoid unnecessary network traffic
+      // Continuous polling fallback every 2.5s to guarantee connection without needing manual page refresh
       pollTimer = setInterval(() => {
         fetchInitial();
-      }, 3000);
+      }, 2500);
 
       channel = supabase
-        .channel(`room_${roomCode}`)
+        .channel(`room_${roomCode.trim().toUpperCase()}`, {
+          config: {
+            broadcast: { ack: true },
+          },
+        })
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'live_sessions', filter: `room_code=eq.${roomCode}` },
+          { event: 'INSERT', schema: 'public', table: 'live_sessions', filter: `room_code=eq.${roomCode.trim().toUpperCase()}` },
           () => {
             fetchInitial();
           }
         )
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'live_sessions', filter: `room_code=eq.${roomCode}` },
+          { event: 'UPDATE', schema: 'public', table: 'live_sessions', filter: `room_code=eq.${roomCode.trim().toUpperCase()}` },
           (payload) => {
             const updated = payload.new;
             if (!updated.is_active) {
               triggerSessionEnding(10, 'Sesi telah diakhiri oleh guru.');
+            } else if (updated.transcript !== undefined) {
+              setSession(prev => ({
+                ...prev,
+                isActive: true,
+                transcript: updated.transcript || prev.transcript,
+                interimTranscript: updated.interim_transcript || prev.interimTranscript,
+              }));
             }
           }
         )
@@ -570,11 +581,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            // Stop polling fallback — Realtime is now connected
-            if (pollTimer) {
-              clearInterval(pollTimer);
-              pollTimer = null;
-            }
             setSession(prev => ({ ...prev, isReconnecting: false }));
             // Broadcast initial presence
             channel.send({
@@ -651,16 +657,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 2. Debounce DB save
+      // 2. Fast DB save (500ms debounce for quick DB updates)
       if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
       dbSyncTimerRef.current = setTimeout(() => {
         db.from('live_sessions').update({
           transcript: session.transcript,
           interim_transcript: session.interimTranscript,
-        }).eq('room_code', session.roomCode).then(({ error }: any) => {
+        }).eq('room_code', session.roomCode?.trim().toUpperCase() || '').then(({ error }: any) => {
           if (error) console.error('[Supabase] Failed to sync transcript', error);
         });
-      }, 1000); // Debounce interval
+      }, 500);
       return () => {
         if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
         if (broadcastThrottleRef.current) clearTimeout(broadcastThrottleRef.current);
@@ -675,7 +681,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const roomCode = session.roomCode;
       
       channel = supabase
-        .channel(`room_${roomCode}`)
+        .channel(`room_${roomCode.trim().toUpperCase()}`, {
+          config: {
+            broadcast: { ack: true },
+          },
+        })
         .on(
           'broadcast',
           { event: 'student_presence' },

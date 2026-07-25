@@ -13,6 +13,7 @@ export interface AppNotification {
 
 const STORAGE_KEY = '@lentera/notifications_read_ids';
 const CLEARED_KEY = '@lentera/notifications_cleared_ids';
+const CUSTOM_NOTIFS_KEY = '@lentera/notifications_custom';
 
 export async function getNotifications(teacherId?: string): Promise<AppNotification[]> {
   try {
@@ -23,6 +24,24 @@ export async function getNotifications(teacherId?: string): Promise<AppNotificat
     const clearedIds: string[] = rawClearedIds ? JSON.parse(rawClearedIds) : [];
 
     const notifications: AppNotification[] = [];
+
+    // 0. Load local custom notifications (e.g. student_left, live_session alerts)
+    try {
+      const rawCustom = await AsyncStorage.getItem(CUSTOM_NOTIFS_KEY);
+      if (rawCustom) {
+        const customNotifs: AppNotification[] = JSON.parse(rawCustom);
+        for (const cn of customNotifs) {
+          if (!clearedIds.includes(cn.id)) {
+            notifications.push({
+              ...cn,
+              read: readIds.includes(cn.id),
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load custom notifications:', e);
+    }
 
     // 1. Fetch active live sessions from Supabase
     try {
@@ -103,15 +122,19 @@ export async function getNotifications(teacherId?: string): Promise<AppNotificat
 
 export async function addNotification(notif: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): Promise<void> {
   try {
-    const current = await getNotifications();
+    const rawCustom = await AsyncStorage.getItem(CUSTOM_NOTIFS_KEY);
+    const existingCustom: AppNotification[] = rawCustom ? JSON.parse(rawCustom) : [];
+
     const newNotif: AppNotification = {
       ...notif,
       id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: Date.now(),
       read: false,
     };
-    const updated = [newNotif, ...current];
-    await saveNotifications(updated);
+
+    // Keep max 30 custom notifications
+    const updatedCustom = [newNotif, ...existingCustom].slice(0, 30);
+    await AsyncStorage.setItem(CUSTOM_NOTIFS_KEY, JSON.stringify(updatedCustom));
   } catch (error) {
     console.error('addNotification error:', error);
   }

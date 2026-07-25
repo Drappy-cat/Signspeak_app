@@ -155,7 +155,7 @@ function FloatingDevMenu() {
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
   const { settings } = useSettings();
-  const { role, setRole, login } = useAuth();
+  const { role, setRole } = useAuth();
   const router = useRouter();
   const hc = settings.highContrast;
   const appLang = settings.appLang || 'id';

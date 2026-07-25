@@ -456,12 +456,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       fetchInitial();
       
       // Polling fallback every 3s to guarantee initial connection without needing page refresh
+      // Will be cleared once Realtime channel SUBSCRIBED to avoid unnecessary network traffic
       pollTimer = setInterval(() => {
         fetchInitial();
       }, 3000);
 
       channel = supabase
-        .channel(`room_${roomCode}`)
+        .channel(`student_room_${roomCode}`)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'live_sessions', filter: `room_code=eq.${roomCode}` },
@@ -564,6 +565,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
+            // Stop polling fallback — Realtime is now connected
+            if (pollTimer) {
+              clearInterval(pollTimer);
+              pollTimer = null;
+            }
             setSession(prev => ({ ...prev, isReconnecting: false }));
             // Broadcast initial presence
             channel.send({
@@ -598,6 +604,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }));
           }
         });
+      // B1 Fix: Assign ref so leaveStudentRoom() can broadcast student_left
+      studentChannelRef.current = channel;
     }
     return () => {
       if (pollTimer) clearInterval(pollTimer);
@@ -610,21 +618,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthReady, role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
 
   // ── Supabase Teacher Sync ───────────────────────────────────────────────────
+  // A3 Fix: Throttle broadcast to max once per 300ms to avoid flooding students
+  const broadcastThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (role === 'teacher' && session.isActive && session.roomCode) {
-      // 1. Broadcast instantly to all students
+      // 1. Throttled broadcast to all students (max once per 300ms)
       if (teacherChannelRef.current) {
-        teacherChannelRef.current.send({
-          type: 'broadcast',
-          event: 'sync_transcript',
-          payload: {
-            transcript: session.transcript,
-            interimTranscript: session.interimTranscript,
-            teacherName: user?.name || session.teacherName || 'Guru',
-            teacherSchool: user?.school || session.teacherSchool || null,
-            teacherPhotoUrl: user?.photoUri || session.teacherPhotoUrl || null,
+        if (broadcastThrottleRef.current) clearTimeout(broadcastThrottleRef.current);
+        broadcastThrottleRef.current = setTimeout(() => {
+          if (teacherChannelRef.current) {
+            teacherChannelRef.current.send({
+              type: 'broadcast',
+              event: 'sync_transcript',
+              payload: {
+                transcript: session.transcript,
+                interimTranscript: session.interimTranscript,
+                teacherName: user?.name || session.teacherName || 'Guru',
+                teacherSchool: user?.school || session.teacherSchool || null,
+                teacherPhotoUrl: user?.photoUri || session.teacherPhotoUrl || null,
+              }
+            });
           }
-        });
+        }, 300);
       }
 
       // 2. Debounce DB save
@@ -639,6 +655,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }, 1000); // Debounce interval
       return () => {
         if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
+        if (broadcastThrottleRef.current) clearTimeout(broadcastThrottleRef.current);
       };
     }
   }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript, user?.name, user?.school]);
@@ -650,7 +667,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const roomCode = session.roomCode;
       
       channel = supabase
-        .channel(`room_${roomCode}`)
+        .channel(`teacher_room_${roomCode}`)
         .on(
           'broadcast',
           { event: 'student_presence' },

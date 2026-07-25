@@ -52,13 +52,17 @@ export default function SessionEndedScreen() {
       let activeSession: any = null;
       try {
         activeSession = await getActiveSessionByRoomCode(upperCode);
-      } catch (_) {}
+      } catch (e) {
+        console.warn('[SessionEnded] getActiveSessionByRoomCode lookup failed:', e);
+      }
 
       if (!activeSession) {
         let existingClass: any = null;
         try {
           existingClass = await getClassByRoomCode(upperCode);
-        } catch (_) {}
+        } catch (e) {
+          console.warn('[SessionEnded] getClassByRoomCode lookup failed:', e);
+        }
 
         if (!existingClass) {
           setErrorMsg(

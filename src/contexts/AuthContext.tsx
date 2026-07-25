@@ -93,7 +93,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setHasOnboarded(true);
       }
 
-      await refreshUser();
+      // B3 Fix: Only refresh teacher profiles from Supabase, skip for students
+      const effectiveRole = storedRole || (storedUser ? JSON.parse(storedUser).role : null);
+      if (effectiveRole !== 'student') {
+        await refreshUser();
+      }
     } catch (e) {
       console.error('Failed to load auth state', e);
     } finally {

@@ -71,7 +71,11 @@ function findFuzzyMatchMadurese(word: string): string | null {
   }
 
   if (fuzzyCache.size > 2000) {
-    fuzzyCache.clear();
+    // Evict oldest 500 entries instead of clearing entire cache to prevent sudden CPU spikes
+    const keysToDelete = Array.from(fuzzyCache.keys()).slice(0, 500);
+    for (const k of keysToDelete) {
+      fuzzyCache.delete(k);
+    }
   }
   fuzzyCache.set(lower, bestMatch);
   return bestMatch;

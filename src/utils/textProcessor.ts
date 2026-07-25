@@ -50,15 +50,17 @@ export function applyGlossaryCorrections(
   let processed = text;
 
   // Apply custom glossary corrections if present
+  // B4 Fix: Replace misheard words (keys) with their correct form (values)
   if (customGlossary && Object.keys(customGlossary).length > 0) {
-    for (const [key] of Object.entries(customGlossary)) {
-      if (!key.trim()) continue;
+    for (const [key, value] of Object.entries(customGlossary)) {
+      if (!key.trim() || !value.trim()) continue;
       const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
       processed = processed.replace(regex, (match) => {
-        if (match === match.toUpperCase()) return key.toUpperCase();
-        if (match[0] === match[0].toUpperCase()) return key[0].toUpperCase() + key.slice(1);
-        return key;
+        // Preserve original casing pattern
+        if (match === match.toUpperCase()) return value.toUpperCase();
+        if (match[0] === match[0].toUpperCase()) return value[0].toUpperCase() + value.slice(1);
+        return value;
       });
     }
   }

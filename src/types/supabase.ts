@@ -332,18 +332,21 @@ export type Database = {
       subjects: {
         Row: {
           created_by: string | null
+          description: string | null
           id: string
           is_custom: boolean
           subject_name: string
         }
         Insert: {
           created_by?: string | null
+          description?: string | null
           id?: string
           is_custom?: boolean
           subject_name: string
         }
         Update: {
           created_by?: string | null
+          description?: string | null
           id?: string
           is_custom?: boolean
           subject_name?: string

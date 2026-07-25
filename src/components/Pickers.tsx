@@ -512,7 +512,7 @@ export function SubjectPicker({
   const items: DropdownItem[] = subjects.map(s => ({
     id: s.id,
     label: s.subject_name,
-    sublabel: s.is_custom ? 'Custom' : undefined,
+    sublabel: s.description || (s.is_custom ? 'Custom' : undefined),
   }));
 
   const handleCreateCustomSubject = async (name: string) => {

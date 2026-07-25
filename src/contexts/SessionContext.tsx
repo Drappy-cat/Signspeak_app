@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { saveSession } from '../services/db';
 import { addNotification } from '../services/notificationService';
@@ -8,6 +9,8 @@ import { DEMO_SENTENCES } from '../constants/keywords';
 import { translateToMadurese, translateToJavanese, translateToEnglish } from '../utils/translator';
 import { formatAutoPunctuation, applyGlossaryCorrections } from '../utils/textProcessor';
 import { supabase, db } from '../services/supabase';
+
+const SESSION_CACHE_KEY = '@lentera/active_teacher_session';
 
 
 // All 4 translation modes use id-ID input because teacher speaks Indonesian in class!
@@ -668,6 +671,85 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [role, session.isActive, session.roomCode, session.transcript, session.interimTranscript, user?.name, user?.school]);
 
+  // ── Auto-save Teacher Active Session State to AsyncStorage for Recovery ───
+  useEffect(() => {
+    if (role === 'teacher' && session.isActive && session.roomCode) {
+      const cachePayload = {
+        roomCode: session.roomCode,
+        subject: session.subject,
+        teacherName: session.teacherName || user?.name || 'Guru',
+        teacherSchool: session.teacherSchool || user?.school || null,
+        classId: session.classId,
+        subjectId: session.subjectId,
+        language: session.language,
+        transcript: session.transcript,
+        startTime: session.startTime,
+        customKeywords: session.customKeywords,
+        customGlossary: session.customGlossary,
+        updatedAt: Date.now(),
+      };
+      AsyncStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(cachePayload)).catch(err => {
+        console.warn('[SessionContext] Failed to cache active teacher session:', err);
+      });
+    }
+  }, [role, session.isActive, session.roomCode, session.transcript, session.language, session.subject, user?.name, user?.school]);
+
+  // ── Auto-recover Teacher Active Session after App Crash / Restart ──────────
+  useEffect(() => {
+    if (!isAuthReady || role !== 'teacher' || session.isActive) return;
+
+    const recoverSavedSession = async () => {
+      try {
+        const cachedRaw = await AsyncStorage.getItem(SESSION_CACHE_KEY);
+        if (!cachedRaw) return;
+
+        const cached = JSON.parse(cachedRaw);
+        const isValidTime = cached.updatedAt && (Date.now() - cached.updatedAt < 12 * 3600 * 1000);
+
+        if (isValidTime && cached.roomCode) {
+          const { data } = await db.from('live_sessions')
+            .select('*')
+            .eq('room_code', cached.roomCode.trim().toUpperCase())
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (data || cached.transcript) {
+            console.log('[SessionContext] Auto-recovering active teacher session:', cached.roomCode);
+            accumulatedTranscriptRef.current = data?.transcript || cached.transcript || '';
+            
+            setSession({
+              isActive: true,
+              roomCode: cached.roomCode,
+              subject: cached.subject || 'Sesi Pembelajaran (Dipulihkan)',
+              teacherName: cached.teacherName || user?.name || 'Guru',
+              teacherSchool: cached.teacherSchool || user?.school || null,
+              classId: cached.classId || null,
+              subjectId: cached.subjectId || null,
+              language: cached.language || 'id',
+              transcript: data?.transcript || cached.transcript || '',
+              interimTranscript: '',
+              errorMessage: null,
+              startTime: cached.startTime || Date.now(),
+              participants: [],
+              customKeywords: cached.customKeywords || [],
+              customGlossary: cached.customGlossary || {},
+              isPaused: false,
+              isReconnecting: false,
+            });
+
+            await rejoinOngoingTeacherSession(cached.roomCode);
+          } else {
+            await AsyncStorage.removeItem(SESSION_CACHE_KEY);
+          }
+        }
+      } catch (err) {
+        console.warn('[SessionContext] Error auto-recovering teacher session:', err);
+      }
+    };
+
+    recoverSavedSession();
+  }, [isAuthReady, role, user?.teacher_id]);
+
   // ── Supabase Teacher Participants Receiver ──────────────────────────────────
   useEffect(() => {
     let channel: any = null;
@@ -994,35 +1076,55 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // ── Rejoin Ongoing Active Session for Teacher ────────────────────────────────
   const rejoinOngoingTeacherSession = async (roomCode: string) => {
     try {
+      const cleanRoomCode = roomCode.trim().toUpperCase();
       const { data } = await db.from('live_sessions')
         .select('*')
-        .eq('room_code', roomCode.trim().toUpperCase())
+        .eq('room_code', cleanRoomCode)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (data) {
-        accumulatedTranscriptRef.current = data.transcript || '';
-        setSession({
-          isActive: true,
-          roomCode: data.room_code,
-          subject: 'Sesi Pembelajaran Berlangsung',
-          teacherName: data.teacher_name || user?.name || 'Guru',
-          teacherSchool: data.teacher_school || user?.school || null,
-          subjectId: data.subject_id,
-          classId: data.class_id,
-          language: data.language || 'id',
-          transcript: data.transcript || '',
-          interimTranscript: data.interim_transcript || '',
-          errorMessage: null,
-          startTime: data.started_at ? new Date(data.started_at).getTime() : Date.now(),
-          participants: [],
-          customKeywords: [],
-          customGlossary: {},
-          isPaused: false,
-          isReconnecting: false,
-        });
-        await startRecording(data.language || 'id', data.transcript || '');
+      const cachedRaw = await AsyncStorage.getItem(SESSION_CACHE_KEY);
+      const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+
+      const mergedTranscript = data?.transcript && data.transcript.length > (cached?.transcript?.length || 0)
+        ? data.transcript
+        : (cached?.transcript || data?.transcript || '');
+
+      const resolvedSubject = cached?.subject || (data?.subject_id ? 'Sesi Pembelajaran Berlangsung' : 'Sesi Pembelajaran');
+      const resolvedClassId = cached?.classId || data?.class_id || null;
+      const resolvedSubjectId = cached?.subjectId || data?.subject_id || null;
+      const resolvedLanguage = cached?.language || data?.language || 'id';
+
+      accumulatedTranscriptRef.current = mergedTranscript;
+
+      if (cached?.customKeywords || cached?.customGlossary) {
+        customGlossaryRef.current = {
+          keywords: cached.customKeywords || [],
+          glossary: cached.customGlossary || {},
+        };
       }
+
+      setSession(prev => ({
+        ...prev,
+        isActive: true,
+        roomCode: cleanRoomCode,
+        subject: resolvedSubject,
+        teacherName: cached?.teacherName || data?.teacher_name || user?.name || 'Guru',
+        teacherSchool: cached?.teacherSchool || data?.teacher_school || user?.school || null,
+        subjectId: resolvedSubjectId,
+        classId: resolvedClassId,
+        language: resolvedLanguage,
+        transcript: mergedTranscript,
+        interimTranscript: '',
+        errorMessage: null,
+        startTime: cached?.startTime || (data?.started_at ? new Date(data.started_at).getTime() : Date.now()),
+        customKeywords: cached?.customKeywords || prev.customKeywords || [],
+        customGlossary: cached?.customGlossary || prev.customGlossary || {},
+        isPaused: false,
+        isReconnecting: false,
+      }));
+
+      await startRecording(resolvedLanguage, mergedTranscript);
     } catch (e) {
       console.error('Failed to rejoin ongoing session:', e);
     }
@@ -1274,6 +1376,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
     accumulatedTranscriptRef.current = '';
     customGlossaryRef.current = { keywords: [], glossary: {} };
+    await AsyncStorage.removeItem(SESSION_CACHE_KEY).catch(() => {});
     setSession(defaultSession);
     setIsRecording(false);
   };

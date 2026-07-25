@@ -1,4 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { db } from './supabase';
 
 export interface AppNotification {
@@ -14,6 +17,82 @@ export interface AppNotification {
 const STORAGE_KEY = '@lentera/notifications_read_ids';
 const CLEARED_KEY = '@lentera/notifications_cleared_ids';
 const CUSTOM_NOTIFS_KEY = '@lentera/notifications_custom';
+
+// Configure how notifications appear when app is in foreground
+if (Platform.OS !== 'web') {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (e) {
+    console.warn('[Notifications] Handler set failed:', e);
+  }
+}
+
+/**
+ * Mendaftarkan ijin push notification pada HP (Android/iOS) dan membuat Channel Notifikasi Android
+ */
+export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.warn('[Notifications] Permission not granted for push notifications.');
+      return null;
+    }
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Notifikasi LENTERA',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#1e3a8a',
+      });
+    }
+
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
+    const tokenData = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined).catch(() => null);
+    return tokenData ? tokenData.data : null;
+  } catch (error) {
+    console.warn('[Notifications] Error requesting push permissions:', error);
+    return null;
+  }
+}
+
+/**
+ * Memicu Notifikasi Lokal di Perangkat HP (Banner & Swiping Notif HP)
+ */
+export async function triggerDevicePushNotification(title: string, body: string, data?: any): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data: data || {},
+        sound: true,
+      },
+      trigger: null, // trigger immediately
+    });
+  } catch (e) {
+    console.warn('[Notifications] Failed to trigger device push notification:', e);
+  }
+}
 
 export async function getNotifications(teacherId?: string): Promise<AppNotification[]> {
   try {
@@ -132,6 +211,9 @@ export async function addNotification(notif: Omit<AppNotification, 'id' | 'times
       read: false,
     };
 
+    // Trigger Native Push Notification on phone
+    await triggerDevicePushNotification(newNotif.title, newNotif.body, newNotif.actionData);
+
     // Keep max 30 custom notifications
     const updatedCustom = [newNotif, ...existingCustom].slice(0, 30);
     await AsyncStorage.setItem(CUSTOM_NOTIFS_KEY, JSON.stringify(updatedCustom));
@@ -161,3 +243,4 @@ export async function clearAllNotifications(notifIds?: string[]): Promise<void> 
     console.error('clearAllNotifications error:', error);
   }
 }
+

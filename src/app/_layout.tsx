@@ -338,9 +338,12 @@ function RootNavigator() {
   );
 }
 
+import { registerForPushNotificationsAsync } from '../services/notificationService';
+
 export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
+    registerForPushNotificationsAsync().catch(err => console.warn('Push registration error:', err));
   }, []);
 
   return (

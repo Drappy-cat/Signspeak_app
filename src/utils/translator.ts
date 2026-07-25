@@ -93,8 +93,7 @@ export function translateToMadurese(text: string): string {
     cachedRegexMad = new RegExp(`\\b(${escapedKeys.join('|')})\\b`, 'gi');
   }
 
-  // 1. First pass: Replace exact dictionary key matches
-  const translated = text.replace(cachedRegexMad, (match) => {
+  return text.replace(cachedRegexMad, (match) => {
     const lowerMatch = match.toLowerCase();
     const translation = dictionaryMad[lowerMatch];
     
@@ -105,31 +104,6 @@ export function translateToMadurese(text: string): string {
     }
     return match;
   });
-
-  // 2. Second pass: Fuzzy match for remaining un-translated Indonesian words (if length >= 4)
-  const words = translated.split(/(\s+)/);
-  const resultWords = words.map(word => {
-    if (!word || /^\s+$/.test(word)) return word;
-
-    const cleanWord = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
-    if (!cleanWord || cleanWord.length < 4) return word;
-
-    const fuzzyKey = findFuzzyMatchMadurese(cleanWord);
-    if (fuzzyKey && dictionaryMad[fuzzyKey]) {
-      const translation = dictionaryMad[fuzzyKey];
-      let formattedTranslation = translation;
-      if (cleanWord === cleanWord.toUpperCase()) {
-        formattedTranslation = translation.toUpperCase();
-      } else if (cleanWord[0] === cleanWord[0].toUpperCase()) {
-        formattedTranslation = translation[0].toUpperCase() + translation.slice(1);
-      }
-      return word.replace(cleanWord, formattedTranslation);
-    }
-
-    return word;
-  });
-
-  return resultWords.join('');
 }
 
 /**

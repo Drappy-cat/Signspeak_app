@@ -467,7 +467,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }, 3000);
 
       channel = supabase
-        .channel(`student_room_${roomCode}`)
+        .channel(`room_${roomCode}`)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'live_sessions', filter: `room_code=eq.${roomCode}` },
@@ -675,7 +675,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const roomCode = session.roomCode;
       
       channel = supabase
-        .channel(`teacher_room_${roomCode}`)
+        .channel(`room_${roomCode}`)
         .on(
           'broadcast',
           { event: 'student_presence' },

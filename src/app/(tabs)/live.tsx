@@ -348,7 +348,7 @@ export default function LiveScreen() {
     const activeFontSize = FontSizes[settings.fontSize] || FontSizes.normal;
 
     // Split completed transcript into sentences to style older sentences differently
-    const sentences = (session.transcript || '').split(/(?<=[.!?])\s+/).filter(Boolean);
+    const sentences = (session.transcript || '').match(/[^.!?]+[.!?]*/g)?.map(s => s.trim()).filter(Boolean) || [];
 
     return (
       <View style={{ flex: 1, backgroundColor: bgColor }}>

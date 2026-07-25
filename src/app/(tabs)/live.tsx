@@ -631,8 +631,6 @@ export default function LiveScreen() {
                 paddingHorizontal: 16,
                 paddingVertical: 10,
                 borderRadius: 24,
-                borderWidth: 1,
-                borderColor: hc ? '#334155' : '#e2e8f0',
                 ...getCardShadow(hc, 'sm'),
               }}
             >

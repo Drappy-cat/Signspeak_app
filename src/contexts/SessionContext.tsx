@@ -623,29 +623,32 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthReady, role, user?.joinedRoomCode, user?.name, user?.absen, user?.className]);
 
   // ── Supabase Teacher Sync ───────────────────────────────────────────────────
-  // A3 Fix: Throttle broadcast to max once per 300ms to avoid flooding students
   const broadcastThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestTranscriptRef = useRef({ t: '', i: '' });
+  latestTranscriptRef.current = { t: session.transcript, i: session.interimTranscript };
 
   useEffect(() => {
     if (role === 'teacher' && session.isActive && session.roomCode) {
-      // 1. Throttled broadcast to all students (max once per 300ms)
+      // 1. Throttled broadcast to all students (max once per 150ms to ensure real-time)
       if (teacherChannelRef.current) {
-        if (broadcastThrottleRef.current) clearTimeout(broadcastThrottleRef.current);
-        broadcastThrottleRef.current = setTimeout(() => {
-          if (teacherChannelRef.current) {
-            teacherChannelRef.current.send({
-              type: 'broadcast',
-              event: 'sync_transcript',
-              payload: {
-                transcript: session.transcript,
-                interimTranscript: session.interimTranscript,
-                teacherName: user?.name || session.teacherName || 'Guru',
-                teacherSchool: user?.school || session.teacherSchool || null,
-                teacherPhotoUrl: user?.photoUri || session.teacherPhotoUrl || null,
-              }
-            });
-          }
-        }, 300);
+        if (!broadcastThrottleRef.current) {
+          broadcastThrottleRef.current = setTimeout(() => {
+            if (teacherChannelRef.current) {
+              teacherChannelRef.current.send({
+                type: 'broadcast',
+                event: 'sync_transcript',
+                payload: {
+                  transcript: latestTranscriptRef.current.t,
+                  interimTranscript: latestTranscriptRef.current.i,
+                  teacherName: user?.name || session.teacherName || 'Guru',
+                  teacherSchool: user?.school || session.teacherSchool || null,
+                  teacherPhotoUrl: user?.photoUri || session.teacherPhotoUrl || null,
+                }
+              });
+            }
+            broadcastThrottleRef.current = null;
+          }, 150);
+        }
       }
 
       // 2. Debounce DB save
